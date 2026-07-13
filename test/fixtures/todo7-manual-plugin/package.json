@@ -1,0 +1,11 @@
+{
+  "name": "omp-lazy-todo7-qa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "omp": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  }
+}
