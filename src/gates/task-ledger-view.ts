@@ -3,6 +3,7 @@ import type {
   TaskAuthorizationFact,
   TaskFact,
   TaskIdentityFact,
+  TaskLedgerEntry,
   TaskReceiptFact,
   TaskReservationFact,
 } from "./task-ledger-codec"
@@ -22,13 +23,21 @@ export type AsyncCapabilityRecord =
   | { readonly status: "unknown" }
   | { readonly status: "proven" | "blocked"; readonly reason: string }
 
+function currentOwnerEntries(scope: TaskRunScope): readonly TaskLedgerEntry[] {
+  return scope.ledger.entries.filter(
+    (entry) =>
+      entry.ownerSessionId === scope.run.owner.sessionId &&
+      entry.ownerEpoch === scope.run.owner.epoch,
+  )
+}
+
 export function taskFacts(scope: TaskRunScope): readonly TaskFact[] {
-  return scope.ledger.entries.map((entry) => entry.fact)
+  return currentOwnerEntries(scope).map((entry) => entry.fact)
 }
 
 export function taskGeneration(scope: TaskRunScope): number {
   return (
-    scope.ledger.entries.findLast(
+    currentOwnerEntries(scope).findLast(
       (entry) => entry.fact.kind === "task_reserved" || entry.fact.kind === "task_identities_bound",
     )?.sequence ?? 0
   )
@@ -53,47 +62,52 @@ export function taskAuthorization(
   scope: TaskRunScope,
   toolCallId: ToolCallId,
 ): TaskAuthorizationFact | undefined {
-  return scope.ledger.entries.find(
+  const entry = currentOwnerEntries(scope).find(
     (entry) =>
-      entry.ownerSessionId === scope.run.owner.sessionId &&
-      entry.ownerEpoch === scope.run.owner.epoch &&
-      entry.fact.kind === "task_control_authorized" &&
-      entry.fact.toolCallId === toolCallId,
-  )?.fact as TaskAuthorizationFact | undefined
+      entry.fact.kind === "task_control_authorized" && entry.fact.toolCallId === toolCallId,
+  )
+  return entry?.fact.kind === "task_control_authorized" ? entry.fact : undefined
 }
 
 export function taskReceipts(scope: TaskRunScope): readonly TaskReceiptFact[] {
   return taskFacts(scope).flatMap((fact) => (fact.kind === "task_receipt_observed" ? [fact] : []))
 }
 
-export function runtimeIdentities(scope: TaskRunScope): readonly RuntimeIdentityRecord[] {
+export function runtimeIdentities(
+  scope: TaskRunScope,
+  generation = taskGeneration(scope),
+): readonly RuntimeIdentityRecord[] {
+  const identityEntry = currentOwnerEntries(scope).find(
+    (entry) => entry.sequence === generation && entry.fact.kind === "task_identities_bound",
+  )
+  if (identityEntry?.fact.kind !== "task_identities_bound") return []
+  const identity = identityEntry.fact
   const reservations = new Map(taskReservations(scope).map((fact) => [fact.toolCallId, fact]))
   const returnedJobs = new Map(
     taskReceipts(scope).flatMap((fact) =>
-      fact.receipt.kind === "job"
+      fact.receipt.kind === "job" &&
+      taskAuthorization(scope, fact.toolCallId)?.taskGeneration === generation
         ? [[runtimeIdValue(fact.receipt.jobId), fact.receipt.jobId] as const]
         : [],
     ),
   )
-  return taskIdentityFacts(scope).flatMap((identity) => {
-    const reservation = reservations.get(identity.toolCallId)
-    if (reservation === undefined) return []
-    return identity.bindings.flatMap((binding) => {
-      const request = reservation.requests[binding.itemIndex]
-      if (request === undefined) return []
-      return [
-        {
-          toolCallId: identity.toolCallId,
-          itemIndex: binding.itemIndex,
-          requestedName: request.requestedName,
-          agentType: request.agentType,
-          actualAgentId: binding.actualAgentId,
-          actualJobId:
-            binding.actualJobId ?? returnedJobs.get(runtimeIdValue(binding.actualAgentId)) ?? null,
-          parentActualAgentId: null,
-        },
-      ]
-    })
+  const reservation = reservations.get(identity.toolCallId)
+  if (reservation === undefined) return []
+  return identity.bindings.flatMap((binding) => {
+    const request = reservation.requests[binding.itemIndex]
+    if (request === undefined) return []
+    return [
+      {
+        toolCallId: identity.toolCallId,
+        itemIndex: binding.itemIndex,
+        requestedName: request.requestedName,
+        agentType: request.agentType,
+        actualAgentId: binding.actualAgentId,
+        actualJobId:
+          binding.actualJobId ?? returnedJobs.get(runtimeIdValue(binding.actualAgentId)) ?? null,
+        parentActualAgentId: null,
+      },
+    ]
   })
 }
 

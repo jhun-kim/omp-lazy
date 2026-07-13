@@ -5,7 +5,9 @@ import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
 import { decodeJobResult } from "../../src/observers/job-result-codec"
 import { decodeTaskResult } from "../../src/observers/task-result-codec"
 import { ToolResultObserver } from "../../src/observers/tool-result-observer"
-import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
+import { newRunId, type StateEvent } from "../../src/state/domain"
+import { deadlineAfter } from "../../src/state/repo-lock"
+import { initializedStore, pauseEvent, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
@@ -45,10 +47,11 @@ function jobDetails(ids: readonly string[]) {
 async function runtime(label: string) {
   const root = await temporaryRoot(label)
   roots.push(root.displayPath)
-  const { store } = await initializedStore(root)
+  const { store, run } = await initializedStore(root)
   const ledger = new TaskEventLedger(store)
   return {
     store,
+    run,
     ledger,
     guard: new TaskSpawnGuard(ledger, 8),
     observer: new ToolResultObserver(ledger),
@@ -440,4 +443,86 @@ test("Given exact job and IRC result replays When observed Then receipts and rev
   expect(await ledger.ledgerRevision("session-a")).toBe(ircRevision)
   expect(receipts.filter((fact) => fact.receipt.kind === "job")).toHaveLength(1)
   expect(receipts.filter((fact) => fact.receipt.kind === "irc")).toHaveLength(1)
+})
+
+test("Given owner adoption When prior-epoch identities exist Then only a current-epoch bind owns them", async () => {
+  // Given
+  const { store, run, ledger, guard, observer } = await runtime("task-owner-epoch")
+  await guard.handle({
+    toolName: "task",
+    toolCallId: "prior-owner-task",
+    input: { task: "prior owner" },
+    sessionId: "session-a",
+  })
+  await observer.observe({
+    toolName: "task",
+    toolCallId: "prior-owner-task",
+    input: {},
+    details: taskDetails(["shared-worker"], "shared-worker"),
+    isError: false,
+    sessionId: "session-a",
+  })
+  const paused = await store.commit(pauseEvent(run), { deadline: deadlineAfter(2_000) })
+  if (!paused.ok) throw new Error(paused.code)
+  const adoption: StateEvent = {
+    schemaVersion: 1,
+    eventId: newRunId(),
+    sequence: paused.index.revision + 1,
+    runId: paused.run.runId,
+    workflow: paused.run.workflow,
+    kind: "owner_adopted",
+    expected: {
+      indexRevision: paused.index.revision,
+      runRevision: paused.run.revision,
+      ownerSessionId: paused.run.owner.sessionId,
+      ownerEpoch: paused.run.owner.epoch,
+    },
+    mutation: { kind: "owner_adopted", sessionId: "session-b" },
+    at: "2026-07-13T00:04:00.000Z",
+  }
+  const adopted = await store.commit(adoption, { deadline: deadlineAfter(2_000) })
+  if (!adopted.ok) throw new Error(adopted.code)
+
+  // When
+  const inherited = await guard.handle({
+    toolName: "irc",
+    toolCallId: "inherited-control",
+    input: { op: "send", to: "shared-worker", message: "before rebind" },
+    sessionId: "session-b",
+  })
+  const oldOwner = await guard.handle({
+    toolName: "irc",
+    toolCallId: "old-owner-control",
+    input: { op: "send", to: "shared-worker", message: "foreign session" },
+    sessionId: "session-a",
+  })
+  await guard.handle({
+    toolName: "task",
+    toolCallId: "current-owner-task",
+    input: { task: "current owner" },
+    sessionId: "session-b",
+  })
+  await observer.observe({
+    toolName: "task",
+    toolCallId: "current-owner-task",
+    input: {},
+    details: taskDetails(["shared-worker"], "shared-worker"),
+    isError: false,
+    sessionId: "session-b",
+  })
+  const rebound = await guard.handle({
+    toolName: "irc",
+    toolCallId: "rebound-control",
+    input: { op: "send", to: "shared-worker", message: "after rebind" },
+    sessionId: "session-b",
+  })
+
+  // Then
+  expect(adopted.run.owner).toEqual({ sessionId: "session-b", epoch: 2 })
+  expect(inherited).toEqual({ block: true, reason: "omp-lazy: unowned agent" })
+  expect(oldOwner).toBeUndefined()
+  expect(rebound).toBeUndefined()
+  expect(await ledger.identities("session-b")).toMatchObject([
+    { toolCallId: "current-owner-task", actualAgentId: "shared-worker" },
+  ])
 })

@@ -89,7 +89,13 @@ export class TaskSidecarStore {
   ):
     | { readonly kind: "merged"; readonly ledger: TaskLedger; readonly changed: boolean }
     | { readonly kind: "conflict" } {
-    const byKey = new Map(ledger.entries.map((entry) => [taskFactKey(entry.fact), entry.fact]))
+    const byKey = new Map(
+      ledger.entries
+        .filter(
+          (entry) => entry.ownerSessionId === ownerSessionId && entry.ownerEpoch === ownerEpoch,
+        )
+        .map((entry) => [taskFactKey(entry.fact), entry.fact]),
+    )
     const novel: TaskFact[] = []
     for (const fact of facts) {
       const key = taskFactKey(fact)

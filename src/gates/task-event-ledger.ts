@@ -143,7 +143,7 @@ export class TaskEventLedger {
     return this.sidecar.transact(sessionId, (scope) => {
       const generation = taskGeneration(scope)
       if (generation === 0) return { kind: "return", value: "no_generation" }
-      const identities = runtimeIdentities(scope)
+      const identities = runtimeIdentities(scope, generation)
       const owned = new Set(
         authorization.control === "irc_send" || authorization.control === "irc_target"
           ? identities.map((identity) => runtimeIdValue(identity.actualAgentId))

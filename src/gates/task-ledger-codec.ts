@@ -125,7 +125,9 @@ export const taskLedgerSchema = z
     ) {
       context.addIssue({ code: "custom", message: "task ledger sequence mismatch" })
     }
-    const keys = ledger.entries.map((entry) => taskFactKey(entry.fact))
+    const keys = ledger.entries.map(
+      (entry) => `${entry.ownerSessionId}\u0000${entry.ownerEpoch}\u0000${taskFactKey(entry.fact)}`,
+    )
     if (new Set(keys).size !== keys.length) {
       context.addIssue({ code: "custom", message: "duplicate task fact key" })
     }

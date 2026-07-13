@@ -223,4 +223,48 @@ describe("honest async capability", () => {
     expect(result).toEqual({ kind: "blocked", reason: "stale task generation" })
     expect(await value.ledger.capability("session-a")).toEqual({ status: "unknown" })
   })
+
+  test("Given older and current bound generations When the current jobs return Then capability is proven", async () => {
+    // Given
+    const value = await runtime("capability-current-generation")
+    await reserveAndObserve(value, taskDetails(["older", "older-2"], "older"))
+    await value.guard.handle({
+      toolName: "task",
+      toolCallId: "current-task",
+      input: { task: "current generation" },
+      sessionId: "session-a",
+    })
+    await value.observer.observe({
+      toolName: "task",
+      toolCallId: "current-task",
+      input: {},
+      details: taskDetails(["current"], "current"),
+      isError: false,
+      sessionId: "session-a",
+    })
+    const permitted = await value.guard.handle({
+      toolName: "job",
+      toolCallId: "current-job-call",
+      input: { list: true },
+      sessionId: "session-a",
+    })
+
+    // When
+    const result = await value.observer.observe({
+      toolName: "job",
+      toolCallId: "current-job-call",
+      input: { list: true },
+      details: jobDetails(["current"]),
+      isError: false,
+      sessionId: "session-a",
+    })
+
+    // Then
+    expect(permitted).toBeUndefined()
+    expect(result).toEqual({ kind: "recorded", capability: "proven" })
+    expect(await value.ledger.capability("session-a")).toEqual({
+      status: "proven",
+      reason: "matching_job_snapshot",
+    })
+  })
 })

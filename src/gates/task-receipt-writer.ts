@@ -57,7 +57,7 @@ export async function recordJobSnapshot(
   return sidecar.transact(sessionId, (scope) => {
     const matched = matchingAuthorization(toolCallId, inputKey, "job_snapshot", scope)
     if (matched.kind !== "matched") return { kind: "return", value: matched.kind }
-    const identities = runtimeIdentities(scope)
+    const identities = runtimeIdentities(scope, matched.authorization.taskGeneration)
     const expected = new Set(identities.map((identity) => runtimeIdValue(identity.actualAgentId)))
     const taskJobs = jobs.filter((job) => job.type === "task")
     const returned = new Set(taskJobs.map((job) => runtimeIdValue(job.id)))
