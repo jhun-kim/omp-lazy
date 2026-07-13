@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "runId": "forged-green",
+  "principal": { "identity": "E-ARCH", "role": "executor" },
+  "immutableInputs": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "manifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "results": [
+    {
+      "scenarioId": "G01",
+      "status": "PASS",
+      "process": {
+        "argv": ["bun", "test"],
+        "cwd": ".",
+        "startedAt": "2026-07-13T00:00:00.000Z",
+        "endedAt": "2026-07-13T00:00:00.001Z",
+        "durationMs": 1,
+        "deadlineMs": 120000,
+        "timedOut": false,
+        "exitCode": 0,
+        "stdout": {
+          "path": "raw/G01.stdout.bin",
+          "sha256": "6269d58c91278708443fa5ec37843a4fac4622f2a8af6c9dd19a178537a617d9"
+        },
+        "stderr": {
+          "path": "raw/G01.stderr.bin",
+          "sha256": "83334383ff5978d927b8e6b824a8eb06b746484f60879d9e02972b0138d94e8d"
+        }
+      },
+      "cleanup": { "processTree": "complete", "sandbox": "complete", "residue": [] }
+    }
+  ]
+}
