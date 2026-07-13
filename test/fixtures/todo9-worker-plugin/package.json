@@ -1,0 +1,10 @@
+{
+  "name": "todo9-worker-plugin-fixture",
+  "private": true,
+  "type": "module",
+  "omp": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  }
+}
