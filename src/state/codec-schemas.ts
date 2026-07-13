@@ -1,0 +1,233 @@
+import { z } from "zod"
+import { UuidSchema } from "./domain"
+
+const counter = z.number().int().nonnegative()
+const nonempty = z.string().trim().min(1)
+const timestamp = z.iso.datetime({ offset: true })
+const uniqueStrings = z
+  .array(nonempty)
+  .readonly()
+  .superRefine((values, context) => {
+    if (new Set(values).size !== values.length) {
+      context.addIssue({ code: "custom", message: "duplicate id" })
+    }
+  })
+const continuationSchema = z
+  .object({
+    lastProcessedLeafId: nonempty.nullable(),
+    progressRevisionSeen: counter,
+    noProgressAttempts: counter,
+    stuck: z.boolean(),
+  })
+  .strict()
+const envelopeFields = {
+  schemaVersion: z.literal(1),
+  runId: UuidSchema,
+  revision: counter,
+  transactionRevision: counter,
+  owner: z.object({ sessionId: nonempty, epoch: counter }).strict(),
+  progressRevision: counter,
+  continuation: continuationSchema,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+} as const
+const planSchema = z
+  .object({
+    planId: UuidSchema,
+    canonicalPath: nonempty,
+    displayPath: nonempty,
+    allowedRoot: nonempty,
+    allowedRootDisplay: nonempty,
+    taskFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    taskIds: uniqueStrings,
+  })
+  .strict()
+const startWorkRunSchema = z
+  .object({
+    ...envelopeFields,
+    workflow: z.literal("start_work"),
+    payload: z
+      .object({
+        kind: z.literal("start_work"),
+        status: z.enum([
+          "active",
+          "paused",
+          "stuck",
+          "completed",
+          "cancelled",
+          "failed",
+          "abandoned",
+        ]),
+        plan: planSchema,
+      })
+      .strict(),
+  })
+  .strict()
+const criterionSchema = z
+  .object({
+    id: nonempty,
+    status: z.enum(["pending", "pass", "fail", "blocked"]),
+    identicalFailureFingerprint: nonempty.nullable(),
+    identicalFailureCount: counter.max(3),
+    evidenceRef: nonempty.nullable(),
+    captureRevision: counter.nullable(),
+    captureCommit: nonempty.nullable(),
+  })
+  .strict()
+const goalSchema = z
+  .object({
+    id: nonempty,
+    status: z.enum([
+      "pending",
+      "in_progress",
+      "complete",
+      "failed",
+      "blocked",
+      "needs_user_decision",
+      "review_blocked",
+    ]),
+    cycleCount: counter.max(5),
+    criteria: z.array(criterionSchema).readonly(),
+  })
+  .strict()
+  .superRefine((goal, context) => {
+    const ids = goal.criteria.map((criterion) => criterion.id)
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "duplicate criterion" })
+    }
+  })
+const ulwLoopRunSchema = z
+  .object({
+    ...envelopeFields,
+    workflow: z.literal("ulw_loop"),
+    payload: z
+      .object({
+        kind: z.literal("ulw_loop"),
+        status: z.enum([
+          "active",
+          "paused",
+          "stuck",
+          "completed",
+          "cancelled",
+          "failed",
+          "blocked",
+          "needs_user_decision",
+          "review_blocked",
+        ]),
+        activeGoalId: nonempty.nullable(),
+        goals: z.array(goalSchema).readonly(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((run, context) => {
+    const goalIds = run.payload.goals.map((goal) => goal.id)
+    const criterionIds = run.payload.goals.flatMap((goal) =>
+      goal.criteria.map((criterion) => criterion.id),
+    )
+    if (new Set(goalIds).size !== goalIds.length) {
+      context.addIssue({ code: "custom", message: "duplicate goal" })
+    }
+    if (new Set(criterionIds).size !== criterionIds.length) {
+      context.addIssue({ code: "custom", message: "duplicate criterion" })
+    }
+    const inProgress = run.payload.goals.filter((goal) => goal.status === "in_progress")
+    const activeMatches = inProgress.length === 1 && inProgress[0]?.id === run.payload.activeGoalId
+    if (
+      (run.payload.activeGoalId === null && inProgress.length !== 0) ||
+      (run.payload.activeGoalId !== null && !activeMatches)
+    ) {
+      context.addIssue({ code: "custom", message: "active goal mismatch" })
+    }
+  })
+
+export const runSchema = z.union([startWorkRunSchema, ulwLoopRunSchema])
+export const activeIndexSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    revision: counter,
+    entries: z
+      .array(
+        z
+          .object({
+            workflow: z.enum(["start_work", "ulw_loop"]),
+            sessionId: nonempty,
+            runId: UuidSchema,
+            ownerEpoch: counter,
+            runRevision: counter,
+            transactionRevision: counter,
+            statusHint: z.enum(["active", "paused", "stuck", "blocked"]),
+          })
+          .strict(),
+      )
+      .readonly(),
+  })
+  .strict()
+const mutationSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("run_created"), run: runSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("workflow_controlled"),
+      control: z.enum(["pause", "resume", "cancel"]),
+    })
+    .strict(),
+  z.object({ kind: z.literal("owner_adopted"), sessionId: nonempty }).strict(),
+  z
+    .object({
+      kind: z.literal("plan_reconciled"),
+      taskIds: uniqueStrings,
+      taskFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("continuation_attempted"),
+      leafId: nonempty,
+      progressRevision: counter,
+    })
+    .strict(),
+  z.object({ kind: z.literal("continuation_stuck"), leafId: nonempty }).strict(),
+  z.object({ kind: z.literal("goal_cycle_started"), goalId: nonempty }).strict(),
+  z
+    .object({
+      kind: z.literal("criterion_failure_recorded"),
+      goalId: nonempty,
+      criterionId: nonempty,
+      fingerprint: nonempty,
+    })
+    .strict(),
+])
+export const stateEventSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    eventId: UuidSchema,
+    sequence: counter,
+    runId: UuidSchema,
+    workflow: z.enum(["start_work", "ulw_loop"]),
+    kind: z.enum([
+      "run_created",
+      "workflow_controlled",
+      "owner_adopted",
+      "plan_reconciled",
+      "continuation_attempted",
+      "continuation_stuck",
+      "goal_cycle_started",
+      "criterion_failure_recorded",
+    ]),
+    expected: z
+      .object({
+        indexRevision: counter,
+        runRevision: counter.nullable(),
+        ownerSessionId: nonempty.nullable(),
+        ownerEpoch: counter.nullable(),
+      })
+      .strict(),
+    mutation: mutationSchema,
+    at: timestamp,
+  })
+  .strict()
+  .superRefine((event, context) => {
+    if (event.kind !== event.mutation.kind) {
+      context.addIssue({ code: "custom", message: "event mutation mismatch" })
+    }
+  })
