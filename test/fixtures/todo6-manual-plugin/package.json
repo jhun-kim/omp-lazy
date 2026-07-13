@@ -1,0 +1,9 @@
+{
+  "name": "omp-lazy-todo6-qa",
+  "version": "0.0.0",
+  "omp": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  }
+}
