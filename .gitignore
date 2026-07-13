@@ -1,0 +1,7 @@
+node_modules/
+.omo/
+.omp-lazy-isolated-*/
+coverage/
+dist/
+*.tgz
+*.log
