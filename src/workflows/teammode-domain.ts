@@ -131,3 +131,42 @@ export type TeamResult =
   | { readonly ok: false; readonly code: string }
 
 export type TeamWorktreeBinding = { readonly requestedName: string; readonly path: string }
+
+function teamDefinitionKey(
+  teamName: TeamDefinition["teamName"],
+  members: TeamDefinition["members"],
+): string {
+  const canonicalMembers = members
+    .map((member) => ({
+      requestedName: member.requestedName,
+      agentType: member.agentType,
+      focus: member.focus,
+      ownership: member.ownership.map(normalizedOwnership).sort(),
+      deliverable: member.deliverable,
+      isolated: member.isolated,
+    }))
+    .sort((left, right) => left.requestedName.localeCompare(right.requestedName))
+  return JSON.stringify({ teamName, members: canonicalMembers })
+}
+
+export function matchesTeamDefinition(state: TeamState, definition: TeamDefinition): boolean {
+  return (
+    teamDefinitionKey(state.teamName, state.members) ===
+    teamDefinitionKey(definition.teamName, definition.members)
+  )
+}
+
+export function matchesTeamWorktreeBindings(
+  state: TeamState,
+  bindings: readonly TeamWorktreeBinding[],
+): boolean {
+  const actual = new Map(bindings.map((binding) => [binding.requestedName, binding.path]))
+  const expected = state.members.flatMap((member) =>
+    member.worktreePath === null ? [] : [[member.requestedName, member.worktreePath] as const],
+  )
+  return (
+    actual.size === bindings.length &&
+    actual.size === expected.length &&
+    expected.every(([requestedName, path]) => actual.get(requestedName) === path)
+  )
+}

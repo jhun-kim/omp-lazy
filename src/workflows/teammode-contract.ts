@@ -7,6 +7,8 @@ import { atomicReplace } from "../state/atomic-file"
 import { deadlineAfter } from "../state/repo-lock"
 import { checkWorkingDirectory } from "../state/repo-root"
 import {
+  matchesTeamDefinition,
+  matchesTeamWorktreeBindings,
   type TeamCaller,
   TeamDefinitionSchema,
   TeamNameSchema,
@@ -42,6 +44,13 @@ export class TeammodeContract {
       return { ok: false, code: "async_team_surfaces_unavailable" }
     }
     return this.#transact(caller, parsed.data.teamName, async (current, scope) => {
+      if (current !== null) {
+        const sameScope =
+          current.runId === scope.run.runId && current.attempt === scope.run.progressRevision
+        return sameScope && matchesTeamDefinition(current, parsed.data)
+          ? { ok: true, status: "replayed", state: current }
+          : { ok: false, code: "team_conflict" }
+      }
       const candidate: TeamState = TeamStateSchema.parse({
         schemaVersion: 1,
         teamName: parsed.data.teamName,
@@ -57,10 +66,6 @@ export class TeammodeContract {
           acceptanceKey: null,
         })),
       })
-      if (current !== null)
-        return same(current, candidate)
-          ? { ok: true, status: "replayed", state: current }
-          : { ok: false, code: "team_conflict" }
       return { ok: true, status: "created", state: candidate }
     })
   }
@@ -74,12 +79,7 @@ export class TeammodeContract {
       if (current === null) return { ok: false, code: "team_missing" }
       if (current.status !== "initializing") {
         if (current.status !== "active") return { ok: false, code: "invalid_team_state" }
-        const expected = current.members.flatMap((member) =>
-          member.worktreePath === null
-            ? []
-            : [{ requestedName: member.requestedName, path: member.worktreePath }],
-        )
-        return same(expected, worktrees)
+        return matchesTeamWorktreeBindings(current, worktrees)
           ? { ok: true, status: "replayed", state: current }
           : { ok: false, code: "team_bind_conflict" }
       }

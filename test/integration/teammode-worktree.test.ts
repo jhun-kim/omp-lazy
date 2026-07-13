@@ -62,6 +62,105 @@ describe("teammode worktree binding", () => {
     expect(JSON.stringify(await runtime.contract.read(teamDefinition.teamName))).toBe(bytes)
   })
 
+  test("reinitializes an active team from the same semantic definition without changing bytes", async () => {
+    const runtime = await teamRuntime("active-init-replay")
+    const implementation = createWorktree(runtime.displayPath, "team-init-implementation")
+    const verification = createWorktree(runtime.displayPath, "team-init-verification")
+    cleanups.push(() => removeTeamRuntime(runtime))
+    cleanups.push(
+      () => rm(implementation, { recursive: true, force: true }),
+      () => rm(verification, { recursive: true, force: true }),
+    )
+    await runtime.contract.initialize(runtime.caller, teamDefinition)
+    await observeTeam(runtime)
+    const bound = await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "implementation", path: implementation },
+      { requestedName: "verification", path: verification },
+    ])
+    expect(bound).toMatchObject({ ok: true, status: "bound" })
+    expect(
+      bound.ok
+        ? bound.state?.members.map((member) => ({
+            actualAgentId: String(member.actualAgentId),
+            worktreePath: member.worktreePath,
+          }))
+        : [],
+    ).toEqual([
+      { actualAgentId: "actual-implementation", worktreePath: implementation },
+      { actualAgentId: "actual-verification", worktreePath: verification },
+    ])
+    const bytes = JSON.stringify(await runtime.contract.read(teamDefinition.teamName))
+
+    const replay = await runtime.contract.initialize(runtime.caller, {
+      ...teamDefinition,
+      members: [...teamDefinition.members].reverse(),
+    })
+    const conflict = await runtime.contract.initialize(runtime.caller, {
+      ...teamDefinition,
+      members: teamDefinition.members.map((member) =>
+        member.requestedName === "implementation"
+          ? { ...member, deliverable: "conflicting receipt" }
+          : member,
+      ),
+    })
+
+    expect(replay).toMatchObject({ ok: true, status: "replayed" })
+    expect(conflict).toEqual({ ok: false, code: "team_conflict" })
+    expect(JSON.stringify(await runtime.contract.read(teamDefinition.teamName))).toBe(bytes)
+  })
+
+  test("replays equivalent keyed worktrees independent of input order and rejects changed sets", async () => {
+    const runtime = await teamRuntime("binding-set-replay")
+    const implementation = createWorktree(runtime.displayPath, "team-bind-implementation")
+    const verification = createWorktree(runtime.displayPath, "team-bind-verification")
+    const changed = createWorktree(runtime.displayPath, "team-bind-changed")
+    cleanups.push(() => removeTeamRuntime(runtime))
+    cleanups.push(
+      () => rm(implementation, { recursive: true, force: true }),
+      () => rm(verification, { recursive: true, force: true }),
+      () => rm(changed, { recursive: true, force: true }),
+    )
+    await runtime.contract.initialize(runtime.caller, teamDefinition)
+    await observeTeam(runtime)
+    await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "implementation", path: implementation },
+      { requestedName: "verification", path: verification },
+    ])
+    const bytes = JSON.stringify(await runtime.contract.read(teamDefinition.teamName))
+
+    const replay = await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "verification", path: verification },
+      { requestedName: "implementation", path: implementation },
+    ])
+    const conflicts = [
+      await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+        { requestedName: "implementation", path: changed },
+        { requestedName: "verification", path: verification },
+      ]),
+      await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+        { requestedName: "implementation", path: implementation },
+        { requestedName: "implementation", path: implementation },
+      ]),
+      await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+        { requestedName: "implementation", path: implementation },
+      ]),
+      await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+        { requestedName: "implementation", path: implementation },
+        { requestedName: "verification", path: verification },
+        { requestedName: "extra", path: changed },
+      ]),
+    ]
+
+    expect(replay).toMatchObject({ ok: true, status: "replayed" })
+    expect(conflicts).toEqual([
+      { ok: false, code: "team_bind_conflict" },
+      { ok: false, code: "team_bind_conflict" },
+      { ok: false, code: "team_bind_conflict" },
+      { ok: false, code: "team_bind_conflict" },
+    ])
+    expect(JSON.stringify(await runtime.contract.read(teamDefinition.teamName))).toBe(bytes)
+  })
+
   test("inline task results block activation without inventing a synchronous team", async () => {
     const runtime = await teamRuntime("inline")
     cleanups.push(() => removeTeamRuntime(runtime))
