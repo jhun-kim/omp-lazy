@@ -1,4 +1,5 @@
 import type { WorkflowActivationId } from "../activation/types"
+import { COMMAND_DEFINITIONS } from "./command-definitions"
 
 export type ParsedWorkflowCommand =
   | { readonly ok: true; readonly operation: string; readonly words: readonly string[] }
@@ -33,6 +34,27 @@ function tokenize(args: string): readonly string[] | null {
     if (index < args.length && !/\s/u.test(args[index] ?? "")) return null
   }
   return words
+}
+
+function tokensFollowCatalogGrammar(
+  workflow: WorkflowActivationId,
+  words: readonly string[],
+): boolean {
+  const definition = COMMAND_DEFINITIONS.find((candidate) => candidate.workflow === workflow)
+  if (definition === undefined) return false
+  const grammar = definition.grammar.join(" ")
+  const allowedFlags = new Set([...grammar.matchAll(/--[a-z][a-z-]*/gu)].map((match) => match[0]))
+  const acceptsDelimiter = grammar.includes("-- <")
+  let afterDelimiter = false
+  for (const word of words) {
+    if (word === "--") {
+      if (!acceptsDelimiter || afterDelimiter) return false
+      afterDelimiter = true
+    } else if (!afterDelimiter && word.startsWith("--") && !allowedFlags.has(word)) {
+      return false
+    }
+  }
+  return true
 }
 
 function parseStart(words: readonly string[]): ParsedWorkflowCommand {
@@ -87,7 +109,7 @@ export function parseWorkflowCommand(
   args: string,
 ): ParsedWorkflowCommand {
   const words = tokenize(args.trim())
-  if (words === null) return invalid()
+  if (words === null || !tokensFollowCatalogGrammar(workflow, words)) return invalid()
   switch (workflow) {
     case "start_work":
       return parseStart(words)
@@ -126,7 +148,7 @@ export function parseWorkflowCommand(
     case "report_bug":
       return parseReport(words)
     case "contribute_bug_fix":
-      return words[0] === "--dry-run" && words.length > 1
+      return words[0] === "--dry-run" && words.length === 2
         ? valid("dry_run", words.slice(1))
         : invalid()
     default:

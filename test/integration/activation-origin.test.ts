@@ -2,10 +2,11 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { rm } from "node:fs/promises"
 import { ActivationProvenanceController } from "../../src/activation/provenance-controller"
 import { TransactionActivationState } from "../../src/activation/transaction-activation-state"
-import { COMMAND_REGISTRATIONS } from "../../src/commands/command-definitions"
+import { COMMAND_DEFINITIONS, COMMAND_REGISTRATIONS } from "../../src/commands/command-definitions"
 import { parseWorkflowCommand } from "../../src/commands/command-parser"
 import { DurableWorkflowCommandExecutor } from "../../src/commands/workflow-command-handler"
 import { TransactionStore } from "../../src/state/transaction-store"
+import { VALID_COMMAND_GRAMMAR_CASES } from "../fixtures/command-grammar-cases"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
@@ -134,6 +135,29 @@ describe("trusted activation provenance", () => {
 })
 
 describe("command grammar", () => {
+  test.each([
+    ["start_work", "status --evil"],
+    ["ulw_loop", "status --evil"],
+    ["teammode", "status --evil"],
+    ["ulw_research", "query --evil"],
+    ["contribute_bug_fix", "--dry-run issue-1 extra"],
+  ] as const)("rejects verifier regression %s: %s", (workflow, args) => {
+    expect(parseWorkflowCommand(workflow, args)).toEqual({
+      ok: false,
+      code: "invalid_grammar",
+    })
+  })
+
+  test("rejects an uncatalogued flag for every authoritative workflow grammar", () => {
+    for (const definition of COMMAND_DEFINITIONS) {
+      expect(parseWorkflowCommand(definition.workflow, "--not-in-catalog").ok).toBeFalse()
+    }
+  })
+
+  test.each(VALID_COMMAND_GRAMMAR_CASES)("preserves valid grammar %s: %s", (workflow, args) => {
+    expect(parseWorkflowCommand(workflow, args).ok).toBeTrue()
+  })
+
   test("accepts authoritative forms and rejects malformed flags and positions", () => {
     expect(parseWorkflowCommand("start_work", "pause run-1").ok).toBeTrue()
     expect(parseWorkflowCommand("ultrawork", "heavy -- implement safely").ok).toBeTrue()
