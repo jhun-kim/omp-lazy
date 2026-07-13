@@ -1,0 +1,73 @@
+import { mkdir, readdir, readFile } from "node:fs/promises"
+import { join } from "node:path"
+import { atomicCreate } from "./atomic-file"
+import { decodeStateEvent } from "./codec"
+import type { StateEvent } from "./domain"
+import type { Deadline } from "./repo-lock"
+
+const EVENT_FILE = /^(\d{16})-([0-9a-f-]{36})\.json$/
+
+function isMissing(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+export class EventStoreError extends Error {
+  readonly name = "EventStoreError"
+  constructor(
+    readonly code:
+      | "invalid_event_filename"
+      | "malformed_event"
+      | "event_filename_mismatch"
+      | "event_sequence_gap",
+  ) {
+    super(code)
+  }
+}
+
+export class EventStore {
+  readonly eventsPath: string
+
+  constructor(readonly stateRoot: string) {
+    this.eventsPath = join(stateRoot, "events")
+  }
+
+  async append(event: StateEvent, deadline: Deadline): Promise<void> {
+    if (event.sequence < 1) throw new EventStoreError("event_sequence_gap")
+    await mkdir(this.eventsPath, { recursive: true })
+    const sequence = event.sequence.toString().padStart(16, "0")
+    const path = join(this.eventsPath, `${sequence}-${event.eventId}.json`)
+    await atomicCreate(path, JSON.stringify(event), { deadline })
+  }
+
+  async readAll(): Promise<readonly StateEvent[]> {
+    let names: readonly string[]
+    try {
+      names = await readdir(this.eventsPath)
+    } catch (error) {
+      if (isMissing(error)) return []
+      throw error
+    }
+    const committed = names.filter((name) => !name.includes(".tmp-"))
+    const events: StateEvent[] = []
+    for (const name of committed) {
+      const match = EVENT_FILE.exec(name)
+      if (match === null) throw new EventStoreError("invalid_event_filename")
+      const sequenceText = match[1]
+      const eventId = match[2]
+      if (sequenceText === undefined || eventId === undefined) {
+        throw new EventStoreError("invalid_event_filename")
+      }
+      const decoded = decodeStateEvent(await readFile(join(this.eventsPath, name), "utf8"))
+      if (!decoded.ok) throw new EventStoreError("malformed_event")
+      if (decoded.value.sequence !== Number(sequenceText) || decoded.value.eventId !== eventId) {
+        throw new EventStoreError("event_filename_mismatch")
+      }
+      events.push(decoded.value)
+    }
+    events.sort((left, right) => left.sequence - right.sequence)
+    for (const [index, event] of events.entries()) {
+      if (event.sequence !== index + 1) throw new EventStoreError("event_sequence_gap")
+    }
+    return events
+  }
+}
