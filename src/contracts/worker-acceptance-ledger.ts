@@ -100,13 +100,7 @@ export class WorkerAcceptanceLedgerError extends Error {
 }
 
 function rejectionKey(scope: RejectionScope): string {
-  return [
-    scope.runId,
-    scope.attempt,
-    scope.ownerEpoch,
-    scope.taskGeneration,
-    scope.actualAgentId,
-  ].join("\u0000")
+  return [scope.runId, scope.attempt].join("\u0000")
 }
 
 export class WorkerAcceptanceLedger {
