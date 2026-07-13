@@ -59,6 +59,24 @@ describe("lcx Windows adapter arguments", () => {
     })
   })
 
+  test("rejects root-relative paths that depend on the current drive", () => {
+    // Given: rooted paths without explicit drive qualifiers.
+    const argv = [
+      "--project-root",
+      "\\repo",
+      "--omp-exe",
+      "\\omp.exe",
+      "--evidence-root",
+      "\\evidence",
+    ] as const
+
+    // When: the offline adapter parses the drive-context-dependent paths.
+    const result = parseLcxWindowsAdapterArguments(argv)
+
+    // Then: root-relative input is rejected rather than resolved implicitly.
+    expect(result).toEqual({ ok: false, code: "absolute_windows_path_required" })
+  })
+
   test("generates an offline PR body with Windows input and output paths", async () => {
     // Given: an evidence-backed contribution body input in a spaced Windows path.
     const root = await mkdtemp(join(process.cwd(), ".todo16 pr body "))

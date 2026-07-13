@@ -49,7 +49,8 @@ export function evaluateDoctor(input: {
 } {
   const overall = input.checks.some((check) => check.verdict === "fail")
     ? "fail"
-    : input.checks.length === 0 || input.checks.some((check) => check.verdict === "warn")
+    : input.checks.length === 0 ||
+        input.checks.some((check) => check.verdict === "warn" || check.evidence.trim().length === 0)
       ? "warn"
       : "pass"
   return {
@@ -198,11 +199,7 @@ export function evaluateContribution(request: ContributionRequest): Contribution
   const green = request.evidence.find((entry) => entry.stage === "green")
   if (green === undefined || green.exitCode !== 0) return blockedContribution("green_required")
   const surface = request.evidence.find((entry) => entry.stage === "real_surface")
-  if (
-    surface === undefined ||
-    surface.exitCode !== 0 ||
-    !surface.surface.startsWith("omp-16.4.8")
-  ) {
+  if (surface === undefined || surface.exitCode !== 0 || surface.surface !== "omp-16.4.8") {
     return blockedContribution("real_surface_required")
   }
   if (
@@ -250,7 +247,8 @@ export function parseLcxWindowsAdapterArguments(
   const evidenceRoot = argv[5] ?? ""
   if (
     [projectRoot, ompExecutable, evidenceRoot].some(
-      (path) => path.includes("\0") || !win32.isAbsolute(path),
+      (path) =>
+        path.includes("\0") || !win32.isAbsolute(path) || win32.parse(path).root === win32.sep,
     )
   ) {
     return { code: "absolute_windows_path_required", ok: false }

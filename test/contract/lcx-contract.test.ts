@@ -102,6 +102,17 @@ describe("doctor contract", () => {
     expect(result.overall).toBe("fail")
     expect(result.checks).toEqual(checks)
   })
+
+  test("does not pass a check whose evidence is blank", () => {
+    // Given: a nominally passing observation without captured evidence.
+    const checks = [{ id: "loader", verdict: "pass", evidence: "   " }] as const
+
+    // When: the doctor evaluates the unbound observation.
+    const result = evaluateDoctor({ checks, deep: false })
+
+    // Then: missing evidence prevents an overall PASS.
+    expect(result.overall).toBe("warn")
+  })
 })
 
 describe("bug report contract", () => {
@@ -212,6 +223,19 @@ describe("contribution dry-run contract", () => {
 
     // Then: missing RED cannot be waived.
     expect(result).toMatchObject({ kind: "blocked", code: "red_required" })
+  })
+
+  test("rejects a fabricated OMP surface prefix", () => {
+    // Given: otherwise-complete evidence whose surface is only a forged prefix.
+    const evidence = completeContribution.evidence.map((entry) =>
+      entry.stage === "real_surface" ? { ...entry, surface: "omp-16.4.8-fabricated" } : entry,
+    )
+
+    // When: the contribution is evaluated.
+    const result = evaluateContribution({ ...completeContribution, evidence })
+
+    // Then: only the exact real OMP surface token is accepted.
+    expect(result).toMatchObject({ kind: "blocked", code: "real_surface_required" })
   })
 
   test("blocks target mismatch, cleanup failure, and foreign state mutation", () => {
