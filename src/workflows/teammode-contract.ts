@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises"
+import { readFile, realpath, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { WorkerAcceptanceLedger } from "../contracts/worker-acceptance-ledger"
 import type { TaskEventLedger } from "../gates/task-event-ledger"
@@ -79,7 +79,20 @@ export class TeammodeContract {
       if (current === null) return { ok: false, code: "team_missing" }
       if (current.status !== "initializing") {
         if (current.status !== "active") return { ok: false, code: "invalid_team_state" }
-        return matchesTeamWorktreeBindings(current, worktrees)
+        const canonicalWorktrees = (
+          await Promise.all(
+            worktrees.map(async (binding) => {
+              try {
+                return [{ ...binding, path: await realpath(binding.path) }]
+              } catch (error) {
+                if (error instanceof Error) return []
+                throw error
+              }
+            }),
+          )
+        ).flat()
+        return canonicalWorktrees.length === worktrees.length &&
+          matchesTeamWorktreeBindings(current, canonicalWorktrees)
           ? { ok: true, status: "replayed", state: current }
           : { ok: false, code: "team_bind_conflict" }
       }

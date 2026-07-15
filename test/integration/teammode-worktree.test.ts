@@ -161,6 +161,37 @@ describe("teammode worktree binding", () => {
     expect(JSON.stringify(await runtime.contract.read(teamDefinition.teamName))).toBe(bytes)
   })
 
+  test("replays an identical noncanonical worktree path and rejects a different canonical path", async () => {
+    const runtime = await teamRuntime("raw-path-replay")
+    const implementation = createWorktree(runtime.displayPath, "team-bind-raw")
+    const changed = createWorktree(runtime.displayPath, "team-bind-raw-changed")
+    cleanups.push(() => removeTeamRuntime(runtime))
+    cleanups.push(
+      () => rm(implementation, { recursive: true, force: true }),
+      () => rm(changed, { recursive: true, force: true }),
+    )
+    await runtime.contract.initialize(runtime.caller, teamDefinition)
+    await observeTeam(runtime)
+    const rawPath = `${implementation}/.`
+    const bound = await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "implementation", path: rawPath },
+    ])
+    const bytes = JSON.stringify(await runtime.contract.read(teamDefinition.teamName))
+
+    const replay = await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "implementation", path: rawPath },
+    ])
+    const conflict = await runtime.contract.bind(runtime.caller, teamDefinition.teamName, [
+      { requestedName: "implementation", path: `${changed}/.` },
+    ])
+
+    expect(bound).toMatchObject({ ok: true, status: "bound" })
+    expect(bound.ok ? bound.state?.members[0]?.worktreePath : null).toBe(implementation)
+    expect(replay).toMatchObject({ ok: true, status: "replayed" })
+    expect(conflict).toEqual({ ok: false, code: "team_bind_conflict" })
+    expect(JSON.stringify(await runtime.contract.read(teamDefinition.teamName))).toBe(bytes)
+  }, 20_000)
+
   test("inline task results block activation without inventing a synchronous team", async () => {
     const runtime = await teamRuntime("inline")
     cleanups.push(() => removeTeamRuntime(runtime))
