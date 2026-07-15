@@ -42,6 +42,30 @@ describe("teammode contract", () => {
     ).toBe(false)
   })
 
+  test("Given root ownership When descendants are parsed Then every root form overlaps without rejecting siblings", () => {
+    const overlaps = [
+      [".", "src"],
+      ["./", "src/nested"],
+      [".", "docs/deep/file"],
+      ["src", "src/api"],
+      ["src/api", "src/api"],
+    ] as const
+    for (const [root, descendant] of overlaps) {
+      expect(
+        TeamDefinitionSchema.safeParse({
+          teamName: "ownership-overlap",
+          members: [member("root", "root", [root]), member("nested", "nested", [descendant])],
+        }).success,
+      ).toBe(false)
+    }
+    expect(
+      TeamDefinitionSchema.safeParse({
+        teamName: "ownership-siblings",
+        members: [member("api", "api", ["src/api"]), member("ui", "ui", ["src/ui"])],
+      }).success,
+    ).toBe(true)
+  })
+
   test("initialization is idempotent and missing async surfaces block without state", async () => {
     const runtime = await teamRuntime("contract")
     cleanups.push(() => removeTeamRuntime(runtime))

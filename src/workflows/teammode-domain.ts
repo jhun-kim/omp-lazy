@@ -34,11 +34,21 @@ const memberDefinitionSchema = z
   .strict()
 
 function normalizedOwnership(value: string): string {
-  return posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "").replace(/\/$/, "")
+  const normalized = posix
+    .normalize(value.replaceAll("\\", "/"))
+    .replace(/^\.\//, "")
+    .replace(/\/$/, "")
+  return normalized === "" ? "." : normalized
 }
 
 function pathsOverlap(left: string, right: string): boolean {
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`)
+  return (
+    left === "." ||
+    right === "." ||
+    left === right ||
+    left.startsWith(`${right}/`) ||
+    right.startsWith(`${left}/`)
+  )
 }
 
 export const TeamDefinitionSchema = z
