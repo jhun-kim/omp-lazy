@@ -12,6 +12,17 @@ import { run } from "../fixtures/package-test-helpers"
 
 const temporaryRoots: string[] = []
 
+type GitCommandResult = {
+  readonly exitCode: number
+  readonly stderr: string
+  readonly stdout: string
+}
+
+type DiffFixtureEntry = {
+  readonly path: string
+  readonly status: string
+}
+
 afterEach(async () =>
   Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true }))),
 )
@@ -34,10 +45,67 @@ function entry(path: string, sourceCommit = CANDIDATE_COMMIT) {
   } as const
 }
 
+function gitOutput(arguments_: readonly string[]): string {
+  const result = Bun.spawnSync({
+    cmd: ["git", ...arguments_],
+    stderr: "pipe",
+    stdout: "pipe",
+  })
+  const decoder = new TextDecoder()
+  const commandResult: GitCommandResult = {
+    exitCode: result.exitCode,
+    stderr: decoder.decode(result.stderr),
+    stdout: decoder.decode(result.stdout),
+  }
+  expect(commandResult.exitCode).toBe(0)
+  return commandResult.stdout
+}
+
+function immutableDiffFixture(): readonly DiffFixtureEntry[] {
+  return gitOutput(["diff", "--name-status", `${BASE_COMMIT}..${CANDIDATE_COMMIT}`])
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => {
+      const fields = line.split("\t")
+      const status = fields[0]
+      const path = fields[fields.length - 1]
+      expect(status).toBeDefined()
+      expect(path).toBeDefined()
+      return { path: path ?? "", status: status ?? "" }
+    })
+}
+
+function sourceCommitFor(path: string): string {
+  const sourceCommit = gitOutput([
+    "log",
+    "-1",
+    "--format=%H",
+    `${BASE_COMMIT}..${CANDIDATE_COMMIT}`,
+    "--",
+    path,
+  ]).trim()
+  expect(sourceCommit).toMatch(/^[a-f0-9]{40}$/)
+  return sourceCommit
+}
+
+async function temporaryCompleteClassification(): Promise<string> {
+  return temporaryJson("complete-delta-classification.json", {
+    schemaVersion: 1,
+    frozenRange: { base: BASE_COMMIT, candidate: CANDIDATE_COMMIT },
+    entries: immutableDiffFixture().map((diffEntry) => ({
+      path: diffEntry.path,
+      status: diffEntry.status,
+      category: "test",
+      decision: "adapt",
+      sourceCommit: sourceCommitFor(diffEntry.path),
+    })),
+  })
+}
+
 describe("delta classification verifier", () => {
   it("passes when the classification covers the immutable diff exactly once", async () => {
-    // Given: the committed T01 classification evidence.
-    const classificationPath = ".omo/evidence/plugin-completion-60/T01/delta-classification.json"
+    // Given: a complete temporary classification generated from immutable Git data.
+    const classificationPath = await temporaryCompleteClassification()
 
     // When: the reusable verifier compares it to the frozen commit range.
     const result = await verifyDeltaClassification({
@@ -49,7 +117,9 @@ describe("delta classification verifier", () => {
     // Then: all immutable diff paths are accounted for exactly once.
     expect(result.status).toBe("PASS")
     expect(result.pathCount).toBe(118)
+    expect(result.classifiedCount).toBe(118)
     expect(result.reasons).toEqual([])
+    expect(classificationPath.includes(".omo/evidence")).toBe(false)
   })
 
   it("rejects duplicate and omitted immutable diff paths", async () => {
