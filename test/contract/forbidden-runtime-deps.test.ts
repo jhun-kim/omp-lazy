@@ -37,6 +37,41 @@ describe("forbidden runtime dependencies", () => {
     expect(result.stderr).toContain("runtime dependency")
   })
 
+  it("accepts Zod as the only required runtime dependency", async () => {
+    // Given: production runtime modules import Zod schemas.
+    const manifest = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"))
+
+    // When: runtime dependencies are inspected.
+    const dependencies = manifest.dependencies
+
+    // Then: Zod is shipped for runtime imports while the OMP host remains external.
+    expect(dependencies).toEqual({ zod: "4.4.3" })
+    expect(dependencies["@oh-my-pi/pi-coding-agent"]).toBeUndefined()
+  })
+
+  it("rejects a candidate missing runtime Zod", async () => {
+    // Given: a candidate whose runtime package metadata omits Zod.
+    const candidate = await copyCandidate("missing-runtime-zod")
+    candidates.push(candidate)
+    const manifest = JSON.parse(await readFile(join(candidate, "package.json"), "utf8"))
+    manifest.dependencies = {}
+    await writeJson(join(candidate, "package.json"), manifest)
+
+    // When: the package inspector evaluates the candidate.
+    const result = run([
+      "bun",
+      "scripts/pack-candidate.ts",
+      "--candidate",
+      candidate,
+      "--mode",
+      "inspect",
+    ])
+
+    // Then: runtime Zod is required because packed source imports it.
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain("missing runtime dependency: zod")
+  })
+
   it("rejects absolute cache and Codex runtime references", async () => {
     // Given: runtime source containing both forbidden lookup classes.
     const candidate = await copyCandidate("runtime-path")

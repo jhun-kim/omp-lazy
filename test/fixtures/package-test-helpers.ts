@@ -1,5 +1,5 @@
 import { setDefaultTimeout } from "bun:test"
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 export type CommandResult = {
@@ -38,6 +38,11 @@ export async function copyCandidate(prefix: string): Promise<string> {
     ["LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "package.json", "third_party"].map((entry) =>
       cp(join(repositoryRoot, entry), join(candidate, entry), { recursive: true }),
     ),
+  )
+  await mkdir(join(candidate, "scripts"), { recursive: true })
+  await cp(
+    join(repositoryRoot, "scripts", "assert-skill-sync.ts"),
+    join(candidate, "scripts", "assert-skill-sync.ts"),
   )
   return candidate
 }

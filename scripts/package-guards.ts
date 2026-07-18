@@ -11,6 +11,7 @@ const REQUIRED_ASSETS = [
   "LICENSE",
   "README.md",
   "THIRD_PARTY_NOTICES.md",
+  "scripts/assert-skill-sync.ts",
   "third_party/SOURCE_COMMITS.json",
   "third_party/lazycodex/LICENSE",
   "third_party/lazycodex/SOURCE.md",
@@ -30,7 +31,7 @@ const forbiddenRuntimePatterns = [
 
 const manifestSchema = z
   .object({
-    dependencies: z.record(z.string(), z.string()).optional(),
+    dependencies: z.object({ zod: z.string().optional() }).catchall(z.string()).optional(),
     files: z.array(z.string()),
     omp: z.object({ extensions: z.tuple([z.literal("./src/index.ts")]) }),
   })
@@ -117,11 +118,17 @@ export async function inspectCandidate(
     JSON.parse(await readFile(join(root, "package.json"), "utf8")),
   )
   const runtimeDependencies = Object.keys(manifest.dependencies ?? {})
+  if (manifest.dependencies?.zod !== "4.4.3") {
+    throw new PackageGuardError("missing runtime dependency: zod")
+  }
   const forbiddenDependency = runtimeDependencies.find(
     (name) => name === "@oh-my-pi/pi-coding-agent" || /codex|lazycodex/i.test(name),
   )
   if (forbiddenDependency !== undefined) {
     throw new PackageGuardError(`forbidden runtime dependency: ${forbiddenDependency}`)
+  }
+  if (!manifest.files.includes("scripts/assert-skill-sync.ts")) {
+    throw new PackageGuardError("package files must include scripts/assert-skill-sync.ts")
   }
 
   await requireFiles(root, REQUIRED_ASSETS)

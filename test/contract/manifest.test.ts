@@ -20,8 +20,24 @@ describe("package manifest", () => {
     expect(manifest.peerDependenciesMeta).toEqual({
       "@oh-my-pi/pi-coding-agent": { optional: true },
     })
+    expect(manifest.dependencies).toEqual({ zod: "4.4.3" })
     expect(manifest.devDependencies["@oh-my-pi/pi-coding-agent"]).toBe("16.4.8")
+    expect(manifest.devDependencies.zod).toBeUndefined()
     expect(manifest.dependencies?.["@oh-my-pi/pi-coding-agent"]).toBeUndefined()
+  })
+
+  it("lists the required skill-sync verifier in the packed file allowlist", async () => {
+    // Given: the package manifest explicitly owns selected runtime support files.
+    const raw = await readFile(join(root, "package.json"), "utf8")
+
+    // When: the files allowlist is decoded.
+    const manifest = JSON.parse(raw)
+
+    // Then: the T07 sync verifier stays packaged until T10 generalizes all file checks.
+    expect(manifest.files).toContain("scripts/assert-skill-sync.ts")
+    await expect(
+      readFile(join(root, "scripts", "assert-skill-sync.ts"), "utf8"),
+    ).resolves.toContain("parseFrontmatter")
   })
 
   it("records complete source provenance and required notices", async () => {
