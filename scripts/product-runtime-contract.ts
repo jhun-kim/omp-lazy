@@ -164,6 +164,8 @@ export async function assertExactProductRuntime(
   requireEqual("tools", receipt.inventory.toolNames, expectedProductRuntime.toolNames)
   requireEqual("commands", receipt.inventory.commandNames, expectedProductRuntime.commandNames)
   requireEqual("handlers", receipt.inventory.handlerCounts, expectedProductRuntime.handlerCounts)
+  requireEqual("skills", receipt.inventory.skillNames, expectedProductRuntime.skillNames)
+  requireEqual("agents", receipt.inventory.agentNames, expectedProductRuntime.agentNames)
   requireEqual("warnings", receipt.inventory.warnings, expectedProductRuntime.warnings)
   return receipt
 }
