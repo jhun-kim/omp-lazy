@@ -1,20 +1,22 @@
 import { realpath } from "node:fs/promises"
-import { resolve } from "node:path"
+import { join, resolve } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader"
 import { z } from "zod"
+import { resolveManifestExtensionPaths } from "./product-runtime-contract"
 
-const argumentsSchema = z.tuple([
-  z.literal("--extension"),
-  z.string().min(1),
-  z.literal("--cwd"),
-  z.string().min(1),
+const argumentsSchema = z.union([
+  z.tuple([]),
+  z.tuple([z.literal("--extension"), z.string().min(1), z.literal("--cwd"), z.string().min(1)]),
 ])
 
 async function main(): Promise<void> {
   const parsed = argumentsSchema.parse(Bun.argv.slice(2))
-  const extensionPath = await realpath(resolve(parsed[1]))
-  const cwd = await realpath(resolve(parsed[3]))
-  const result = await loadExtensions([extensionPath], cwd)
+  const cwd = await realpath(resolve(parsed.length === 0 ? process.cwd() : parsed[3]))
+  const manifest =
+    parsed.length === 0
+      ? await resolveManifestExtensionPaths(join(cwd, "package.json"))
+      : { extensionPaths: [resolve(parsed[1])], packageRoot: cwd }
+  const result = await loadExtensions([...manifest.extensionPaths], manifest.packageRoot)
   const commandNames = result.extensions
     .flatMap((extension) => [...extension.commands.keys()])
     .sort()
@@ -30,6 +32,7 @@ async function main(): Promise<void> {
       errors: result.errors,
       extensionPaths: result.extensions.map((extension) => extension.resolvedPath),
       handlerCounts,
+      mode: parsed.length === 0 ? "product" : "fixture",
       toolNames,
     })}\n`,
   )
