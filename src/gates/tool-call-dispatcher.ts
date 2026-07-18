@@ -1,8 +1,8 @@
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent"
 import { validateActiveIndex } from "../state/active-index"
 import type { AnyRun, CanonicalRoot } from "../state/domain"
 import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
+import { authorizeImmutableToolCall } from "./immutable-tool-authorization"
 import { TaskEventLedger } from "./task-event-ledger"
 import { TaskSpawnGuard } from "./task-spawn-guard"
 
@@ -15,6 +15,21 @@ export type CurrentRunScope =
       readonly store: TransactionStore
       readonly run: AnyRun
     }
+
+export type ToolCallDispatchResult = { readonly block: true; readonly reason: string } | undefined
+
+export type ToolCallDispatcherApi = {
+  readonly on: (
+    event: "tool_call",
+    handler: (
+      event: { readonly toolName: string; readonly toolCallId: string; readonly input: unknown },
+      context: {
+        readonly cwd: string
+        readonly sessionManager: { readonly getSessionId: () => string }
+      },
+    ) => Promise<ToolCallDispatchResult>,
+  ) => void
+}
 
 function isNonterminal(run: AnyRun): boolean {
   const status = run.payload.status
@@ -70,18 +85,23 @@ export async function resolveCurrentRunScope(
   }
 }
 
-export function registerToolCallDispatcher(api: Pick<ExtensionAPI, "on">, maxFanOut = 32): void {
+export function registerToolCallDispatcher(api: ToolCallDispatcherApi, maxFanOut = 32): void {
   api.on("tool_call", async (event, context) => {
+    const authorization = authorizeImmutableToolCall({
+      toolName: event.toolName,
+      toolCallId: event.toolCallId,
+      input: event.input,
+    })
+    if (authorization.kind === "pass_through") return undefined
+
     const sessionId = context.sessionManager.getSessionId()
     const scope = await resolveCurrentRunScope(context.cwd, sessionId)
     if (scope.kind === "foreign") return undefined
     if (scope.kind === "conflict") {
       return { block: true, reason: "omp-lazy: active workflow state conflict" }
     }
-    return new TaskSpawnGuard(new TaskEventLedger(scope.store), maxFanOut).handle({
-      toolName: event.toolName,
-      toolCallId: event.toolCallId,
-      input: event.input,
+    return new TaskSpawnGuard(new TaskEventLedger(scope.store), maxFanOut).handleAuthorized({
+      authorization,
       sessionId,
     })
   })
