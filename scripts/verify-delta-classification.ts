@@ -154,20 +154,19 @@ function requireExpectedCommit(label: string, actual: string, expected: string):
   return actual === expected ? [] : [`${label} drift: expected ${expected}, got ${actual}`]
 }
 
-function isAncestor(ancestor: string, descendant: string): boolean {
-  return runGit(["merge-base", "--is-ancestor", ancestor, descendant]).exitCode === 0
-}
-
-function sourceCommitInRange(sourceCommit: string, base: string, candidate: string): boolean {
-  return (
-    sourceCommit !== base && isAncestor(base, sourceCommit) && isAncestor(sourceCommit, candidate)
-  )
+function sourceCommitsInRange(base: string, candidate: string): ReadonlySet<string> {
+  const result = runGit(["rev-list", `${base}..${candidate}`])
+  if (result.exitCode !== 0) {
+    throw new DeltaClassificationError(`git rev-list failed: ${result.stderr.trim()}`)
+  }
+  return new Set(result.stdout.split(/\r?\n/).filter((line) => line.length > 0))
 }
 
 function compareClassification(
   classification: DeltaClassificationDocument,
   diffEntries: readonly DiffEntry[],
   arguments_: VerifyDeltaArguments,
+  validSourceCommits: ReadonlySet<string>,
 ): readonly string[] {
   const reasons: string[] = []
   reasons.push(...requireExpectedCommit("base", arguments_.base, BASE_COMMIT))
@@ -200,7 +199,7 @@ function compareClassification(
         `status mismatch for ${entry.path}: expected ${expectedStatus}, got ${entry.status}`,
       )
     }
-    if (!sourceCommitInRange(entry.sourceCommit, arguments_.base, arguments_.candidate)) {
+    if (!validSourceCommits.has(entry.sourceCommit)) {
       reasons.push(`source commit outside frozen range for ${entry.path}: ${entry.sourceCommit}`)
     }
   }
@@ -227,6 +226,7 @@ export async function verifyDeltaClassification(
   const rawJson: unknown = JSON.parse(await readFile(arguments_.classificationPath, "utf8"))
   const parsedClassification = classificationSchema.safeParse(rawJson)
   const diffEntries = parseDiff(diffResult.stdout)
+  const validSourceCommits = sourceCommitsInRange(arguments_.base, arguments_.candidate)
   if (!parsedClassification.success) {
     return {
       status: "FAIL",
@@ -237,7 +237,12 @@ export async function verifyDeltaClassification(
       reasons: [`invalid classification JSON: ${formatZodIssues(parsedClassification.error)}`],
     }
   }
-  const reasons = compareClassification(parsedClassification.data, diffEntries, arguments_)
+  const reasons = compareClassification(
+    parsedClassification.data,
+    diffEntries,
+    arguments_,
+    validSourceCommits,
+  )
   return {
     status: reasons.length === 0 ? "PASS" : "FAIL",
     base: resolvedBase,

@@ -75,19 +75,6 @@ function immutableDiffFixture(): readonly DiffFixtureEntry[] {
     })
 }
 
-function sourceCommitFor(path: string): string {
-  const sourceCommit = gitOutput([
-    "log",
-    "-1",
-    "--format=%H",
-    `${BASE_COMMIT}..${CANDIDATE_COMMIT}`,
-    "--",
-    path,
-  ]).trim()
-  expect(sourceCommit).toMatch(/^[a-f0-9]{40}$/)
-  return sourceCommit
-}
-
 async function temporaryCompleteClassification(): Promise<string> {
   return temporaryJson("complete-delta-classification.json", {
     schemaVersion: 1,
@@ -97,7 +84,7 @@ async function temporaryCompleteClassification(): Promise<string> {
       status: diffEntry.status,
       category: "test",
       decision: "adapt",
-      sourceCommit: sourceCommitFor(diffEntry.path),
+      sourceCommit: CANDIDATE_COMMIT,
     })),
   })
 }
