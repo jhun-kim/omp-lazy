@@ -40,7 +40,12 @@
     "smoke:staged": "bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/smoke-staged.ts",
     "dogfood:omp": "bun scripts/run-isolated.ts --timeout-ms 600000 --cwd . --env-profile omp -- bun scripts/smoke-real-omp.ts",
     "verify:candidate": "bun scripts/run-isolated.ts --timeout-ms 1200000 --cwd . --env-profile integration -- bun scripts/verify-candidate.ts",
-    "check": "bun scripts/check.ts"
+    "verify:skills": "bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun scripts/assert-skill-sync.ts",
+    "verify:readme": "bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun scripts/verify-readme-contract.ts",
+    "evidence:source": "bun scripts/build-evidence-manifest.ts --mode source --root .omo/evidence/plugin-completion-60 --commit-from-git-head",
+    "evidence:review": "bun scripts/build-evidence-manifest.ts --mode review --root .omo/evidence/plugin-completion-60 --commit-from-git-head",
+    "check": "bun scripts/check.ts",
+    "verify:release": "bun scripts/verify-release.ts"
   },
   "peerDependencies": {
     "@oh-my-pi/pi-coding-agent": ">=16.4.8 <17"
