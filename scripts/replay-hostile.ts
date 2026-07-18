@@ -66,6 +66,7 @@ async function overallTimeoutResult(
     durationMs: 0,
     endedAt: timestamp,
     exitCode: null,
+    processGroupOwned: false,
     startedAt: timestamp,
     stderr,
     stdout,

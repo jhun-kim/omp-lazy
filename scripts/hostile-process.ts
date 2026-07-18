@@ -16,32 +16,22 @@ export class ProcessTreeCleanupError extends Error {
   }
 }
 
-async function killProcessTree(pid: number): Promise<void> {
+async function killProcessTree(pid: number, completionSettled: () => boolean): Promise<void> {
   if (process.platform === "win32") {
     const killer = Bun.spawn(["taskkill", "/PID", String(pid), "/T", "/F"], {
       stderr: "ignore",
       stdout: "ignore",
     })
-    if ((await killer.exited) !== 0) throw new ProcessTreeCleanupError(pid)
+    if ((await killer.exited) !== 0 && !completionSettled()) {
+      throw new ProcessTreeCleanupError(pid)
+    }
     return
   }
   try {
     process.kill(-pid, "SIGKILL")
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error
-    try {
-      process.kill(pid, "SIGKILL")
-    } catch (fallbackError) {
-      if (
-        !(
-          fallbackError instanceof Error &&
-          "code" in fallbackError &&
-          fallbackError.code === "ESRCH"
-        )
-      ) {
-        throw fallbackError
-      }
-    }
+    if (!completionSettled()) throw new ProcessTreeCleanupError(pid)
   }
 }
 
@@ -50,15 +40,20 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
   const started = performance.now()
   const child = Bun.spawn([...request.argv], {
     cwd: request.cwd,
+    detached: process.platform !== "win32",
     env: request.environment,
     stderr: "pipe",
     stdout: "pipe",
   })
+  let completionSettled = false
   const completion = Promise.all([
     child.exited,
     new Response(child.stdout).arrayBuffer(),
     new Response(child.stderr).arrayBuffer(),
-  ])
+  ]).then((result) => {
+    completionSettled = true
+    return result
+  })
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined
   const timedOut = await Promise.race([
     completion.then(() => false),
@@ -66,7 +61,7 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
       timeoutHandle = setTimeout(() => resolveTimeout(true), request.deadlineMs)
     }),
   ])
-  if (timedOut) await killProcessTree(child.pid)
+  if (timedOut) await killProcessTree(child.pid, () => completionSettled)
   const [exitCode, stdout, stderr] = await completion
   if (timeoutHandle !== undefined) clearTimeout(timeoutHandle)
   return {
@@ -76,6 +71,7 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
     durationMs: Math.round(performance.now() - started),
     endedAt: new Date().toISOString(),
     exitCode: timedOut ? null : exitCode,
+    processGroupOwned: process.platform !== "win32",
     startedAt: startedAt.toISOString(),
     stderr: new Uint8Array(stderr),
     stdout: new Uint8Array(stdout),
@@ -114,6 +110,7 @@ export async function writeRawProcess(
       durationMs: captured.durationMs,
       endedAt: captured.endedAt,
       exitCode: captured.exitCode,
+      processGroupOwned: captured.processGroupOwned,
       startedAt: captured.startedAt,
       stderr: reference(root, stderrPath, captured.stderr),
       stdout: reference(root, stdoutPath, captured.stdout),

@@ -45,6 +45,7 @@ export type CapturedProcess = {
   readonly durationMs: number
   readonly endedAt: string
   readonly exitCode: number | null
+  readonly processGroupOwned: boolean
   readonly startedAt: string
   readonly stderr: Uint8Array
   readonly stdout: Uint8Array

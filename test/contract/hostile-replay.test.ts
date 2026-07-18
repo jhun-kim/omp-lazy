@@ -74,7 +74,7 @@ describe("bounded hostile replay", () => {
     }
   }, 30_000)
 
-  test("Given a delayed escaping descendant When its scenario times out Then named FAIL waits for tree cleanup and observes no late mutation", async () => {
+  test("Given a delayed escaping descendant When Windows taskkill or a POSIX-owned group times out Then no late mutation survives", async () => {
     // Given
     const root = await temporaryEvidence("hostile-escape")
 
@@ -96,6 +96,7 @@ describe("bounded hostile replay", () => {
       })
       expect(result.process.exitCode).toBeNull()
       expect(result.process.timedOut).toBeTrue()
+      expect(result.process.processGroupOwned).toBe(process.platform !== "win32")
       expect(result.rawEvidenceBytes).toBeGreaterThan(0)
       const rawBytes = await Promise.all([
         readFile(resolve(root, result.process.stdout.path)),
