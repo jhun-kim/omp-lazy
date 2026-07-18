@@ -1,4 +1,8 @@
+.gitattributes text eol=lf
 scripts/probe-loader.ts text eol=lf
+scripts/product-discovery-contract.ts text eol=lf
+scripts/product-discovery-files.ts text eol=lf
 scripts/product-runtime-contract.ts text eol=lf
+test/contract/discovery-probe.test.ts text eol=lf
 test/contract/product-runtime-contract.test.ts text eol=lf
 test/integration/state-root-containment.test.ts text eol=lf
