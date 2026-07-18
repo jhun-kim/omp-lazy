@@ -1,6 +1,12 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { z } from "zod"
+import {
+  cleanupProcessTree,
+  POST_KILL_COMPLETION_MS,
+  ProcessTreeCleanupError,
+  settleWithin,
+} from "./process-tree-cleanup"
 
 const profileSchema = z.enum(["unit", "integration", "omp"])
 const positiveIntegerSchema = z.coerce.number().int().positive()
@@ -131,18 +137,6 @@ async function createEnvironment(cwd: string): Promise<{
   }
 }
 
-async function killProcessTree(pid: number): Promise<void> {
-  if (process.platform === "win32") {
-    const killer = Bun.spawn(["taskkill", "/PID", String(pid), "/T", "/F"], {
-      stderr: "ignore",
-      stdout: "ignore",
-    })
-    await killer.exited
-    return
-  }
-  process.kill(-pid, "SIGKILL")
-}
-
 function collectedZeroTests(argv: readonly string[], output: string): boolean {
   if (argv[0] !== "bun" || argv[1] !== "test") return false
   return /\b0 pass\b|\b0 tests?\b|No tests found/i.test(output)
@@ -153,44 +147,63 @@ async function run(arguments_: RunnerArguments): Promise<RunReceipt> {
   const cwd = await realpath(requestedCwd)
   const { environment, sandboxRoot } = await createEnvironment(cwd)
   const startedAt = performance.now()
-  let processTree: "complete" = "complete"
-  let timedOut = false
-
   const child = Bun.spawn([...arguments_.argv], {
     cwd,
+    detached: process.platform !== "win32",
     env: environment,
     stderr: "pipe",
     stdout: "pipe",
   })
-  const timeout = setTimeout(() => {
-    timedOut = true
-    void killProcessTree(child.pid)
-  }, arguments_.timeoutMs)
-  const [exitCode, stdout, stderr] = await Promise.all([
+  let completionSettled = false
+  const completion = Promise.all([
     child.exited,
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
-  ])
-  clearTimeout(timeout)
-  if (timedOut) {
-    await killProcessTree(child.pid)
-    processTree = "complete"
-  }
-  await rm(sandboxRoot, { force: true, recursive: true })
-
-  const output = `${stdout}\n${stderr}`
-  const acceptedExit = !timedOut && exitCode === 0 && !collectedZeroTests(arguments_.argv, output)
-  return {
-    argv: arguments_.argv,
-    cleanup: { processTree, sandbox: "complete" },
-    cwd,
-    durationMs: Math.round(performance.now() - startedAt),
-    envProfile: arguments_.profile,
-    exitCode: acceptedExit ? 0 : exitCode === 0 ? 1 : exitCode,
-    sandboxRoot,
-    stderr,
-    stdout,
-    timedOut,
+  ]).then((result) => {
+    completionSettled = true
+    return result
+  })
+  try {
+    const initial = await settleWithin(completion, arguments_.timeoutMs)
+    const timedOut = !initial.settled
+    const cleanupError = timedOut
+      ? await cleanupProcessTree({
+          completionSettled,
+          pid: child.pid,
+          systemRoot: inherited("SystemRoot"),
+        }).then(
+          () => undefined,
+          (error: unknown) => error,
+        )
+      : undefined
+    if (!timedOut && process.platform !== "win32") {
+      await cleanupProcessTree({ completionSettled: true, pid: child.pid, systemRoot: "" })
+    }
+    const completed = initial.settled
+      ? initial
+      : await settleWithin(completion, POST_KILL_COMPLETION_MS)
+    if (!completed.settled) {
+      if (cleanupError !== undefined) throw cleanupError
+      throw new ProcessTreeCleanupError(child.pid)
+    }
+    if (cleanupError !== undefined) throw cleanupError
+    const [exitCode, stdout, stderr] = completed.value
+    const output = `${stdout}\n${stderr}`
+    const acceptedExit = !timedOut && exitCode === 0 && !collectedZeroTests(arguments_.argv, output)
+    return {
+      argv: arguments_.argv,
+      cleanup: { processTree: "complete", sandbox: "complete" },
+      cwd,
+      durationMs: Math.round(performance.now() - startedAt),
+      envProfile: arguments_.profile,
+      exitCode: acceptedExit ? 0 : exitCode === 0 ? 1 : exitCode,
+      sandboxRoot,
+      stderr,
+      stdout,
+      timedOut,
+    }
+  } finally {
+    await rm(sandboxRoot, { force: true, recursive: true })
   }
 }
 

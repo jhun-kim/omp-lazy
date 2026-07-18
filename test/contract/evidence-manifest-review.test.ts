@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { rm, writeFile } from "node:fs/promises"
+import { chmod, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildEvidenceManifest } from "../../scripts/evidence-manifest-builder"
 import {
@@ -77,5 +77,56 @@ describe("review evidence manifest", () => {
 
     // Then
     await expect(result).rejects.toThrow("unexpected evidence file: final/F5-undeclared.md")
+  })
+
+  it("parses the source manifest from the same bytes that were inspected", async () => {
+    // Given: an invalid source manifest whose pathname is repaired only after inspection.
+    const root = await fixture()
+    const path = join(root, "final", "evidence-manifest.json")
+    const valid = await readFile(path, "utf8")
+    const invalid = { ...JSON.parse(valid), commit: "b".repeat(40) }
+    await chmod(path, 0o666)
+    await writeFile(path, `${JSON.stringify(invalid)}\n`)
+    let swapped = false
+
+    // When: the path changes to valid bytes after its inspected bytes are fixed.
+    const result = buildEvidenceManifest({
+      commit: testCommit,
+      mode: "review",
+      root,
+      afterInspection: async (inspectedPath: string) => {
+        if (inspectedPath !== "final/evidence-manifest.json") return
+        await writeFile(path, valid)
+        swapped = true
+      },
+    })
+
+    // Then: parsing rejects the inspected invalid bytes rather than reopening the repaired path.
+    await expect(result).rejects.toThrow("source manifest commit mismatch")
+    expect(swapped).toBeTrue()
+  })
+
+  it("evaluates approval from the same bytes that were hashed", async () => {
+    // Given: a failing F1 receipt whose pathname becomes APPROVE only after inspection.
+    const root = await fixture()
+    const path = join(root, "final", "F1-plan-compliance.md")
+    await writeFile(path, "Verdict: FAIL\n")
+    let swapped = false
+
+    // When: the path changes after the entry hash has consumed its opened bytes.
+    const result = buildEvidenceManifest({
+      commit: testCommit,
+      mode: "review",
+      root,
+      afterInspection: async (inspectedPath: string) => {
+        if (inspectedPath !== "final/F1-plan-compliance.md") return
+        await writeFile(path, "Verdict: APPROVE\n")
+        swapped = true
+      },
+    })
+
+    // Then: approval rejects the hashed FAIL bytes and the test proves the swap ran.
+    await expect(result).rejects.toThrow("review receipt is not unconditional APPROVE")
+    expect(swapped).toBeTrue()
   })
 })

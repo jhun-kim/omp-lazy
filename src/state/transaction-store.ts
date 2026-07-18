@@ -7,6 +7,7 @@ import { EventStore } from "./event-store"
 import {
   ensureStatePathContained,
   runSnapshotPath,
+  type StatePathGuard,
   StateRootContainmentError,
   statePaths,
 } from "./paths"
@@ -34,12 +35,13 @@ export class TransactionStore {
   readonly paths
   readonly events
   readonly lock
+  readonly guard: StatePathGuard
 
   constructor(readonly root: CanonicalRoot) {
     this.paths = statePaths(root)
-    const guard = (path: string): Promise<void> => ensureStatePathContained(root, path)
-    this.events = new EventStore(this.paths.root, guard)
-    this.lock = new RepoLock(this.paths.lock, guard)
+    this.guard = (path) => ensureStatePathContained(root, path)
+    this.events = new EventStore(this.paths.root, this.guard)
+    this.lock = new RepoLock(this.paths.lock, this.guard)
   }
 
   async commit(
@@ -87,14 +89,14 @@ export class TransactionStore {
         JSON.stringify(prepared.run),
         {
           deadline: options.deadline,
-          guard: (path) => ensureStatePathContained(this.root, path),
+          guard: this.guard,
         },
       )
       options.crash?.("after_run")
       if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
       await atomicReplace(this.paths.activeIndex, JSON.stringify(prepared.index), {
         deadline: options.deadline,
-        guard: (path) => ensureStatePathContained(this.root, path),
+        guard: this.guard,
       })
       options.crash?.("after_index")
       return { ok: true, ...prepared }

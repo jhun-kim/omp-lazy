@@ -1,17 +1,19 @@
-import { chmod, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, realpath, rm, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { z } from "zod"
 import {
   type EvidenceEntry,
   type EvidenceManifest,
   REVIEW_RECEIPTS,
+  type ReceiptContract,
   SOURCE_RECEIPTS,
   type SourceManifest,
   sourceManifestSchema,
 } from "./evidence-manifest-contract"
 import {
   EvidenceManifestError,
-  inspectEvidenceFile,
+  type InspectedEvidenceFile,
+  inspectEvidenceFileBytes,
   listEvidenceFiles,
 } from "./evidence-manifest-files"
 import { type RawEvidenceContract, t14RawEvidenceContracts } from "./t14-evidence-references"
@@ -19,9 +21,20 @@ import { type RawEvidenceContract, t14RawEvidenceContracts } from "./t14-evidenc
 export { EvidenceManifestError } from "./evidence-manifest-files"
 
 type BuildOptions = {
+  readonly afterInspection?: (path: string) => Promise<void>
   readonly commit: string
   readonly mode: "review" | "source"
   readonly root: string
+}
+
+async function inspectForBuild(
+  root: string,
+  contract: ReceiptContract,
+  options: BuildOptions,
+): Promise<InspectedEvidenceFile> {
+  const inspected = await inspectEvidenceFileBytes(root, contract)
+  await options.afterInspection?.(contract.path)
+  return inspected
 }
 
 const commitSchema = z.string().regex(/^[a-f0-9]{40}$/)
@@ -48,9 +61,10 @@ function assertExactPaths(actual: readonly string[], expected: readonly string[]
 async function inspectSourceEntries(
   root: string,
   contracts: readonly RawEvidenceContract[],
+  options: BuildOptions,
 ): Promise<readonly EvidenceEntry[]> {
   const entries = await Promise.all(
-    contracts.map((contract) => inspectEvidenceFile(root, contract)),
+    contracts.map(async (contract) => (await inspectForBuild(root, contract, options)).entry),
   )
   for (let index = 0; index < contracts.length; index += 1) {
     const contract = contracts[index]
@@ -91,18 +105,23 @@ async function validateSourceManifest(
   root: string,
   commit: string,
   contracts: readonly RawEvidenceContract[],
-): Promise<SourceManifest> {
-  const path = resolve(root, "final", "evidence-manifest.json")
-  const manifest = sourceManifestSchema.parse(JSON.parse(await readFile(path, "utf8")))
+  options: BuildOptions,
+): Promise<{ readonly inspected: InspectedEvidenceFile; readonly manifest: SourceManifest }> {
+  const inspected = await inspectForBuild(
+    root,
+    { path: "final/evidence-manifest.json", producerTodo: "T15" },
+    options,
+  )
+  const manifest = sourceManifestSchema.parse(JSON.parse(new TextDecoder().decode(inspected.bytes)))
   if (manifest.commit !== commit) throw new EvidenceManifestError("source manifest commit mismatch")
   if (manifest.evidenceRoot !== root) {
     throw new EvidenceManifestError("source manifest evidence root mismatch")
   }
-  const entries = await inspectSourceEntries(root, contracts)
+  const entries = await inspectSourceEntries(root, contracts, options)
   if (JSON.stringify(manifest.entries) !== JSON.stringify(entries)) {
     throw new EvidenceManifestError("source manifest entries or hashes changed")
   }
-  return manifest
+  return { inspected, manifest }
 }
 
 async function writeManifest(root: string, manifest: EvidenceManifest): Promise<void> {
@@ -127,7 +146,7 @@ export async function buildEvidenceManifest(options: BuildOptions): Promise<Evid
     assertExactPaths(actual, sourcePaths)
     const manifest: EvidenceManifest = {
       commit,
-      entries: await inspectSourceEntries(root, contracts),
+      entries: await inspectSourceEntries(root, contracts, options),
       evidenceRoot: root,
       mode: "source",
       schemaVersion: 1,
@@ -139,19 +158,22 @@ export async function buildEvidenceManifest(options: BuildOptions): Promise<Evid
   const sourceManifestPath = "final/evidence-manifest.json"
   const reviewPaths = REVIEW_RECEIPTS.map((receipt) => receipt.path)
   assertExactPaths(actual, [...sourcePaths, sourceManifestPath, ...reviewPaths].toSorted())
-  await validateSourceManifest(root, commit, contracts)
-  const entries = await Promise.all(
-    REVIEW_RECEIPTS.map((receipt) => inspectEvidenceFile(root, receipt)),
+  const source = await validateSourceManifest(root, commit, contracts, options)
+  const inspectedReviews = await Promise.all(
+    REVIEW_RECEIPTS.map((receipt) => inspectForBuild(root, receipt, options)),
   )
-  for (const receipt of REVIEW_RECEIPTS) {
+  for (let index = 0; index < REVIEW_RECEIPTS.length; index += 1) {
+    const receipt = REVIEW_RECEIPTS[index]
+    const inspected = inspectedReviews[index]
+    if (receipt === undefined || inspected === undefined) {
+      throw new EvidenceManifestError("review receipt inspection mismatch")
+    }
     if (receipt.approval) {
-      assertApproval(receipt.path, await readFile(resolve(root, receipt.path), "utf8"))
+      assertApproval(receipt.path, new TextDecoder().decode(inspected.bytes))
     }
   }
-  const sourceEntry = await inspectEvidenceFile(root, {
-    path: sourceManifestPath,
-    producerTodo: "T15",
-  })
+  const entries = inspectedReviews.map((inspected) => inspected.entry)
+  const sourceEntry = source.inspected.entry
   const manifest: EvidenceManifest = {
     commit,
     entries,

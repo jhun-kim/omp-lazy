@@ -1,8 +1,10 @@
-import { readFile } from "node:fs/promises"
-import { resolve } from "node:path"
 import { z } from "zod"
 import type { ReceiptContract } from "./evidence-manifest-contract"
-import { assertRelativeEvidencePath, EvidenceManifestError } from "./evidence-manifest-files"
+import {
+  assertRelativeEvidencePath,
+  EvidenceManifestError,
+  inspectEvidenceFileBytes,
+} from "./evidence-manifest-files"
 import { HOSTILE_SCENARIO_IDS } from "./hostile-contract"
 
 const rawReferenceSchema = z.strictObject({
@@ -35,22 +37,18 @@ function references(scenario: z.infer<typeof scenarioSchema>): readonly RawEvide
 export async function t14RawEvidenceContracts(
   root: string,
 ): Promise<readonly RawEvidenceContract[]> {
-  const verdictPath = resolve(root, "T14", "hostile-verdict.json")
-  const rejectPath = resolve(root, "T14", "hostile-reject.json")
-  let verdict: z.infer<typeof verdictSchema>
-  let reject: z.infer<typeof rejectSchema>
-  try {
-    verdict = verdictSchema.parse(JSON.parse(await readFile(verdictPath, "utf8")))
-    reject = rejectSchema.parse(JSON.parse(await readFile(rejectPath, "utf8")))
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      const missing = error.message.includes("hostile-verdict")
-        ? "T14/hostile-verdict.json"
-        : "T14/hostile-reject.json"
-      throw new EvidenceManifestError(`missing evidence file: ${missing}`)
-    }
-    throw error
-  }
+  const [verdictFile, rejectFile] = await Promise.all([
+    inspectEvidenceFileBytes(root, {
+      path: "T14/hostile-verdict.json",
+      producerTodo: "T14",
+    }),
+    inspectEvidenceFileBytes(root, {
+      path: "T14/hostile-reject.json",
+      producerTodo: "T14",
+    }),
+  ])
+  const verdict = verdictSchema.parse(JSON.parse(new TextDecoder().decode(verdictFile.bytes)))
+  const reject = rejectSchema.parse(JSON.parse(new TextDecoder().decode(rejectFile.bytes)))
   const scenarioIds = verdict.results.map((result) => result.scenarioId)
   if (JSON.stringify(scenarioIds) !== JSON.stringify(HOSTILE_SCENARIO_IDS)) {
     throw new EvidenceManifestError("T14 hostile verdict must contain G01-G25 exactly once")

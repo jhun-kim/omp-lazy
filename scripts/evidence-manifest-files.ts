@@ -1,4 +1,4 @@
-import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises"
+import { lstat, open, readdir, realpath, stat } from "node:fs/promises"
 import { isAbsolute, relative, resolve } from "node:path"
 import type { EvidenceEntry, ReceiptContract } from "./evidence-manifest-contract"
 
@@ -6,9 +6,54 @@ export class EvidenceManifestError extends Error {
   override readonly name = "EvidenceManifestError"
 }
 
+export type EvidenceInspectionHooks = {
+  readonly afterPathValidation?: () => Promise<void>
+  readonly afterRead?: () => Promise<void>
+}
+
+export type InspectedEvidenceFile = {
+  readonly bytes: Uint8Array
+  readonly entry: EvidenceEntry
+}
+
 function contained(root: string, candidate: string): boolean {
   const fromRoot = relative(root, candidate)
   return fromRoot === "" || (!fromRoot.startsWith("..") && !isAbsolute(fromRoot))
+}
+
+function sameFile(
+  left: { readonly dev: number; readonly ino: number },
+  right: { readonly dev: number; readonly ino: number },
+): boolean {
+  return left.dev === right.dev && left.ino === right.ino
+}
+
+function sameSnapshot(
+  left: {
+    readonly ctimeMs: number
+    readonly dev: number
+    readonly ino: number
+    readonly mtimeMs: number
+    readonly size: number
+  },
+  right: {
+    readonly ctimeMs: number
+    readonly dev: number
+    readonly ino: number
+    readonly mtimeMs: number
+    readonly size: number
+  },
+): boolean {
+  return (
+    sameFile(left, right) &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs
+  )
+}
+
+function samePath(left: string, right: string): boolean {
+  return contained(left, right) && contained(right, left)
 }
 
 export function normalizeEvidencePath(path: string): string {
@@ -52,10 +97,11 @@ function mediaType(path: string): string {
   return "application/octet-stream"
 }
 
-export async function inspectEvidenceFile(
+export async function inspectEvidenceFileBytes(
   root: string,
   contract: ReceiptContract,
-): Promise<EvidenceEntry> {
+  hooks: EvidenceInspectionHooks = {},
+): Promise<InspectedEvidenceFile> {
   const path = assertRelativeEvidencePath(contract.path, "escaping evidence path")
   const candidate = resolve(root, path)
   if (!contained(root, candidate))
@@ -68,19 +114,62 @@ export async function inspectEvidenceFile(
   if (metadata.isSymbolicLink() || !metadata.isFile()) {
     throw new EvidenceManifestError(`evidence is not a regular file: ${path}`)
   }
-  const canonical = await realpath(candidate)
-  const canonicalMetadata = await stat(canonical)
-  if (!contained(root, canonical) || !canonicalMetadata.isFile()) {
-    throw new EvidenceManifestError(`evidence realpath escaped root: ${path}`)
+  const handle = await open(candidate, "r")
+  try {
+    const canonicalRoot = await realpath(root)
+    const canonical = await realpath(candidate)
+    const [openedMetadata, canonicalMetadata] = await Promise.all([handle.stat(), stat(canonical)])
+    if (
+      !contained(canonicalRoot, canonical) ||
+      !openedMetadata.isFile() ||
+      !canonicalMetadata.isFile() ||
+      !sameFile(openedMetadata, canonicalMetadata)
+    ) {
+      throw new EvidenceManifestError(`evidence realpath escaped root: ${path}`)
+    }
+    try {
+      await hooks.afterPathValidation?.()
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new EvidenceManifestError(`evidence identity changed: ${path}`, { cause: error })
+      }
+      throw error
+    }
+    const bytes = await handle.readFile()
+    await hooks.afterRead?.()
+    const afterReadMetadata = await handle.stat()
+    const currentCanonical = await realpath(candidate)
+    const currentMetadata = await stat(currentCanonical)
+    if (
+      !afterReadMetadata.isFile() ||
+      !sameSnapshot(openedMetadata, afterReadMetadata) ||
+      !contained(canonicalRoot, currentCanonical) ||
+      !samePath(canonical, currentCanonical) ||
+      !sameFile(afterReadMetadata, currentMetadata)
+    ) {
+      throw new EvidenceManifestError(`evidence identity changed: ${path}`)
+    }
+    if (bytes.byteLength === 0) throw new EvidenceManifestError(`empty evidence file: ${path}`)
+    return {
+      bytes,
+      entry: {
+        absolutePath: canonical,
+        bytes: bytes.byteLength,
+        mediaType: mediaType(path),
+        path,
+        producerTodo: contract.producerTodo,
+        sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"),
+      },
+    }
+  } finally {
+    await handle.close()
   }
-  const bytes = await readFile(canonical)
-  if (bytes.byteLength === 0) throw new EvidenceManifestError(`empty evidence file: ${path}`)
-  return {
-    absolutePath: canonical,
-    bytes: bytes.byteLength,
-    mediaType: mediaType(path),
-    path,
-    producerTodo: contract.producerTodo,
-    sha256: new Bun.CryptoHasher("sha256").update(bytes).digest("hex"),
-  }
+}
+
+export async function inspectEvidenceFile(
+  root: string,
+  contract: ReceiptContract,
+  hooks: EvidenceInspectionHooks = {},
+): Promise<EvidenceEntry> {
+  return (await inspectEvidenceFileBytes(root, contract, hooks)).entry
 }

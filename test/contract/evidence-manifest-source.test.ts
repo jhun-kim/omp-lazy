@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { appendFile, cp, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
   buildEvidenceManifest,
   EvidenceManifestError,
 } from "../../scripts/evidence-manifest-builder"
+import { inspectEvidenceFile } from "../../scripts/evidence-manifest-files"
 import { createSourceEvidence, testCommit } from "../fixtures/evidence-manifest-fixtures"
 import { repositoryRoot, run } from "../fixtures/package-test-helpers"
 
@@ -137,5 +138,52 @@ describe("source evidence manifest", () => {
     expect(JSON.parse(clean.stdout).commit).toMatch(/^[a-f0-9]{40}$/)
     expect(dirty.exitCode).not.toBe(0)
     expect(dirty.stderr).toContain("tracked worktree is not clean")
+  })
+
+  it("rejects an ancestor swap between evidence validation and byte consumption", async () => {
+    // Given: a contained file and an external junction target with attacker-controlled bytes.
+    const root = await mkdtemp(join(tmpdir(), "omp-lazy-evidence-swap-"))
+    const external = await mkdtemp(join(tmpdir(), "omp-lazy-evidence-external-"))
+    roots.push(root, external)
+    const directory = join(root, "T99")
+    const backup = join(root, "T99-original")
+    await mkdir(directory)
+    await writeFile(join(directory, "receipt.txt"), "trusted bytes\n")
+    await writeFile(join(external, "receipt.txt"), "attacker bytes\n")
+
+    // When: the ancestor becomes an external junction after validation but before pathname read.
+    const inspected = inspectEvidenceFile(
+      root,
+      { path: "T99/receipt.txt", producerTodo: "T15" },
+      {
+        afterPathValidation: async () => {
+          await rename(directory, backup)
+          await symlink(external, directory, "junction")
+        },
+      },
+    )
+
+    // Then: identity/containment drift must reject rather than hash attacker bytes.
+    await expect(inspected).rejects.toThrow(EvidenceManifestError)
+  })
+
+  it("rejects opened-file metadata drift during byte consumption", async () => {
+    // Given: a contained evidence file that changes after its opened bytes are read.
+    const root = await mkdtemp(join(tmpdir(), "omp-lazy-evidence-fstat-"))
+    roots.push(root)
+    const directory = join(root, "T99")
+    const path = join(directory, "receipt.txt")
+    await mkdir(directory)
+    await writeFile(path, "trusted bytes\n")
+
+    // When: the opened file grows before post-read descriptor verification.
+    const inspected = inspectEvidenceFile(
+      root,
+      { path: "T99/receipt.txt", producerTodo: "T15" },
+      { afterRead: async () => appendFile(path, "late bytes\n") },
+    )
+
+    // Then: the inspector rejects metadata drift rather than returning a stale hash.
+    await expect(inspected).rejects.toThrow(EvidenceManifestError)
   })
 })

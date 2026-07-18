@@ -1,5 +1,6 @@
-import { mkdir, open, readFile } from "node:fs/promises"
-import { dirname } from "node:path"
+import { readFile } from "node:fs/promises"
+import { atomicReplace } from "../state/atomic-file"
+import type { StatePathGuard } from "../state/paths"
 import type { Deadline } from "../state/repo-lock"
 
 const MAX_WAL_BYTES = 4 * 1_024 * 1_024
@@ -17,8 +18,12 @@ function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
 }
 
-export async function readAcceptanceWal(path: string): Promise<readonly unknown[]> {
+export async function readAcceptanceWal(
+  path: string,
+  guard?: StatePathGuard,
+): Promise<readonly unknown[]> {
   let bytes: string
+  await guard?.(path)
   try {
     bytes = await readFile(path, "utf8")
   } catch (error) {
@@ -39,16 +44,24 @@ export async function readAcceptanceWal(path: string): Promise<readonly unknown[
 export async function appendAcceptanceWal(
   path: string,
   value: unknown,
-  deadline: Deadline,
+  options: {
+    readonly beforePublish?: () => void
+    readonly deadline: Deadline
+    readonly guard?: StatePathGuard
+  },
 ): Promise<void> {
-  if (!deadline.isValid()) throw new WorkerAcceptanceWalError("deadline_expired")
-  await mkdir(dirname(path), { recursive: true })
-  const handle = await open(path, "a")
-  try {
-    await handle.writeFile(`${JSON.stringify(value)}\n`)
-    await handle.sync()
-  } finally {
-    await handle.close()
+  if (!options.deadline.isValid()) throw new WorkerAcceptanceWalError("deadline_expired")
+  const entries = [...(await readAcceptanceWal(path, options.guard)), value]
+  if (entries.length > MAX_WAL_ENTRIES) throw new WorkerAcceptanceWalError("wal_too_large")
+  const lines = entries.map((entry) => JSON.stringify(entry))
+  if (lines.some((line) => line === undefined)) {
+    throw new WorkerAcceptanceWalError("malformed_wal")
   }
-  if (!deadline.isValid()) throw new WorkerAcceptanceWalError("deadline_expired")
+  const bytes = `${lines.join("\n")}\n`
+  if (Buffer.byteLength(bytes) > MAX_WAL_BYTES) throw new WorkerAcceptanceWalError("wal_too_large")
+  await atomicReplace(path, bytes, {
+    deadline: options.deadline,
+    ...(options.beforePublish === undefined ? {} : { beforePublish: options.beforePublish }),
+    ...(options.guard === undefined ? {} : { guard: options.guard }),
+  })
 }

@@ -1,9 +1,7 @@
-import { readFile, realpath, rm } from "node:fs/promises"
-import { join } from "node:path"
+import { realpath } from "node:fs/promises"
 import { WorkerAcceptanceLedger } from "../contracts/worker-acceptance-ledger"
 import type { TaskEventLedger } from "../gates/task-event-ledger"
 import { taskGeneration } from "../gates/task-ledger-view"
-import { atomicReplace } from "../state/atomic-file"
 import { deadlineAfter } from "../state/repo-lock"
 import { checkWorkingDirectory } from "../state/repo-root"
 import {
@@ -17,6 +15,7 @@ import {
   TeamStateSchema,
   type TeamWorktreeBinding,
 } from "./teammode-domain"
+import { TeammodeStateStore } from "./teammode-state-store"
 import { validateTeamWorktree } from "./teammode-worktree"
 
 export type { TeamCaller, TeamDefinition, TeamResult, TeamState } from "./teammode-domain"
@@ -26,15 +25,13 @@ function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-function missing(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT"
-}
-
 export class TeammodeContract {
   readonly acceptance: WorkerAcceptanceLedger
+  readonly states: TeammodeStateStore
 
   constructor(readonly taskLedger: TaskEventLedger) {
     this.acceptance = new WorkerAcceptanceLedger(taskLedger.store)
+    this.states = new TeammodeStateStore(taskLedger.store)
   }
 
   async initialize(caller: TeamCaller, input: unknown): Promise<TeamResult> {
@@ -211,12 +208,7 @@ export class TeammodeContract {
   }
 
   async read(teamName: string): Promise<TeamState | null> {
-    try {
-      return TeamStateSchema.parse(JSON.parse(await readFile(this.#path(teamName), "utf8")))
-    } catch (error) {
-      if (missing(error)) return null
-      throw error
-    }
+    return this.states.read(teamName)
   }
 
   async #transact(
@@ -244,16 +236,12 @@ export class TeammodeContract {
       const current = await this.read(teamName)
       const result = await decide(current, scope.value)
       if (!result.ok) return result
-      if (result.status === "deleted") await rm(this.#path(teamName))
+      if (result.status === "deleted") await this.states.remove(teamName, deadline)
       else if (result.state !== undefined && !same(result.state, current))
-        await atomicReplace(this.#path(teamName), JSON.stringify(result.state), { deadline })
+        await this.states.replace(teamName, result.state, deadline)
       return result
     } finally {
       await handle.release()
     }
-  }
-
-  #path(teamName: string): string {
-    return join(this.taskLedger.store.paths.root, "teams", `${teamName}.json`)
   }
 }

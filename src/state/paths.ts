@@ -54,12 +54,11 @@ function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
 }
 
-async function nearestExistingPath(path: string): Promise<string> {
+async function nearestExistingCanonicalPath(path: string): Promise<string> {
   let candidate = path
   while (true) {
     try {
-      await realpath(candidate)
-      return candidate
+      return await realpath(candidate)
     } catch (error) {
       if (!isMissing(error)) throw new StateRootContainmentError("state_root_unreadable")
       const parent = dirname(candidate)
@@ -74,8 +73,7 @@ export async function ensureStatePathContained(root: CanonicalRoot, path: string
   if (!isCanonicalPathContained(root.canonicalPath, lexical)) {
     throw new StateRootContainmentError("state_root_escaped")
   }
-  const existing = await nearestExistingPath(path)
-  const resolved = canonicalComparisonPath(await realpath(existing))
+  const resolved = canonicalComparisonPath(await nearestExistingCanonicalPath(path))
   if (!isCanonicalPathContained(root.canonicalPath, resolved)) {
     throw new StateRootContainmentError("state_root_escaped")
   }

@@ -73,7 +73,7 @@ export class TaskSidecarStore {
       await atomicReplace(
         this.#ledgerPath(resolved.value.run.runId),
         JSON.stringify(merged.ledger),
-        { deadline },
+        { deadline, guard: this.store.guard },
       )
       return { kind: "scope", value: decision.value, changed: true }
     } finally {
@@ -153,8 +153,10 @@ export class TaskSidecarStore {
 
   async #readLedger(run: AnyRun): Promise<TaskLedger> {
     let bytes: string
+    const path = this.#ledgerPath(run.runId)
+    await this.store.guard(path)
     try {
-      bytes = await readFile(this.#ledgerPath(run.runId), "utf8")
+      bytes = await readFile(path, "utf8")
     } catch (error) {
       if (isMissing(error)) {
         return taskLedgerSchema.parse({

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { appendFile, chmod, mkdir, rm, writeFile } from "node:fs/promises"
+import { appendFile, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { sha256File } from "../../scripts/artifact-hash"
 import { expectedProductRuntime } from "../../scripts/product-runtime-contract"
 import {
   commitCandidate,
@@ -108,5 +109,49 @@ describe("staged candidate proof", () => {
     // Then: the missing installed entry cannot be mistaken for a valid package.
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain("staged package is missing its declared extension entrypoint")
+  }, 300_000)
+
+  it("rejects a jointly replaced receipt and tarball before extension side effects", async () => {
+    // Given: a valid victim receipt and a self-consistent malicious tarball/receipt pair.
+    const victim = await builtCandidate("staged-forged-victim")
+    const malicious = await copyCandidate("staged-forged-malicious")
+    sandboxes.push(malicious)
+    const marker = join(victim.candidate, "malicious-extension-loaded.txt")
+    const entrypoint = join(malicious, "src", "index.ts")
+    await writeFile(
+      entrypoint,
+      `await Bun.write(${JSON.stringify(marker)}, "loaded before validation\\n")\n${await readFile(entrypoint, "utf8")}`,
+    )
+    commitCandidate(malicious)
+    const packed = run([
+      "bun",
+      "scripts/pack-candidate.ts",
+      "--candidate",
+      malicious,
+      "--mode",
+      "build",
+      "--destination",
+      join(malicious, ".omo", "evidence", "candidate"),
+    ])
+    expect(packed.exitCode).toBe(0)
+    const maliciousReceipt = JSON.parse(packed.stdout)
+    const forged = {
+      ...JSON.parse(JSON.stringify(victim.receipt)),
+      tarball: maliciousReceipt.tarball,
+      sha256: await sha256File(maliciousReceipt.tarball),
+    }
+    const forgedReceipt = join(victim.candidate, ".omo", "evidence", "candidate", "candidate.json")
+    await chmod(forgedReceipt, 0o666)
+    await writeFile(forgedReceipt, `${JSON.stringify(forged, null, 2)}\n`)
+
+    // When: staged smoke consumes the attacker-replaced ignored artifacts.
+    const result = run(
+      ["bun", join(repositoryRoot, "scripts", "smoke-staged.ts")],
+      victim.candidate,
+    )
+
+    // Then: independent committed-byte proof rejects before any extension import.
+    expect(result.exitCode).not.toBe(0)
+    expect(await Bun.file(marker).exists()).toBeFalse()
   }, 300_000)
 })

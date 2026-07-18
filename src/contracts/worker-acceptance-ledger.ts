@@ -142,7 +142,7 @@ export class WorkerAcceptanceLedger {
     await atomicReplace(
       this.rejectionPath(scope.runId),
       JSON.stringify(rejectionLedgerSchema.parse({ ...ledger, entries })),
-      { deadline },
+      { deadline, guard: this.store.guard },
     )
     return count
   }
@@ -176,8 +176,14 @@ export class WorkerAcceptanceLedger {
       ledgerRevision: ledger.ledgerRevision + 1,
       entries: [...ledger.entries, candidate],
     })
-    await appendAcceptanceWal(this.acceptanceWalPath(event.runId), candidate, deadline)
-    await atomicReplace(this.acceptancePath(event.runId), JSON.stringify(updated), { deadline })
+    await appendAcceptanceWal(this.acceptanceWalPath(event.runId), candidate, {
+      deadline,
+      guard: this.store.guard,
+    })
+    await atomicReplace(this.acceptancePath(event.runId), JSON.stringify(updated), {
+      deadline,
+      guard: this.store.guard,
+    })
     return "accepted"
   }
 
@@ -187,10 +193,10 @@ export class WorkerAcceptanceLedger {
 
   async #readAcceptance(runId: string): Promise<AcceptanceLedger> {
     let snapshot: AcceptanceLedger
+    const path = this.acceptancePath(runId)
+    await this.store.guard(path)
     try {
-      snapshot = acceptanceLedgerSchema.parse(
-        JSON.parse(await readFile(this.acceptancePath(runId), "utf8")),
-      )
+      snapshot = acceptanceLedgerSchema.parse(JSON.parse(await readFile(path, "utf8")))
     } catch (error) {
       if (isMissing(error)) {
         snapshot = acceptanceLedgerSchema.parse({
@@ -204,7 +210,7 @@ export class WorkerAcceptanceLedger {
       }
     }
     const entries = [...snapshot.entries]
-    for (const raw of await readAcceptanceWal(this.acceptanceWalPath(runId))) {
+    for (const raw of await readAcceptanceWal(this.acceptanceWalPath(runId), this.store.guard)) {
       const event = acceptanceEventSchema.parse(raw)
       const existing = entries[event.sequence - 1]
       if (existing !== undefined) {
@@ -221,10 +227,10 @@ export class WorkerAcceptanceLedger {
   }
 
   async #readRejections(runId: string): Promise<RejectionLedger> {
+    const path = this.rejectionPath(runId)
+    await this.store.guard(path)
     try {
-      return rejectionLedgerSchema.parse(
-        JSON.parse(await readFile(this.rejectionPath(runId), "utf8")),
-      )
+      return rejectionLedgerSchema.parse(JSON.parse(await readFile(path, "utf8")))
     } catch (error) {
       if (isMissing(error)) {
         return rejectionLedgerSchema.parse({ schemaVersion: 1, runId, entries: [] })

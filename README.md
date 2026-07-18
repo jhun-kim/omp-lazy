@@ -169,6 +169,9 @@ Repository state lives only below `<repository>/.omo/omp-lazy`. Runs, events, th
 locks, and recovery files remain repository-scoped. Canonical path checks reject symlink or Windows
 junction escapes before mutation. Release and host gates use disposable homes, profiles, temporary
 directories, and worktree roots; they do not mutate a pre-existing operator profile or state root.
+These checks reject static redirected paths at each operation boundary; they do not claim protection
+against a separate hostile OS process concurrently changing filesystem topology because Bun does not
+expose a portable `openat`-style relative filesystem API.
 
 ## Evidence handoff
 
