@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { cp, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { assertSkillSync } from "../../scripts/assert-skill-sync"
+import { assertSkillSync, type SkillSyncReceipt } from "../../scripts/assert-skill-sync"
 import { repositoryRoot, run } from "../fixtures/package-test-helpers"
 
 const candidates: string[] = []
@@ -52,5 +52,53 @@ describe("skill sync contract", () => {
     expect(result.stderr).toContain(
       "missing required skill file: ulw-loop/references/full-workflow.md",
     )
+  })
+
+  it("accepts harmless prose variation when stable protocol markers remain", async () => {
+    // Given: copied skills whose generic explanatory prose changes but protocol markers remain.
+    const candidate = await copiedSkillsCandidate("prose-variation")
+    await writeFile(
+      join(candidate, "skills", "start-work", "SKILL.md"),
+      `---
+name: start-work
+description: start-work fixture
+---
+
+# Start work
+
+Run an accepted plan from \`.omo/plans\` and settle worker evidence through \`omp_lazy_accept_worker_result\`.
+`,
+    )
+    await writeFile(
+      join(candidate, "skills", "ulw-loop", "SKILL.md"),
+      `---
+name: ulw-loop
+description: ulw-loop fixture
+---
+
+# ULW loop
+
+Read [the full workflow](references/full-workflow.md) before controlling a run.
+`,
+    )
+    await writeFile(
+      join(candidate, "skills", "ulw-research", "SKILL.md"),
+      `---
+name: ulw-research
+description: ulw-research fixture
+---
+
+# ulw-research
+
+Keep [attribution](ATTRIBUTION.md) and require the protocol marker \`EXPAND\` on axis output.
+`,
+    )
+
+    // When: structural sync validates the copied candidate.
+    const receipt: SkillSyncReceipt = await assertSkillSync(candidate)
+
+    // Then: harmless prose edits do not fail machine validation.
+    expect(receipt.status).toBe("PASS")
+    expect(receipt.skillNames).toContain("start-work")
   })
 })

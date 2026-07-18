@@ -33,12 +33,12 @@ const requiredContentTokens = {
   "lcx-contribute-bug-fix": [],
   "lcx-doctor": [],
   "lcx-report-bug": [],
-  "start-work": [".omo/plans", "approval", "parent", "omp_lazy_accept_worker_result"],
+  "start-work": [".omo/plans", "omp_lazy_accept_worker_result"],
   teammode: [],
   ultrawork: ["ULTRAWORK MODE ENABLED!", "<!-- omp-lazy-ultrawork-contract:v1 -->"],
-  "ulw-loop": ["references/full-workflow.md", "cycle", "identical failures"],
+  "ulw-loop": ["references/full-workflow.md"],
   "ulw-plan": [],
-  "ulw-research": ["ATTRIBUTION.md", "EXPAND", "abstain"],
+  "ulw-research": ["ATTRIBUTION.md", "EXPAND"],
 } as const satisfies Record<(typeof expectedProductRuntime.skillNames)[number], readonly string[]>
 
 const markdownReferencePattern = /\]\((?!https?:|mailto:|#)([^)]+)\)/g
