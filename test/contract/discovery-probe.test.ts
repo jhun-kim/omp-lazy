@@ -54,19 +54,19 @@ describe("public discovery probe", () => {
     expect(receipt.productAgentNames).toEqual(expectedProductRuntime.agentNames)
   })
 
-  it("characterizes the current product RED without losing existing skill identities", async () => {
-    // Given: T07/T08 have not restored the missing OMO assets yet.
+  it("characterizes the remaining product RED without losing restored skill identities", async () => {
+    // Given: T07 restores OMO skills while T08 still owns the missing agent assets.
     const root = repositoryRoot
 
     // When: the current repository is discovered through the public APIs.
     const receipt = await inspectProductDiscovery(root)
 
-    // Then: only four target skills and four target agents are absent from the owned surface.
-    expect(receipt.missingSkillNames).toHaveLength(4)
+    // Then: all target skills are present and only the four T08 agents remain absent.
+    expect(receipt.missingSkillNames).toEqual([])
     expect(receipt.missingAgentNames).toHaveLength(4)
     expect(receipt.unexpectedSkillNames).toEqual([])
     expect(receipt.unexpectedAgentNames).toEqual([])
-    expect(receipt.productSkillNames).toHaveLength(expectedProductRuntime.skillNames.length - 4)
+    expect(receipt.productSkillNames).toEqual(expectedProductRuntime.skillNames)
   })
 
   it("checks an installed copy candidate through the same discovery contract", async () => {
