@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises"
 const {
   OMP_LAZY_CRASH_POINT,
   OMP_LAZY_ESCAPE_CHILD,
+  OMP_LAZY_ESCAPE_PARENT_PID,
   OMP_LAZY_ESCAPE_ROLE,
   OMP_LAZY_INJECT_DELAY_MS,
   OMP_LAZY_LATE_SENTINEL,
@@ -11,16 +12,36 @@ const delayMs = Number.parseInt(OMP_LAZY_INJECT_DELAY_MS ?? "0", 10)
 const crashPoint = OMP_LAZY_CRASH_POINT ?? "none"
 const sentinel = OMP_LAZY_LATE_SENTINEL
 
+async function waitForProcessExit(pid: number): Promise<void> {
+  while (true) {
+    try {
+      process.kill(pid, 0)
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ESRCH") return
+      throw error
+    }
+    await Bun.sleep(10)
+  }
+}
+
 if (OMP_LAZY_ESCAPE_CHILD === "1" && OMP_LAZY_ESCAPE_ROLE !== "child") {
   process.stdout.write("G04 escaping parent started\n")
-  process.stderr.write("G04 escaping descendant armed\n")
   const child = Bun.spawn(["bun", import.meta.path], {
-    env: { ...process.env, OMP_LAZY_ESCAPE_CHILD: undefined, OMP_LAZY_ESCAPE_ROLE: "child" },
+    env: {
+      ...process.env,
+      OMP_LAZY_ESCAPE_CHILD: undefined,
+      OMP_LAZY_ESCAPE_PARENT_PID: String(process.pid),
+      OMP_LAZY_ESCAPE_ROLE: "child",
+    },
     stderr: "inherit",
     stdout: "inherit",
   })
   process.exitCode = await child.exited
 } else {
+  if (OMP_LAZY_ESCAPE_ROLE === "child") {
+    process.stdout.write("G04 escaping descendant armed\n")
+    await waitForProcessExit(Number.parseInt(OMP_LAZY_ESCAPE_PARENT_PID ?? "", 10))
+  }
   if (delayMs > 0) {
     await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, delayMs))
   }

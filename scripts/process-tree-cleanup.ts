@@ -72,7 +72,7 @@ async function awaitGroupExit(pid: number): Promise<boolean> {
 }
 
 export async function cleanupProcessTree(request: {
-  readonly completionSettled: boolean
+  readonly completionSettled: () => boolean
   readonly pid: number
   readonly systemRoot: string
 }): Promise<void> {
@@ -84,10 +84,11 @@ export async function cleanupProcessTree(request: {
     ) {
       return
     }
+    if (request.completionSettled()) return
     throw new ProcessTreeCleanupError(request.pid)
   }
   if (!groupExists(request.pid)) {
-    if (request.completionSettled) return
+    if (request.completionSettled()) return
     throw new ProcessTreeCleanupError(request.pid)
   }
   process.kill(-request.pid, "SIGKILL")

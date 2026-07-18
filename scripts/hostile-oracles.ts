@@ -50,6 +50,7 @@ export async function runEscapingScenario(
         OMP_LAZY_INJECT_DELAY_MS: String(options.delayMs),
         OMP_LAZY_LATE_SENTINEL: sentinel,
       },
+      stdoutReadyMarker: "G04 escaping descendant armed",
     })
     const raw = await writeRawProcess(root, "G04", "forced-escape", captured)
     await observeWindow(options.observationMs)

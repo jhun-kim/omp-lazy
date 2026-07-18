@@ -8,6 +8,7 @@ import {
   type ScenarioId,
 } from "../../scripts/hostile-contract"
 import { preserveFirstFailure, runEscapingScenario } from "../../scripts/hostile-oracles"
+import { captureProcess, ProcessReadinessError } from "../../scripts/hostile-process"
 import { runHostileScenario } from "../../scripts/hostile-scenario"
 import { replayHostile } from "../../scripts/replay-hostile"
 import { threatManifest } from "../../scripts/threat-manifest"
@@ -74,6 +75,46 @@ describe("bounded hostile replay", () => {
     }
   }, 30_000)
 
+  test("Given a delayed stdout readiness marker When capture starts Then its deadline begins after the complete marker", async () => {
+    // Given
+    const marker = "hostile capture ready"
+
+    // When
+    const captured = await captureProcess({
+      argv: [
+        "bun",
+        "-e",
+        `process.stdout.write("hostile "); await Bun.sleep(100); process.stdout.write("capture "); await Bun.sleep(10); process.stdout.write("ready\\n"); await Bun.sleep(5_000)`,
+      ],
+      cwd: process.cwd(),
+      deadlineMs: 25,
+      environment: process.env,
+      stdoutReadyMarker: marker,
+    })
+
+    // Then
+    expect(captured.timedOut).toBeTrue()
+    expect(new TextDecoder().decode(captured.stdout)).toBe(`${marker}\n`)
+  }, 10_000)
+
+  test("Given a required stdout marker that never arrives When startup remains alive Then capture fails within the startup bound", async () => {
+    // Given
+    const capture = captureProcess({
+      argv: ["bun", "-e", "await Bun.sleep(1_000)"],
+      cwd: process.cwd(),
+      deadlineMs: 5_000,
+      environment: process.env,
+      stdoutReadyMarker: "never emitted",
+      stdoutReadyTimeoutMs: 25,
+    })
+
+    // When / Then
+    await expect(capture).rejects.toMatchObject({
+      name: ProcessReadinessError.name,
+      reason: "timeout",
+    })
+  }, 10_000)
+
   test("Given a delayed escaping descendant When Windows taskkill or a POSIX-owned group times out Then no late mutation survives", async () => {
     // Given
     const root = await temporaryEvidence("hostile-escape")
@@ -102,6 +143,7 @@ describe("bounded hostile replay", () => {
         readFile(resolve(root, result.process.stdout.path)),
         readFile(resolve(root, result.process.stderr.path)),
       ])
+      expect(rawBytes[0]?.toString("utf8")).toContain("G04 escaping descendant armed")
       expect(rawBytes.reduce((total, bytes) => total + bytes.byteLength, 0)).toBeGreaterThan(0)
     } finally {
       await rm(root, { force: true, recursive: true })

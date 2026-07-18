@@ -168,7 +168,7 @@ async function run(arguments_: RunnerArguments): Promise<RunReceipt> {
     const timedOut = !initial.settled
     const cleanupError = timedOut
       ? await cleanupProcessTree({
-          completionSettled,
+          completionSettled: () => completionSettled,
           pid: child.pid,
           systemRoot: inherited("SystemRoot"),
         }).then(
@@ -177,7 +177,7 @@ async function run(arguments_: RunnerArguments): Promise<RunReceipt> {
         )
       : undefined
     if (!timedOut && process.platform !== "win32") {
-      await cleanupProcessTree({ completionSettled: true, pid: child.pid, systemRoot: "" })
+      await cleanupProcessTree({ completionSettled: () => true, pid: child.pid, systemRoot: "" })
     }
     const completed = initial.settled
       ? initial
