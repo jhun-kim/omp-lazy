@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
@@ -103,8 +103,8 @@ describe("product runtime contract", () => {
     )
   })
 
-  it("rejects an unauthorized extra tool", async () => {
-    // Given: a malformed fixture extension registers a tool outside the approved inventory.
+  it("rejects exact unexpected tool and agent items in a copied plugin", async () => {
+    // Given: a copied plugin fixture registers a tool and agent outside the approved inventory.
     const root = await packageFixture([
       `
       export default function fixture(api) {
@@ -117,13 +117,18 @@ describe("product runtime contract", () => {
       }
     `,
     ])
+    await mkdir(join(root, "agents"), { recursive: true })
+    await writeFile(join(root, "agents", "unexpected-agent.md"), agentMarkdown("unexpected-agent"))
 
     // When: the fixture is loaded through OMP's public loader.
     const receipt = await loadRuntimeInventoryFromManifest(join(root, "package.json"))
 
-    // Then: exact tool comparison rejects the unauthorized registration.
-    await expect(assertExactProductRuntime(receipt)).rejects.toThrow("tools inventory mismatch")
+    // Then: exact comparison names the unexpected runtime item.
+    await expect(assertExactProductRuntime(receipt)).rejects.toThrow(
+      'tools inventory mismatch: missing ["omp_lazy_accept_worker_result"], unexpected ["unauthorized_tool"]',
+    )
     expect(receipt.inventory.toolNames).toEqual(["unauthorized_tool"])
+    expect(receipt.inventory.agentNames).toEqual(["unexpected-agent"])
   })
 
   it("rejects a loader error before comparing runtime inventory", async () => {
@@ -140,3 +145,7 @@ describe("product runtime contract", () => {
     expect(JSON.stringify(receipt.inventory.errors)).toContain("Expected identifier")
   })
 })
+
+function agentMarkdown(name: string): string {
+  return `---\nname: ${name}\ndescription: ${name} contract fixture\nblocking: false\n---\n\nReturn the declared fixture result.\n`
+}

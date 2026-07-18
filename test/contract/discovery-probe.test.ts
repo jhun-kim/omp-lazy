@@ -54,19 +54,20 @@ describe("public discovery probe", () => {
     expect(receipt.productAgentNames).toEqual(expectedProductRuntime.agentNames)
   })
 
-  it("characterizes the remaining product RED without losing restored skill identities", async () => {
-    // Given: T07 restores OMO skills while T08 still owns the missing agent assets.
+  it("discovers the completed product inventory without unexpected names", async () => {
+    // Given: T08 restores the four product agent assets after T07 restored OMO skills.
     const root = repositoryRoot
 
     // When: the current repository is discovered through the public APIs.
     const receipt = await inspectProductDiscovery(root)
 
-    // Then: all target skills are present and only the four T08 agents remain absent.
+    // Then: every expected skill and agent is present with no unexpected product-owned names.
     expect(receipt.missingSkillNames).toEqual([])
-    expect(receipt.missingAgentNames).toHaveLength(4)
+    expect(receipt.missingAgentNames).toEqual([])
     expect(receipt.unexpectedSkillNames).toEqual([])
     expect(receipt.unexpectedAgentNames).toEqual([])
     expect(receipt.productSkillNames).toEqual(expectedProductRuntime.skillNames)
+    expect(receipt.productAgentNames).toEqual(expectedProductRuntime.agentNames)
   })
 
   it("checks an installed copy candidate through the same discovery contract", async () => {
@@ -97,6 +98,20 @@ describe("public discovery probe", () => {
     // When/Then: the file-surface contract rejects duplicates before discovery can shadow them.
     await expect(assertExactProductDiscovery(candidate)).rejects.toThrow(
       "duplicate discovery names",
+    )
+  })
+
+  it("rejects the exact unexpected agent in a copied plugin", async () => {
+    // Given: a candidate contains all product inventory plus one unapproved agent file.
+    const candidate = await completeDiscoveryCandidate("unexpected-agent")
+    await writeFile(
+      join(candidate, "agents", "unexpected-agent.md"),
+      agentMarkdown("unexpected-agent", "unexpected agent"),
+    )
+
+    // When/Then: exact discovery rejects the copied plugin by the unexpected item name.
+    await expect(assertExactProductDiscovery(candidate)).rejects.toThrow(
+      "unexpected agent discovery: unexpected-agent",
     )
   })
 

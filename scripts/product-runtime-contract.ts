@@ -78,10 +78,23 @@ function formatZodIssues(error: z.ZodError): string {
 
 function requireEqual(label: string, actual: unknown, expected: unknown): void {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    if (isStringArray(actual) && isStringArray(expected)) {
+      const expectedSet = new Set(expected)
+      const actualSet = new Set(actual)
+      const missing = expected.filter((item) => !actualSet.has(item))
+      const unexpected = actual.filter((item) => !expectedSet.has(item))
+      throw new ProductRuntimeContractError(
+        `${label} inventory mismatch: missing ${JSON.stringify(missing)}, unexpected ${JSON.stringify(unexpected)}`,
+      )
+    }
     throw new ProductRuntimeContractError(
       `${label} inventory mismatch: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`,
     )
   }
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
 }
 
 function findDuplicate(label: string, values: readonly string[]): void {

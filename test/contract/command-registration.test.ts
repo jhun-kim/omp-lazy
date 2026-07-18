@@ -4,30 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions"
+import { expectedProductRuntime } from "../../scripts/product-runtime-contract"
 import { COMMAND_DEFINITIONS, COMMAND_REGISTRATIONS } from "../../src/commands/command-definitions"
 import { diagnoseCommandCollisions } from "../../src/commands/register-workflow-commands"
-
-const EXPECTED_REGISTRATIONS = [
-  "/omp-lazy-teammode",
-  "/teammode",
-  "/omp-lazy-start-work",
-  "/start-work",
-  "/omp-lazy-ultrawork",
-  "/ultrawork",
-  "/ulw",
-  "/omp-lazy-ulw-loop",
-  "/ulw-loop",
-  "/omp-lazy-ulw-plan",
-  "/ulw-plan",
-  "/omp-lazy-ulw-research",
-  "/ulw-research",
-  "/omp-lazy-doctor",
-  "/lcx-doctor",
-  "/omp-lazy-report-bug",
-  "/lcx-report-bug",
-  "/omp-lazy-contribute-bug-fix",
-  "/lcx-contribute-bug-fix",
-] as const
 
 const EXPECTED_GRAMMAR = {
   teammode: [
@@ -85,7 +64,9 @@ async function fixtureExtension(body: string): Promise<string> {
 
 describe("authoritative command catalog", () => {
   test("contains the exact canonical and alias inventory once", () => {
-    expect(COMMAND_REGISTRATIONS.map((entry) => entry.command)).toEqual([...EXPECTED_REGISTRATIONS])
+    expect(COMMAND_REGISTRATIONS.map((entry) => entry.command.slice(1)).sort()).toEqual(
+      expectedProductRuntime.commandNames,
+    )
     expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(19)
     expect(COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw")?.workflow).toBe(
       "ultrawork",
@@ -115,9 +96,7 @@ describe("public OMP registration inventory", () => {
     expect(loaded.errors).toEqual([])
     const product = loaded.extensions[0]
     if (product === undefined) throw new Error("public loader returned no extension")
-    expect([...product.commands.keys()].map((name) => `/${name}`)).toEqual([
-      ...EXPECTED_REGISTRATIONS,
-    ])
+    expect([...product.commands.keys()].sort()).toEqual(expectedProductRuntime.commandNames)
   })
 
   test("reports built-in and later-extension collisions as non-PASS", async () => {
