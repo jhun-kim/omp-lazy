@@ -64,7 +64,9 @@ function parseArguments(argv: readonly string[]): RunnerArguments {
   return { argv: [executable, ...command.slice(1)], cwd, profile, timeoutMs }
 }
 
-function inherited(name: "SystemRoot" | "ComSpec" | "PATH" | "PATHEXT"): string {
+function inherited(
+  name: "SystemRoot" | "ComSpec" | "PATH" | "PATHEXT" | "HOME" | "USERPROFILE",
+): string {
   const pair = Object.entries(process.env).find(([key]) => key.toLowerCase() === name.toLowerCase())
   return pair?.[1] ?? ""
 }
@@ -80,6 +82,8 @@ async function createEnvironment(cwd: string): Promise<{
   readonly environment: Readonly<Record<string, string>>
   readonly sandboxRoot: string
 }> {
+  const hostProfile = inherited("USERPROFILE") || inherited("HOME")
+  if (hostProfile.length === 0) throw new RunnerArgumentError("host profile is unavailable")
   const sandboxRoot = await mkdtemp(join(cwd, ".omp-lazy-isolated-"))
   assertContained(cwd, sandboxRoot)
   const home = join(sandboxRoot, "home")
@@ -112,6 +116,7 @@ async function createEnvironment(cwd: string): Promise<{
       HOME: home,
       PI_CODING_AGENT_DIR: join(home, ".omp", "agent"),
       PI_CONFIG_DIR: ".omp",
+      OMP_LAZY_HOST_PROFILE: hostProfile,
       OMP_WORKTREE_DIR: join(sandboxRoot, "worktrees"),
       XDG_DATA_HOME: join(sandboxRoot, "xdg", "data"),
       XDG_STATE_HOME: join(sandboxRoot, "xdg", "state"),

@@ -1,10 +1,9 @@
-import { createReadStream } from "node:fs"
 import { lstat, mkdir, mkdtemp, readlink, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { z } from "zod"
 import { startLoopbackProvider } from "../test/fixtures/omp-provider-server"
+import { assertPinnedOmpExecutable, ompCommand, parseOmpExecutableOption } from "./omp-executable"
 
-const EXPECTED_VERSION = "16.4.8"
 const fakeKey = "omp-lazy-non-secret-preflight-key"
 
 type PreflightReceipt = {
@@ -28,18 +27,11 @@ function parseArguments(argv: readonly string[]): {
   readonly diagnosticProviderOnly: boolean
   readonly ompPath: string
 } {
-  const schema = z.union([
-    z.tuple([z.literal("--omp-exe"), z.string().min(1)]),
-    z.tuple([z.literal("--omp-exe"), z.string().min(1), z.literal("--diagnostic-provider-only")]),
-  ])
-  const parsed = schema.parse(argv)
-  return { diagnosticProviderOnly: parsed.length === 3, ompPath: resolve(parsed[1]) }
-}
-
-async function sha256(path: string): Promise<string> {
-  const hasher = new Bun.CryptoHasher("sha256")
-  for await (const chunk of createReadStream(path)) hasher.update(chunk)
-  return hasher.digest("hex")
+  const parsed = parseOmpExecutableOption(argv)
+  const rest = z
+    .union([z.tuple([]), z.tuple([z.literal("--diagnostic-provider-only")])])
+    .parse(parsed.rest)
+  return { diagnosticProviderOnly: rest.length === 1, ompPath: resolve(parsed.ompPath) }
 }
 
 function findIdentity(output: string, key: "agentId" | "jobId", fallback: string): string {
@@ -49,12 +41,7 @@ function findIdentity(output: string, key: "agentId" | "jobId", fallback: string
 
 async function main(): Promise<void> {
   const { diagnosticProviderOnly, ompPath } = parseArguments(Bun.argv.slice(2))
-  const versionProcess = Bun.spawnSync([ompPath, "--version"], { stderr: "pipe", stdout: "pipe" })
-  const versionOutput = new TextDecoder().decode(versionProcess.stdout).trim()
-  const version = versionOutput.replace(/^omp\//, "")
-  if (versionProcess.exitCode !== 0 || version !== EXPECTED_VERSION) {
-    throw new PreflightError(`expected OMP ${EXPECTED_VERSION}, received ${versionOutput}`)
-  }
+  const omp = await assertPinnedOmpExecutable(ompPath)
 
   const { TEMP: tempRoot, PI_CODING_AGENT_DIR: agentRoot } = process.env
   if (tempRoot === undefined || agentRoot === undefined) {
@@ -103,24 +90,25 @@ async function main(): Promise<void> {
 
     const session = Bun.spawn(
       [
-        ompPath,
-        "-p",
-        "--mode",
-        "json",
-        "--no-session",
-        "--no-extensions",
-        "--no-skills",
-        "--no-rules",
-        "--model",
-        "omp-lazy-local/omp-lazy-preflight",
-        "--max-time",
-        "90",
-        "--auto-approve",
-        "--approval-mode",
-        "yolo",
-        "--cwd",
-        sandbox,
-        "Launch exactly one task agent named preflight-worker and wait for its result.",
+        ...ompCommand(omp.path, [
+          "-p",
+          "--mode",
+          "json",
+          "--no-session",
+          "--no-extensions",
+          "--no-skills",
+          "--no-rules",
+          "--model",
+          "omp-lazy-local/omp-lazy-preflight",
+          "--max-time",
+          "90",
+          "--auto-approve",
+          "--approval-mode",
+          "yolo",
+          "--cwd",
+          sandbox,
+          "Launch exactly one task agent named preflight-worker and wait for its result.",
+        ]),
       ],
       {
         env: { ...process.env, OMP_LAZY_PROVIDER_KEY: fakeKey },
@@ -145,7 +133,7 @@ async function main(): Promise<void> {
     const receipt: PreflightReceipt = {
       async: { agentId, jobId },
       cleanup: { provider: "complete", sandbox: "complete" },
-      omp: { path: ompPath, sha256: await sha256(ompPath), version },
+      omp,
       provider: { requestCount: provider.requests.length, url: provider.url },
       roots: { agent: await realpath(agentRoot), sandbox: await realpath(sandbox) },
       session: {

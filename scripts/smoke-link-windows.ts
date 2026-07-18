@@ -1,16 +1,25 @@
 import { lstat, realpath } from "node:fs/promises"
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { z } from "zod"
+import { assertPinnedOmpExecutable, ompCommand, parseOmpExecutableOption } from "./omp-executable"
 
 const argumentsSchema = z.union([
   z.tuple([]),
   z.tuple([z.literal("--describe"), z.literal("--candidate"), z.string().min(1)]),
+  z.tuple([
+    z.literal("--describe"),
+    z.literal("--candidate"),
+    z.string().min(1),
+    z.literal("--omp-exe"),
+    z.string().min(1),
+  ]),
+  z.tuple([z.literal("--omp-exe"), z.string().min(1)]),
 ])
 const linkSchema = z
   .object({ enabled: z.boolean(), name: z.string(), path: z.string() })
   .passthrough()
 const listSchema = z
-  .object({ npm: z.array(z.object({ name: z.string() }).passthrough()) })
+  .object({ npm: z.array(z.object({ name: z.string(), path: z.string() }).passthrough()) })
   .passthrough()
 
 type ProcessReceipt = {
@@ -55,17 +64,20 @@ function assertContained(parent: string, child: string): void {
 
 async function main(): Promise<void> {
   const parsed = argumentsSchema.parse(Bun.argv.slice(2))
-  const candidate = await realpath(resolve(parsed.length === 0 ? process.cwd() : parsed[2]))
-  if (parsed.length > 0) {
+  const candidate = await realpath(resolve(parsed[0] === "--describe" ? parsed[2] : process.cwd()))
+  if (parsed[0] === "--describe") {
     process.stdout.write(
       `${JSON.stringify({
         npmInstallProof: false,
+        ...(parsed[3] === "--omp-exe" ? { ompExecutable: parsed[4] } : {}),
         proof: "symlink-required",
         route: "local-link",
       })}\n`,
     )
     return
   }
+  const option = parseOmpExecutableOption(parsed)
+  const omp = await assertPinnedOmpExecutable(option.ompPath)
 
   const { HOME: homeValue, USERPROFILE: profileValue } = process.env
   if (homeValue === undefined || profileValue === undefined) {
@@ -75,35 +87,26 @@ async function main(): Promise<void> {
   const profile = await realpath(profileValue)
   assertContained(resolve(process.cwd()), home)
   assertContained(resolve(process.cwd()), profile)
-  const omp = "C:\\Users\\user\\AppData\\Local\\omp\\omp.exe"
-  const link = await run([omp, "plugin", "link", candidate, "--json"])
+  const link = await run(ompCommand(omp.path, ["plugin", "link", candidate, "--json"]))
   if (link.exitCode !== 0) throw new LinkSmokeError(`OMP link failed: ${link.stderr}`)
   const linked = linkSchema.parse(JSON.parse(link.stdout))
   if (!linked.enabled || linked.name !== "omp-lazy")
     throw new LinkSmokeError("linked package is not enabled")
 
-  const list = await run([omp, "plugin", "list", "--json"])
+  const list = await run(ompCommand(omp.path, ["plugin", "list", "--json"]))
   if (list.exitCode !== 0) throw new LinkSmokeError(`OMP list failed: ${list.stderr}`)
   const listed = listSchema.parse(JSON.parse(list.stdout))
   if (!listed.npm.some((plugin) => plugin.name === "omp-lazy")) {
     throw new LinkSmokeError("linked package is missing from OMP list")
   }
-  const doctor = await run([omp, "plugin", "doctor", "--json"])
+  const doctor = await run(ompCommand(omp.path, ["plugin", "doctor", "--json"]))
   if (doctor.exitCode !== 0 || hasUnfixedDoctorError(JSON.parse(doctor.stdout))) {
     throw new LinkSmokeError("OMP doctor reported an unfixed error")
   }
 
-  const matches: string[] = []
-  for await (const path of new Bun.Glob("**/node_modules/omp-lazy").scan({
-    cwd: home,
-    onlyFiles: false,
-  })) {
-    matches.push(join(home, path))
-  }
-  if (matches.length !== 1)
-    throw new LinkSmokeError(`expected one linked path, found ${matches.length}`)
-  const linkedRoot = matches[0]
-  if (linkedRoot === undefined) throw new LinkSmokeError("linked path disappeared")
+  const plugin = listed.npm.find((item) => item.name === "omp-lazy")
+  if (plugin === undefined) throw new LinkSmokeError("linked package is missing from OMP list")
+  const linkedRoot = plugin.path
   const stat = await lstat(linkedRoot)
   if (!stat.isSymbolicLink() || (await realpath(linkedRoot)) !== candidate) {
     throw new LinkSmokeError("linked path is not an exact symlink to the candidate")
@@ -134,6 +137,7 @@ async function main(): Promise<void> {
       loader: JSON.parse(loader.stdout),
       discovery: JSON.parse(discovery.stdout),
       npmInstallProof: false,
+      omp,
       route: "local-link",
     })}\n`,
   )
