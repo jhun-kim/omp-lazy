@@ -2,7 +2,10 @@ import { realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader"
 import { z } from "zod"
-import { resolveManifestExtensionPaths } from "./product-runtime-contract"
+import {
+  assertExactProductRuntime,
+  loadRuntimeInventoryFromManifest,
+} from "./product-runtime-contract"
 
 const argumentsSchema = z.union([
   z.tuple([]),
@@ -12,10 +15,24 @@ const argumentsSchema = z.union([
 async function main(): Promise<void> {
   const parsed = argumentsSchema.parse(Bun.argv.slice(2))
   const cwd = await realpath(resolve(parsed.length === 0 ? process.cwd() : parsed[3]))
-  const manifest =
-    parsed.length === 0
-      ? await resolveManifestExtensionPaths(join(cwd, "package.json"))
-      : { extensionPaths: [resolve(parsed[1])], packageRoot: cwd }
+  if (parsed.length === 0) {
+    const receipt = await assertExactProductRuntime(
+      await loadRuntimeInventoryFromManifest(join(cwd, "package.json")),
+    )
+    process.stdout.write(
+      `${JSON.stringify({
+        commandNames: receipt.inventory.commandNames,
+        errors: receipt.inventory.errors,
+        extensionPaths: receipt.inventory.extensionPaths,
+        handlerCounts: receipt.inventory.handlerCounts,
+        mode: "product",
+        toolNames: receipt.inventory.toolNames,
+        version: receipt.version,
+      })}\n`,
+    )
+    return
+  }
+  const manifest = { extensionPaths: [resolve(parsed[1])], packageRoot: cwd }
   const result = await loadExtensions([...manifest.extensionPaths], manifest.packageRoot)
   const commandNames = result.extensions
     .flatMap((extension) => [...extension.commands.keys()])
@@ -32,7 +49,7 @@ async function main(): Promise<void> {
       errors: result.errors,
       extensionPaths: result.extensions.map((extension) => extension.resolvedPath),
       handlerCounts,
-      mode: parsed.length === 0 ? "product" : "fixture",
+      mode: "fixture",
       toolNames,
     })}\n`,
   )

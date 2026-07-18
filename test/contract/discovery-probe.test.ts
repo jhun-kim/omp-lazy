@@ -15,6 +15,22 @@ afterEach(async () =>
 )
 
 describe("public discovery probe", () => {
+  it("verifies the product discovery contract in no-arg product mode", async () => {
+    // Given: the repository root is the product package root.
+    const root = repositoryRoot
+
+    // When: the discovery smoke probe runs with no explicit fixture arguments.
+    const result = run(["bun", "scripts/probe-discovery.ts"], root)
+
+    // Then: it succeeds only after comparing plugin-owned discovery to the product contract.
+    expect(result.exitCode).toBe(0)
+    const receipt = JSON.parse(result.stdout)
+    expect(receipt.mode).toBe("product")
+    expect(receipt.productSkillNames).toEqual(expectedProductRuntime.skillNames)
+    expect(receipt.productAgentNames).toEqual(expectedProductRuntime.agentNames)
+    expect(receipt.warnings).toEqual([])
+  }, 30_000)
+
   it("discovers extension skills and task agents through separate public APIs", async () => {
     // Given: a project configured with a conventional fixture package.
     const sandbox = await mkdtemp(join(repositoryRoot, ".todo3-discovery-"))
@@ -100,6 +116,23 @@ describe("public discovery probe", () => {
       "duplicate discovery names",
     )
   })
+
+  it("rejects a copied product candidate with a duplicate skill through the probe", async () => {
+    // Given: a copied candidate contains an extra skill file claiming an approved product name.
+    const candidate = await completeDiscoveryCandidate("probe-duplicate-skill")
+    await mkdir(join(candidate, "skills", "duplicate-skill"), { recursive: true })
+    await writeFile(
+      join(candidate, "skills", "duplicate-skill", "SKILL.md"),
+      skillMarkdown(expectedProductRuntime.skillNames[0] ?? "", "duplicate skill"),
+    )
+
+    // When: the discovery product gate runs with an explicit copied candidate path.
+    const result = run(["bun", "scripts/probe-discovery.ts", "--cwd", candidate], repositoryRoot)
+
+    // Then: the duplicate skill delta is precise and fails the process.
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain("duplicate discovery names: skill:")
+  }, 30_000)
 
   it("rejects the exact unexpected agent in a copied plugin", async () => {
     // Given: a candidate contains all product inventory plus one unapproved agent file.

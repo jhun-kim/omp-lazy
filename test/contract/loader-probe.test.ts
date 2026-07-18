@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { expectedProductRuntime } from "../../scripts/product-runtime-contract"
 import { repositoryRoot, run } from "../fixtures/package-test-helpers"
 
 const sandboxes: string[] = []
@@ -11,6 +12,27 @@ afterEach(async () =>
 )
 
 describe("public loader probe", () => {
+  it(
+    "verifies the product runtime contract in no-arg product mode",
+    async () => {
+      // Given: the repository root is the product package root.
+      const root = repositoryRoot
+
+      // When: the loader smoke probe runs with no explicit fixture arguments.
+      const result = run(["bun", "scripts/probe-loader.ts"], root)
+
+      // Then: it succeeds only after comparing the public loader surface to the product contract.
+      expect(result.exitCode).toBe(0)
+      const receipt = JSON.parse(result.stdout)
+      expect(receipt.mode).toBe("product")
+      expect(receipt.commandNames).toEqual(expectedProductRuntime.commandNames)
+      expect(receipt.toolNames).toEqual(expectedProductRuntime.toolNames)
+      expect(receipt.handlerCounts).toEqual(expectedProductRuntime.handlerCounts)
+      expect(receipt.errors).toEqual([])
+    },
+    loaderTestTimeoutMs,
+  )
+
   it(
     "loads a valid extension and inventories its registrations",
     async () => {
@@ -68,4 +90,34 @@ describe("public loader probe", () => {
     },
     loaderTestTimeoutMs,
   )
+
+  it(
+    "rejects product mode when a copied candidate is missing an approved command",
+    async () => {
+      // Given: a copied product candidate omits one command registration at runtime.
+      const candidate = await productRuntimeCandidate("missing-command")
+      const commandFile = join(candidate, "src", "commands", "command-definitions.ts")
+      const source = await readFile(commandFile, "utf8")
+      await writeFile(commandFile, source.replace('aliases: ["/teammode"],', "aliases: [],"))
+
+      // When: the product-mode loader gate runs against the copied candidate root.
+      const result = run(["bun", join(repositoryRoot, "scripts", "probe-loader.ts")], candidate)
+
+      // Then: the exact command delta is reported and the process fails.
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain('commands inventory mismatch: missing ["teammode"]')
+    },
+    loaderTestTimeoutMs,
+  )
 })
+
+async function productRuntimeCandidate(prefix: string): Promise<string> {
+  const candidate = await mkdtemp(join(repositoryRoot, `.todo11-loader-${prefix}-`))
+  sandboxes.push(candidate)
+  await Promise.all(
+    ["package.json", "src", "agents", "skills"].map((entry) =>
+      cp(join(repositoryRoot, entry), join(candidate, entry), { recursive: true }),
+    ),
+  )
+  return candidate
+}
