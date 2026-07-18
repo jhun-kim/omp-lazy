@@ -1,0 +1,3 @@
+scripts/probe-loader.ts text eol=lf
+scripts/product-runtime-contract.ts text eol=lf
+test/contract/product-runtime-contract.test.ts text eol=lf
