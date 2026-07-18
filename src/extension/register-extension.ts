@@ -79,7 +79,7 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
       await new DurableWorkflowCommandExecutor({
         store: new TransactionStore(root.value),
         suppression: activation,
-        sendUserMessage: (message) => api.sendUserMessage(message, { deliverAs: "followUp" }),
+        sendUserMessage: (message) => api.sendUserMessage(message),
       }).execute(request)
     },
   })

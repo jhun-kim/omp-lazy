@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import type { Process } from "@oh-my-pi/pi-natives"
 
 const KILL_ATTEMPT_MS = 1_000
 export const POST_KILL_COMPLETION_MS = 1_000
@@ -75,8 +76,14 @@ export async function cleanupProcessTree(request: {
   readonly completionSettled: () => boolean
   readonly pid: number
   readonly systemRoot: string
+  readonly windowsProcesses?: readonly Process[]
 }): Promise<void> {
   if (process.platform === "win32") {
+    const trackedTreeWasRunning = request.windowsProcesses?.some(
+      (trackedProcess) => trackedProcess.status() === "running",
+    )
+    for (const trackedProcess of request.windowsProcesses ?? []) trackedProcess.killTree()
+    if (trackedTreeWasRunning === true) return
     if (await taskkill("taskkill", request.pid)) return
     if (
       request.systemRoot.length > 0 &&
@@ -84,7 +91,6 @@ export async function cleanupProcessTree(request: {
     ) {
       return
     }
-    if (request.completionSettled()) return
     throw new ProcessTreeCleanupError(request.pid)
   }
   if (!groupExists(request.pid)) {

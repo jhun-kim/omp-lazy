@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join, relative } from "node:path"
+import { Process } from "@oh-my-pi/pi-natives"
 import type { CapturedProcess, CapturedProcessReference, RawReference } from "./hostile-contract"
 import {
   cleanupProcessTree,
@@ -30,6 +31,38 @@ export class ProcessReadinessError extends Error {
 }
 
 type ProcessCompletion = readonly [number, Uint8Array, Uint8Array]
+
+type WindowsProcessTracker = {
+  readonly processes: readonly Process[]
+  readonly stop: () => Promise<void>
+}
+
+function trackWindowsProcessTree(pid: number): WindowsProcessTracker | undefined {
+  const leader = Process.fromPid(pid)
+  if (leader === null) return undefined
+  const processes: Process[] = [leader]
+  const knownPids = new Set([pid])
+  let active = true
+  const observation = (async () => {
+    while (active) {
+      for (const trackedProcess of processes) {
+        for (const child of trackedProcess.children()) {
+          if (knownPids.has(child.pid)) continue
+          knownPids.add(child.pid)
+          processes.push(child)
+        }
+      }
+      if (active) await Bun.sleep(1)
+    }
+  })()
+  return {
+    processes,
+    stop: async () => {
+      active = false
+      await observation
+    },
+  }
+}
 
 function captureStdout(
   stream: ReadableStream<Uint8Array>,
@@ -79,11 +112,16 @@ async function terminateAndComplete(request: {
   readonly completionSettled: () => boolean
   readonly pid: number
   readonly systemRoot: string
+  readonly windowsTracker: WindowsProcessTracker | undefined
 }): Promise<ProcessCompletion> {
+  await request.windowsTracker?.stop()
   const cleanup = await cleanupProcessTree({
     completionSettled: request.completionSettled,
     pid: request.pid,
     systemRoot: request.systemRoot,
+    ...(request.windowsTracker === undefined
+      ? {}
+      : { windowsProcesses: request.windowsTracker.processes }),
   }).then(
     () => ({ ok: true }) as const,
     (error: unknown) => ({ error, ok: false }) as const,
@@ -119,6 +157,10 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
   })
   const systemRoot =
     Object.entries(process.env).find(([name]) => name.toLowerCase() === "systemroot")?.[1] ?? ""
+  const windowsTracker =
+    process.platform === "win32" && request.stdoutReadyMarker !== undefined
+      ? trackWindowsProcessTree(child.pid)
+      : undefined
   if (request.stdoutReadyMarker !== undefined) {
     const startup = await settleWithin(
       Promise.race([
@@ -133,10 +175,20 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
         completionSettled: () => completionSettled,
         pid: child.pid,
         systemRoot,
+        windowsTracker,
       })
       throw new ProcessReadinessError(child.pid, "timeout")
     }
-    if (startup.value === "exited") throw new ProcessReadinessError(child.pid, "exited")
+    if (startup.value === "exited") {
+      await terminateAndComplete({
+        completion,
+        completionSettled: () => completionSettled,
+        pid: child.pid,
+        systemRoot,
+        windowsTracker,
+      })
+      throw new ProcessReadinessError(child.pid, "exited")
+    }
   }
   const initial = await settleWithin(completion, request.deadlineMs)
   const timedOut = !initial.settled
@@ -147,7 +199,9 @@ export async function captureProcess(request: CaptureRequest): Promise<CapturedP
         completionSettled: () => completionSettled,
         pid: child.pid,
         systemRoot,
+        windowsTracker,
       })
+  if (!timedOut) await windowsTracker?.stop()
   if (!timedOut && process.platform !== "win32") {
     await cleanupProcessTree({ completionSettled: () => true, pid: child.pid, systemRoot })
   }

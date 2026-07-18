@@ -115,6 +115,39 @@ describe("bounded hostile replay", () => {
     })
   }, 10_000)
 
+  test("Given a readiness leader exits before its marker When a detached writer survives Then failure is bounded and no late sentinel appears", async () => {
+    // Given: a leader that spawns an ignored-stdio delayed writer and exits before readiness.
+    const root = await temporaryEvidence("readiness-early-exit")
+    const sentinel = join(root, "late-sentinel.txt")
+    const fixture = resolve("test", "fixtures", "delayed-descendant.ts")
+    const started = performance.now()
+
+    try {
+      // When: capture observes leader completion before the required marker.
+      await expect(
+        captureProcess({
+          argv: ["bun", fixture, "readiness-parent", sentinel],
+          cwd: process.cwd(),
+          deadlineMs: 5_000,
+          environment: process.env,
+          stdoutReadyMarker: "readiness marker never emitted",
+          stdoutReadyTimeoutMs: 2_000,
+        }),
+      ).rejects.toMatchObject({
+        name: ProcessReadinessError.name,
+        reason: "exited",
+      })
+      const failureDurationMs = performance.now() - started
+      await Bun.sleep(1_150)
+
+      // Then: failure stays bounded and cleanup prevents the delayed write on every host.
+      expect(failureDurationMs).toBeLessThan(3_000)
+      expect(await Bun.file(sentinel).exists()).toBeFalse()
+    } finally {
+      await rm(root, { force: true, recursive: true })
+    }
+  }, 10_000)
+
   test("Given a delayed escaping descendant When Windows taskkill or a POSIX-owned group times out Then no late mutation survives", async () => {
     // Given
     const root = await temporaryEvidence("hostile-escape")
