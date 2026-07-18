@@ -1,6 +1,13 @@
 import { access, readFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { z } from "zod"
+import {
+  declaredManifestAssets,
+  declaredManifestExtensions,
+  PackageGuardError,
+  requireReviewedExtensionBoundary,
+  verifyPackedAssetCoverage,
+} from "./package-asset-paths"
 
 const EXPECTED_SOURCE_COMMITS = {
   lazycodex: "f39306f1adab6ff155fd736cc7376d27156472bc",
@@ -33,7 +40,7 @@ const manifestSchema = z
   .object({
     dependencies: z.object({ zod: z.string().optional() }).catchall(z.string()).optional(),
     files: z.array(z.string()),
-    omp: z.object({ extensions: z.tuple([z.literal("./src/index.ts")]) }),
+    omp: z.object({ extensions: z.array(z.string().min(1)).min(1) }),
   })
   .passthrough()
 
@@ -49,9 +56,7 @@ export type CandidateInspection = {
   readonly sourceCommits: typeof EXPECTED_SOURCE_COMMITS
 }
 
-export class PackageGuardError extends Error {
-  override readonly name = "PackageGuardError"
-}
+export { PackageGuardError }
 
 async function requireFiles(root: string, paths: readonly string[]): Promise<void> {
   for (const path of paths) {
@@ -130,6 +135,9 @@ export async function inspectCandidate(
   if (!manifest.files.includes("scripts/assert-skill-sync.ts")) {
     throw new PackageGuardError("package files must include scripts/assert-skill-sync.ts")
   }
+  const declaredExtensions = await declaredManifestExtensions(root, manifest.omp.extensions)
+  requireReviewedExtensionBoundary(declaredExtensions)
+  const declaredAssets = await declaredManifestAssets(root, manifest.files)
 
   await requireFiles(root, REQUIRED_ASSETS)
   const sourceCommits = sourceCommitsSchema.parse(
@@ -138,11 +146,18 @@ export async function inspectCandidate(
   await scanRuntimeFiles(root)
   await verifyMarkdownReferences(root)
 
-  const forbiddenAssets = forbiddenPackedAssets(packedAssets)
+  const normalizedPackedAssets = await verifyPackedAssetCoverage({
+    root,
+    extensions: declaredExtensions,
+    directories: declaredAssets.directories,
+    explicitFiles: declaredAssets.explicitFiles,
+    packedAssets,
+  })
+  const forbiddenAssets = forbiddenPackedAssets(normalizedPackedAssets)
   if (forbiddenAssets.length > 0) {
     throw new PackageGuardError(`forbidden packed assets: ${forbiddenAssets.join(", ")}`)
   }
-  const missingPackedAsset = REQUIRED_ASSETS.find((path) => !packedAssets.includes(path))
+  const missingPackedAsset = REQUIRED_ASSETS.find((path) => !normalizedPackedAssets.includes(path))
   if (missingPackedAsset !== undefined) {
     throw new PackageGuardError(`required asset is not packed: ${missingPackedAsset}`)
   }
@@ -154,7 +169,7 @@ export async function inspectCandidate(
 
   return {
     forbiddenAssets,
-    packedAssets,
+    packedAssets: normalizedPackedAssets,
     requiredAssets: REQUIRED_ASSETS,
     sourceCommits,
   }

@@ -35,9 +35,16 @@ export function run(
 export async function copyCandidate(prefix: string): Promise<string> {
   const candidate = await mkdtemp(join(repositoryRoot, `.todo3-${prefix}-`))
   await Promise.all(
-    ["LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "package.json", "third_party"].map((entry) =>
-      cp(join(repositoryRoot, entry), join(candidate, entry), { recursive: true }),
-    ),
+    [
+      "LICENSE",
+      "README.md",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json",
+      "src",
+      "skills",
+      "agents",
+      "third_party",
+    ].map((entry) => cp(join(repositoryRoot, entry), join(candidate, entry), { recursive: true })),
   )
   await mkdir(join(candidate, "scripts"), { recursive: true })
   await cp(
