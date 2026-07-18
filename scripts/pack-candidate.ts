@@ -1,6 +1,6 @@
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { isAbsolute, join, relative, resolve } from "node:path"
 import { z } from "zod"
 import { sha256File } from "./artifact-hash"
 import { inspectCandidate } from "./package-guards"
@@ -123,6 +123,23 @@ function packedAssets(output: string): readonly string[] {
     .filter((path): path is string => path !== undefined)
 }
 
+async function prepareDestination(
+  candidate: string,
+  destination: string | undefined,
+): Promise<void> {
+  if (destination === undefined) return
+  const fromCandidate = relative(candidate, destination)
+  if (fromCandidate === "" || fromCandidate.startsWith("..") || isAbsolute(fromCandidate)) {
+    throw new PackageBuildError(`package destination escapes candidate root: ${destination}`)
+  }
+  await mkdir(destination, { recursive: true })
+  await rm(join(destination, "candidate.json"), { force: true })
+  const tarballs = new Bun.Glob("*.tgz")
+  for await (const tarball of tarballs.scan({ cwd: destination, onlyFiles: true })) {
+    await rm(join(destination, tarball), { force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const parsed = argumentsSchema.parse(Bun.argv.slice(2))
   const isDefault = parsed.length === 0
@@ -140,7 +157,7 @@ async function main(): Promise<void> {
   try {
     materialized = mode === "build" ? await materializeCommittedCandidate(candidate) : undefined
     const packRoot = materialized?.root ?? candidate
-    if (destination !== undefined) await mkdir(destination, { recursive: true })
+    await prepareDestination(candidate, destination)
 
     const pack = Bun.spawn(
       destination === undefined

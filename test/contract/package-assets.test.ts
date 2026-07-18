@@ -97,6 +97,25 @@ describe("packed assets", () => {
     expect(await Bun.file(join(destination, "candidate.json")).exists()).toBe(true)
   })
 
+  it("creates the default evidence destination before no-arg packaging", async () => {
+    // Given: a clean committed candidate without the default package evidence directory.
+    const candidate = await copyCandidate("default-destination")
+    context.candidates.push(candidate)
+    commitCandidate(candidate)
+    const destination = join(candidate, ".omo", "evidence", "candidate")
+    await rm(destination, { force: true, recursive: true })
+
+    // When: no-arg packaging runs twice through the default destination.
+    const first = run(["bun", join(repositoryRoot, "scripts", "pack-candidate.ts")], candidate)
+    const second = run(["bun", join(repositoryRoot, "scripts", "pack-candidate.ts")], candidate)
+
+    // Then: the missing destination is created and the sealed prior tarball does not block reuse.
+    expect(first.exitCode).toBe(0)
+    expect(second.exitCode).toBe(0)
+    expect(parseReceipt(second.stdout).tarball).toBe(join(destination, "omp-lazy-0.1.0.tgz"))
+    expect(await Bun.file(join(destination, "candidate.json")).exists()).toBe(true)
+  })
+
   it("rejects development state added to the packed allowlist", async () => {
     // Given: a candidate explicitly packing an .omo secret canary.
     const candidate = await copyCandidate("extra-state")
