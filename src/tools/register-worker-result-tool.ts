@@ -1,14 +1,19 @@
 import type { ExtensionAPI, ToolDefinition } from "@oh-my-pi/pi-coding-agent"
 import { WorkerAcceptanceInputSchema } from "../contracts/evidence-receipt"
-import type {
-  WorkerAcceptanceResult,
-  WorkerResultAcceptance,
-} from "../contracts/worker-result-acceptance"
+import type { WorkerAcceptanceResult } from "../contracts/worker-result-acceptance"
+
+export interface WorkerResultAcceptancePort {
+  accept(
+    caller: { readonly sessionId: string; readonly cwd: string },
+    inputValue: unknown,
+    signal?: AbortSignal,
+  ): Promise<WorkerAcceptanceResult>
+}
 
 export const WORKER_RESULT_TOOL_NAME = "omp_lazy_accept_worker_result" as const
 
 export function createWorkerResultTool(
-  acceptance: WorkerResultAcceptance,
+  acceptance: WorkerResultAcceptancePort,
 ): ToolDefinition<typeof WorkerAcceptanceInputSchema, WorkerAcceptanceResult> {
   return {
     name: WORKER_RESULT_TOOL_NAME,
@@ -36,7 +41,7 @@ export function createWorkerResultTool(
 
 export function registerWorkerResultTool(
   api: ExtensionAPI,
-  acceptance: WorkerResultAcceptance,
+  acceptance: WorkerResultAcceptancePort,
 ): void {
   api.registerTool(createWorkerResultTool(acceptance))
 }
