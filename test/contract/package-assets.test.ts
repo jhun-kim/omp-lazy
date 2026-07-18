@@ -9,7 +9,13 @@ import {
   parseReceipt,
   readManifest,
 } from "../fixtures/package-asset-test-helpers"
-import { copyCandidate, repositoryRoot, run, writeJson } from "../fixtures/package-test-helpers"
+import {
+  commitCandidate,
+  copyCandidate,
+  repositoryRoot,
+  run,
+  writeJson,
+} from "../fixtures/package-test-helpers"
 
 const context = packageAssetTestContext()
 
@@ -55,6 +61,7 @@ describe("packed assets", () => {
     const candidate = await copyCandidate("build")
     context.candidates.push(candidate)
     const destination = join(candidate, "artifact")
+    const sourceCommit = commitCandidate(candidate)
 
     // When: the generic builder creates the package bytes.
     const result = run([
@@ -73,6 +80,20 @@ describe("packed assets", () => {
     const receipt = parseReceipt(result.stdout)
     expect(receipt.tarball).toEndWith(".tgz")
     expect(receipt.sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(receipt.packageName).toBe("omp-lazy")
+    expect(receipt.sourceCommit).toBe(sourceCommit)
+    expect(receipt.sourceTree).toMatch(/^[a-f0-9]{40}$/)
+    expect(receipt.packInput).toEqual({
+      dirtyPolicy: "git-status-porcelain-v1-untracked-files-all",
+      materialization: "isolated-git-clone-core-autocrlf-false",
+    })
+    expect(receipt.toolchain).toEqual({
+      bun: "1.3.14",
+      packageManager: "bun@1.3.14",
+      typescript: "6.0.3",
+      zod: "4.4.3",
+    })
+    expect(receipt.packedAssets).toContain("src/index.ts")
     expect(await Bun.file(join(destination, "candidate.json")).exists()).toBe(true)
   })
 

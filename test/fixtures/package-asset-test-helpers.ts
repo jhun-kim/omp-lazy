@@ -16,10 +16,29 @@ const receiptSchema = z
   .object({
     forbiddenAssets: z.array(z.string()),
     mode: z.string(),
+    packageName: z.string().nullable().optional(),
     packedAssets: z.array(z.string()),
+    packInput: z
+      .object({
+        dirtyPolicy: z.string(),
+        materialization: z.string(),
+      })
+      .nullable()
+      .optional(),
     requiredAssets: z.array(z.string()),
     sha256: z.string().nullable(),
+    sourceCommit: z.string().nullable().optional(),
+    sourceTree: z.string().nullable().optional(),
     tarball: z.string().nullable(),
+    toolchain: z
+      .object({
+        bun: z.string(),
+        packageManager: z.string(),
+        typescript: z.string(),
+        zod: z.string(),
+      })
+      .nullable()
+      .optional(),
   })
   .passthrough()
 

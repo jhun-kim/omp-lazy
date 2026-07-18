@@ -36,6 +36,7 @@ export async function copyCandidate(prefix: string): Promise<string> {
   const candidate = await mkdtemp(join(repositoryRoot, `.todo3-${prefix}-`))
   await Promise.all(
     [
+      ".gitignore",
       "LICENSE",
       "README.md",
       "THIRD_PARTY_NOTICES.md",
@@ -52,6 +53,24 @@ export async function copyCandidate(prefix: string): Promise<string> {
     join(candidate, "scripts", "assert-skill-sync.ts"),
   )
   return candidate
+}
+
+export function commitCandidate(candidate: string): string {
+  const commands = [
+    ["git", "init", "--quiet"],
+    ["git", "config", "core.autocrlf", "false"],
+    ["git", "config", "user.name", "OMP Lazy Tests"],
+    ["git", "config", "user.email", "omp-lazy-tests@example.invalid"],
+    ["git", "add", "--all"],
+    ["git", "commit", "--quiet", "-m", "test candidate"],
+  ] as const
+  for (const command of commands) {
+    const receipt = run(command, candidate)
+    if (receipt.exitCode !== 0) throw new Error(`${command.join(" ")} failed: ${receipt.stderr}`)
+  }
+  const head = run(["git", "rev-parse", "HEAD"], candidate)
+  if (head.exitCode !== 0) throw new Error(`git rev-parse HEAD failed: ${head.stderr}`)
+  return head.stdout.trim()
 }
 
 export async function removeCandidate(path: string): Promise<void> {

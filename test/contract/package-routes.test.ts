@@ -37,6 +37,7 @@ describe("package route labels", () => {
     expect(JSON.parse(result.stdout)).toEqual({
       installShape: "ordinary-directory",
       npmInstallProof: false,
+      publicRegistry: "NOT_RUN",
       route: "staged-tarball",
     })
   })

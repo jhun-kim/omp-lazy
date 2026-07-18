@@ -1,7 +1,7 @@
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { join, resolve } from "node:path"
+import { lstat, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { dirname, join, resolve } from "node:path"
 import { z } from "zod"
-import { sha256File } from "./artifact-hash"
+import { readCandidateReceipt } from "./candidate-receipt"
 
 const argumentsSchema = z.union([
   z.tuple([]),
@@ -14,10 +14,6 @@ const argumentsSchema = z.union([
       .refine((path) => path.toLowerCase().endsWith(".tgz"), "tarball must end in .tgz"),
   ]),
 ])
-const candidateReceiptSchema = z.object({
-  sha256: z.string().length(64),
-  tarball: z.string().min(1),
-})
 
 class StagedSmokeError extends Error {
   override readonly name = "StagedSmokeError"
@@ -31,6 +27,7 @@ async function main(): Promise<void> {
       `${JSON.stringify({
         installShape: "ordinary-directory",
         npmInstallProof: false,
+        publicRegistry: "NOT_RUN",
         route: "staged-tarball",
       })}\n`,
     )
@@ -38,22 +35,21 @@ async function main(): Promise<void> {
   }
 
   const root = resolve(process.cwd())
-  const receipt = candidateReceiptSchema.parse(
-    JSON.parse(
-      await readFile(join(root, ".omo", "evidence", "candidate", "candidate.json"), "utf8"),
-    ),
-  )
+  const receipt = await readCandidateReceipt(await realpath(root))
   const tarball = resolve(receipt.tarball)
-  if ((await sha256File(tarball)) !== receipt.sha256) {
-    throw new StagedSmokeError("candidate tarball hash changed")
-  }
   const { TEMP: temp } = process.env
   if (temp === undefined) throw new StagedSmokeError("isolated TEMP is required")
   const sandbox = await mkdtemp(join(temp, "omp-lazy-staged-"))
+  let stagedReceipt: object | undefined
   try {
+    const localZod = resolve(dirname(import.meta.dir), "node_modules", "zod")
     await writeFile(
       join(sandbox, "package.json"),
-      `${JSON.stringify({ dependencies: { "omp-lazy": `file:${tarball}` }, private: true })}\n`,
+      `${JSON.stringify({
+        dependencies: { "omp-lazy": `file:${tarball}`, zod: `file:${localZod}` },
+        overrides: { zod: `file:${localZod}` },
+        private: true,
+      })}\n`,
     )
     const install = Bun.spawn(["bun", "install", "--ignore-scripts"], {
       cwd: sandbox,
@@ -82,18 +78,22 @@ async function main(): Promise<void> {
     const runtime = await probeStagedRuntime(installedRoot, project)
     if (runtime.loaderErrors.length > 0)
       throw new StagedSmokeError("staged extension loader failed")
-    process.stdout.write(
-      `${JSON.stringify({
-        ...runtime,
-        installShape: "ordinary-directory",
-        npmInstallProof: false,
-        route: "staged-tarball",
-        sha256: receipt.sha256,
-      })}\n`,
-    )
+    stagedReceipt = {
+      ...runtime,
+      cleanup: { profile: "complete", sandbox: "complete" },
+      installShape: "ordinary-directory",
+      npmInstallProof: false,
+      packedAssets: receipt.packedAssets,
+      route: "staged-tarball",
+      sha256: receipt.sha256,
+      sourceCommit: receipt.sourceCommit,
+      toolchain: receipt.toolchain,
+    }
   } finally {
     await rm(sandbox, { force: true, recursive: true })
   }
+  if (stagedReceipt === undefined) throw new StagedSmokeError("staged receipt was not produced")
+  process.stdout.write(`${JSON.stringify(stagedReceipt)}\n`)
 }
 
 // no-excuse-ok: catch — staged smoke is a CLI boundary.
