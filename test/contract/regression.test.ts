@@ -4,11 +4,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
   HOSTILE_ENVIRONMENTS,
+  HOSTILE_OVERALL_TIMEOUT_MS,
   HOSTILE_REPEATS,
+  HOSTILE_SCENARIO_IDS,
+  HOSTILE_SCENARIO_TIMEOUT_CAP_MS,
   HOSTILE_SEEDS,
-  LATE_EFFECT_HOST_TIMEOUT_MS,
-  LATE_EFFECT_WAIT_MS,
-} from "../../scripts/replay-hostile"
+  readHostileScenarioMap,
+} from "../../scripts/hostile-contract"
 import { verifyEvidenceBundle } from "../../scripts/verify-candidate"
 
 describe("forged evidence regression", () => {
@@ -99,18 +101,22 @@ describe("forged evidence regression", () => {
     }
   })
 
-  it("freezes the hostile replay matrix and late-effect observation window", () => {
+  it("freezes hostile entropy inputs and scenario-addressed timeout bounds", async () => {
     // Given
     const expectedRuns = 27
 
     // When
     const actualRuns = HOSTILE_ENVIRONMENTS.length * HOSTILE_SEEDS.length * HOSTILE_REPEATS
+    const scenarioMap = await readHostileScenarioMap()
 
     // Then
     expect(HOSTILE_SEEDS).toEqual([1357, 7331, 424242])
     expect(HOSTILE_ENVIRONMENTS).toEqual(["enabled", "disabled", "unlinked"])
     expect(actualRuns).toBe(expectedRuns)
-    expect(LATE_EFFECT_HOST_TIMEOUT_MS).toBe(30_000)
-    expect(LATE_EFFECT_WAIT_MS).toBeGreaterThan(30_000)
+    expect(HOSTILE_SCENARIO_IDS).toHaveLength(25)
+    expect(HOSTILE_SCENARIO_TIMEOUT_CAP_MS).toBe(120_000)
+    expect(HOSTILE_OVERALL_TIMEOUT_MS).toBe(900_000)
+    expect(scenarioMap.G02).toContain("test/integration/state-root-containment.test.ts")
+    expect(scenarioMap.G16).toContain("test/contract/staged-candidate.test.ts")
   })
 })

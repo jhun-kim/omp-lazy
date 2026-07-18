@@ -42,6 +42,7 @@ describe("transaction crash boundaries", () => {
     const metadata = await lock.readMetadata()
     if (metadata === null) throw new Error("crash lock receipt missing")
     const cleared = await clearConfirmedStaleLock({
+      root,
       lockPath: lock.path,
       expectedNonce: metadata.nonce,
       ownerAlive: false,

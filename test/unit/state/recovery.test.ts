@@ -53,12 +53,14 @@ describe("explicit state recovery", () => {
 
     // When
     const unconfirmed = await clearConfirmedStaleLock({
+      root,
       lockPath: path,
       expectedNonce: "88888888-8888-4888-8888-888888888888",
       ownerAlive: false,
       confirmed: false,
     })
     const alive = await clearConfirmedStaleLock({
+      root,
       lockPath: path,
       expectedNonce: "88888888-8888-4888-8888-888888888888",
       ownerAlive: true,
@@ -88,6 +90,7 @@ describe("explicit state recovery", () => {
 
     // When
     const result = await clearConfirmedStaleLock({
+      root,
       lockPath: path,
       expectedNonce: "99999999-9999-4999-8999-999999999999",
       ownerAlive: false,

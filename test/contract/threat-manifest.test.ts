@@ -13,10 +13,13 @@ describe("threat manifest", () => {
     const ids = threatManifest.scenarios.map((scenario) => scenario.id)
 
     // Then
-    expect(ids).toEqual(expectedIds)
+    expect(ids.join(",")).toBe(expectedIds.join(","))
     for (const scenario of threatManifest.scenarios) {
       expect(scenario.attestors.length).toBeGreaterThan(0)
       expect(scenario.attestors).not.toContain(scenario.executor)
+      expect(scenario.executor).toMatch(/^E-/)
+      expect(scenario.timeoutMs).toBeGreaterThan(0)
+      expect(scenario.risk.trim().length).toBeGreaterThan(0)
       expect(scenario.oracle.length).toBeGreaterThan(10)
       expect(scenario.forbiddenSideEffects.length).toBeGreaterThan(0)
       expect(scenario.evidencePath.startsWith(".omo/evidence/")).toBe(true)

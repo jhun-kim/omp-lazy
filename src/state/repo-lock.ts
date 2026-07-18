@@ -1,6 +1,7 @@
 import { mkdir, open, readFile, unlink } from "node:fs/promises"
 import { dirname } from "node:path"
 import { z } from "zod"
+import type { StatePathGuard } from "./paths"
 
 export interface Deadline {
   remainingMs(): number
@@ -52,9 +53,11 @@ export class LockHandle {
   constructor(
     readonly path: string,
     readonly metadata: LockMetadata,
+    readonly guard?: StatePathGuard,
   ) {}
 
   async release(): Promise<boolean> {
+    await this.guard?.(this.path)
     let bytes: string
     try {
       bytes = await readFile(this.path, "utf8")
@@ -70,13 +73,17 @@ export class LockHandle {
       throw error
     }
     if (current.nonce !== this.metadata.nonce) return false
+    await this.guard?.(this.path)
     await unlink(this.path)
     return true
   }
 }
 
 export class RepoLock {
-  constructor(readonly path: string) {}
+  constructor(
+    readonly path: string,
+    readonly guard?: StatePathGuard,
+  ) {}
 
   async tryAcquire(request: {
     readonly deadline: Deadline
@@ -84,7 +91,9 @@ export class RepoLock {
     readonly sessionId: string
     readonly maxWaitMs: number
   }): Promise<LockHandle | null> {
+    await this.guard?.(this.path)
     await mkdir(dirname(this.path), { recursive: true })
+    await this.guard?.(this.path)
     const waitUntil = performance.now() + Math.max(0, request.maxWaitMs)
     while (request.deadline.isValid() && performance.now() <= waitUntil) {
       const metadata: LockMetadata = {
@@ -95,6 +104,7 @@ export class RepoLock {
         acquiredAt: new Date().toISOString(),
       }
       try {
+        await this.guard?.(this.path)
         const file = await open(this.path, "wx")
         try {
           await file.writeFile(JSON.stringify(metadata))
@@ -102,7 +112,7 @@ export class RepoLock {
         } finally {
           await file.close()
         }
-        return new LockHandle(this.path, metadata)
+        return new LockHandle(this.path, metadata, this.guard)
       } catch (error) {
         if (!isFileError(error, "EEXIST")) throw error
       }
@@ -114,6 +124,7 @@ export class RepoLock {
   }
 
   async readMetadata(): Promise<LockMetadata | null> {
+    await this.guard?.(this.path)
     let bytes: string
     try {
       bytes = await readFile(this.path, "utf8")

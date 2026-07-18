@@ -2,7 +2,12 @@ import { atomicReplace } from "./atomic-file"
 import { StateDecodeError } from "./codec"
 import type { ActiveIndex, AnyRun, CanonicalRoot } from "./domain"
 import { EventStoreError } from "./event-store"
-import { runSnapshotPath, statePaths } from "./paths"
+import {
+  ensureStatePathContained,
+  runSnapshotPath,
+  StateRootContainmentError,
+  statePaths,
+} from "./paths"
 import { type Deadline, LockHandle, RepoLock } from "./repo-lock"
 import { deriveIndex, prepareTransition } from "./state-transition"
 import { TransactionStore } from "./transaction-store"
@@ -43,7 +48,14 @@ export async function repairState(
 > {
   if (!deadline.isValid()) return { ok: false, code: "deadline_expired" }
   const paths = statePaths(root)
-  const lock = new RepoLock(paths.lock)
+  const guard = (path: string): Promise<void> => ensureStatePathContained(root, path)
+  try {
+    await guard(paths.lock)
+  } catch (error) {
+    if (error instanceof StateRootContainmentError) return { ok: false, code: error.code }
+    throw error
+  }
+  const lock = new RepoLock(paths.lock, guard)
   const handle = await lock.tryAcquire({
     deadline,
     purpose: "command",
@@ -79,10 +91,13 @@ export async function repairState(
     const nextIndex = deriveIndex(index, run, event.sequence)
     if (!deadline.isValid()) return { ok: false, code: "deadline_expired" }
     if (!runPublished) {
-      await atomicReplace(runSnapshotPath(root, run.runId), JSON.stringify(run), { deadline })
+      await atomicReplace(runSnapshotPath(root, run.runId), JSON.stringify(run), {
+        deadline,
+        guard,
+      })
     }
     if (!deadline.isValid()) return { ok: false, code: "deadline_expired" }
-    await atomicReplace(paths.activeIndex, JSON.stringify(nextIndex), { deadline })
+    await atomicReplace(paths.activeIndex, JSON.stringify(nextIndex), { deadline, guard })
     return { ok: true, run, index: nextIndex }
   } finally {
     await handle.release()
@@ -90,6 +105,7 @@ export async function repairState(
 }
 
 export async function clearConfirmedStaleLock(request: {
+  readonly root: CanonicalRoot
   readonly lockPath: string
   readonly expectedNonce: string
   readonly ownerAlive: boolean
@@ -97,11 +113,12 @@ export async function clearConfirmedStaleLock(request: {
 }): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> {
   if (!request.confirmed) return { ok: false, code: "confirmation_required" }
   if (request.ownerAlive) return { ok: false, code: "owner_alive" }
-  const lock = new RepoLock(request.lockPath)
+  const guard = (path: string): Promise<void> => ensureStatePathContained(request.root, path)
+  const lock = new RepoLock(request.lockPath, guard)
   const metadata = await lock.readMetadata()
   if (metadata === null) return { ok: false, code: "lock_missing" }
   if (metadata.nonce !== request.expectedNonce) return { ok: false, code: "nonce_mismatch" }
-  return (await new LockHandle(request.lockPath, metadata).release())
+  return (await new LockHandle(request.lockPath, metadata, guard).release())
     ? { ok: true }
     : { ok: false, code: "nonce_mismatch" }
 }

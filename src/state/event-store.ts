@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { atomicCreate } from "./atomic-file"
 import { decodeStateEvent } from "./codec"
 import type { StateEvent } from "./domain"
+import type { StatePathGuard } from "./paths"
 import type { Deadline } from "./repo-lock"
 
 const EVENT_FILE = /^(\d{16})-([0-9a-f-]{36})\.json$/
@@ -27,19 +28,31 @@ export class EventStoreError extends Error {
 export class EventStore {
   readonly eventsPath: string
 
-  constructor(readonly stateRoot: string) {
+  constructor(
+    readonly stateRoot: string,
+    readonly guard?: StatePathGuard,
+  ) {
     this.eventsPath = join(stateRoot, "events")
+  }
+
+  eventPath(event: StateEvent): string {
+    const sequence = event.sequence.toString().padStart(16, "0")
+    return join(this.eventsPath, `${sequence}-${event.eventId}.json`)
   }
 
   async append(event: StateEvent, deadline: Deadline): Promise<void> {
     if (event.sequence < 1) throw new EventStoreError("event_sequence_gap")
+    const path = this.eventPath(event)
+    await this.guard?.(path)
     await mkdir(this.eventsPath, { recursive: true })
-    const sequence = event.sequence.toString().padStart(16, "0")
-    const path = join(this.eventsPath, `${sequence}-${event.eventId}.json`)
-    await atomicCreate(path, JSON.stringify(event), { deadline })
+    await atomicCreate(path, JSON.stringify(event), {
+      deadline,
+      ...(this.guard === undefined ? {} : { guard: this.guard }),
+    })
   }
 
   async readAll(): Promise<readonly StateEvent[]> {
+    await this.guard?.(this.eventsPath)
     let names: readonly string[]
     try {
       names = await readdir(this.eventsPath)
@@ -57,7 +70,9 @@ export class EventStore {
       if (sequenceText === undefined || eventId === undefined) {
         throw new EventStoreError("invalid_event_filename")
       }
-      const decoded = decodeStateEvent(await readFile(join(this.eventsPath, name), "utf8"))
+      const path = join(this.eventsPath, name)
+      await this.guard?.(path)
+      const decoded = decodeStateEvent(await readFile(path, "utf8"))
       if (!decoded.ok) throw new EventStoreError("malformed_event")
       if (decoded.value.sequence !== Number(sequenceText) || decoded.value.eventId !== eventId) {
         throw new EventStoreError("event_filename_mismatch")

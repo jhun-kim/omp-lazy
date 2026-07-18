@@ -1,9 +1,11 @@
 import { link, mkdir, open, rename, rm } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
+import type { StatePathGuard } from "./paths"
 import type { Deadline } from "./repo-lock"
 
 export type AtomicOptions = {
   readonly deadline: Deadline
+  readonly guard?: StatePathGuard
   readonly beforePublish?: () => void
 }
 
@@ -26,9 +28,11 @@ function isRetryable(error: unknown): boolean {
   )
 }
 
-async function preparedTemp(path: string, bytes: string, deadline: Deadline): Promise<string> {
-  assertDeadline(deadline)
+async function preparedTemp(path: string, bytes: string, options: AtomicOptions): Promise<string> {
+  assertDeadline(options.deadline)
+  await options.guard?.(path)
   await mkdir(dirname(path), { recursive: true })
+  await options.guard?.(path)
   const temp = join(dirname(path), `.${basename(path)}.tmp-${crypto.randomUUID()}`)
   const file = await open(temp, "wx")
   try {
@@ -45,9 +49,10 @@ export async function atomicReplace(
   bytes: string,
   options: AtomicOptions,
 ): Promise<void> {
-  const temp = await preparedTemp(path, bytes, options.deadline)
+  const temp = await preparedTemp(path, bytes, options)
   try {
     options.beforePublish?.()
+    await options.guard?.(path)
     while (true) {
       assertDeadline(options.deadline)
       try {
@@ -68,9 +73,10 @@ export async function atomicCreate(
   bytes: string,
   options: AtomicOptions,
 ): Promise<void> {
-  const temp = await preparedTemp(path, bytes, options.deadline)
+  const temp = await preparedTemp(path, bytes, options)
   try {
     options.beforePublish?.()
+    await options.guard?.(path)
     assertDeadline(options.deadline)
     await link(temp, path)
   } finally {

@@ -1,0 +1,81 @@
+{
+  "G01": ["test/contract/regression.test.ts", "test/contract/evidence-schema.test.ts"],
+  "G02": [
+    "test/unit/state/codec.test.ts",
+    "test/unit/state/recovery.test.ts",
+    "test/integration/state-root-containment.test.ts"
+  ],
+  "G03": ["test/integration/session-stop-lifecycle.test.ts"],
+  "G04": [
+    "test/unit/continuation/deadline-fence.test.ts",
+    "test/integration/session-stop-timeout-fence.test.ts"
+  ],
+  "G05": ["test/integration/activation-origin.test.ts"],
+  "G06": [
+    "test/integration/activation-origin.test.ts",
+    "test/integration/parent-review-fence-adoption.test.ts"
+  ],
+  "G07": [
+    "test/contract/task-spawn-guard.test.ts",
+    "test/integration/task-reservation-two-process.test.ts"
+  ],
+  "G08": ["test/integration/agent-id-binding.test.ts"],
+  "G09": [
+    "test/integration/agent-id-binding.test.ts",
+    "test/integration/teammode-capability.test.ts"
+  ],
+  "G10": [
+    "test/contract/worker-result-acceptance.test.ts",
+    "test/integration/parent-completion-boundary.test.ts"
+  ],
+  "G11": ["test/unit/state/active-index.test.ts", "test/contract/task-spawn-guard.test.ts"],
+  "G12": [
+    "test/unit/state/repo-lock.test.ts",
+    "test/integration/state-two-process.test.ts",
+    "test/integration/state-crash-boundaries.test.ts"
+  ],
+  "G13": [
+    "test/unit/workflows/workflow-control.test.ts",
+    "test/integration/session-stop-lifecycle.test.ts",
+    "test/integration/session-stop-timeout-fence.test.ts"
+  ],
+  "G14": [
+    "test/contract/run-isolated.test.ts",
+    "test/contract/runner-isolation.test.ts",
+    "test/integration/state-root-containment.test.ts"
+  ],
+  "G15": ["test/contract/loader-probe.test.ts", "test/contract/product-runtime-contract.test.ts"],
+  "G16": ["test/contract/package-routes.test.ts", "test/contract/staged-candidate.test.ts"],
+  "G17": ["test/contract/staged-candidate.test.ts", "test/contract/evidence-schema.test.ts"],
+  "G18": [
+    "test/unit/workflows/start-work-contract.test.ts",
+    "test/unit/workflows/ulw-loop-contract.test.ts"
+  ],
+  "G19": [
+    "test/contract/command-registration.test.ts",
+    "test/integration/session-stop-extension-order.test.ts"
+  ],
+  "G20": [
+    "test/unit/continuation/continuation-coordinator.test.ts",
+    "test/integration/session-stop-extension-order.test.ts"
+  ],
+  "G21": [
+    "test/contract/teammode-contract.test.ts",
+    "test/integration/teammode-capability.test.ts"
+  ],
+  "G22": [
+    "test/unit/workflows/start-work-plan.test.ts",
+    "test/unit/workflows/start-work-contract.test.ts"
+  ],
+  "G23": [
+    "test/unit/continuation/continuation-coordinator.test.ts",
+    "test/unit/workflows/ulw-loop-contract.test.ts",
+    "test/unit/state/transaction-store.test.ts"
+  ],
+  "G24": [
+    "test/integration/teammode-worktree.test.ts",
+    "test/contract/lcx-contract.test.ts",
+    "test/integration/lcx-windows-args.test.ts"
+  ],
+  "G25": ["test/contract/package-assets.test.ts", "test/contract/staged-candidate.test.ts"]
+}

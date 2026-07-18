@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { lstat, mkdir, readdir, readFile, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { dirname, join, relative } from "node:path"
 import type { CanonicalRoot } from "../../src/state/domain"
 import { inspectRecovery } from "../../src/state/recovery"
 import { initializedStore } from "../fixtures/store-fixtures"
@@ -14,8 +14,16 @@ const REDIRECT_CASES = [
   { label: "omo-symlink", linkPath: [".omo"], linkType: "dir" },
   { label: "state-symlink", linkPath: [".omo", "omp-lazy"], linkType: "dir" },
 ] as const
+const NESTED_REDIRECT_CASES = [
+  { label: "events-junction", linkPath: [".omo", "omp-lazy", "events"], linkType: "junction" },
+  {
+    label: "run-junction",
+    linkPath: [".omo", "omp-lazy", "runs", "11111111-1111-4111-8111-111111111111"],
+    linkType: "junction",
+  },
+] as const
 
-type RedirectCase = (typeof REDIRECT_CASES)[number]
+type RedirectCase = (typeof REDIRECT_CASES)[number] | (typeof NESTED_REDIRECT_CASES)[number]
 type ExternalEntry =
   | { readonly kind: "dir"; readonly path: string }
   | { readonly kind: "file"; readonly path: string; readonly bytes: string }
@@ -90,7 +98,7 @@ async function redirectStateRoot(
   testCase: RedirectCase,
 ): Promise<"created" | "not_run"> {
   const linkPath = join(root.displayPath, ...testCase.linkPath)
-  if (testCase.linkPath.length > 1) await mkdir(join(root.displayPath, ".omo"), { recursive: true })
+  await mkdir(dirname(linkPath), { recursive: true })
   try {
     await symlink(external, linkPath, testCase.linkType)
     return "created"
@@ -155,6 +163,22 @@ describe("state root containment", () => {
       const external = await sandbox(`escape-${testCase.label}-external`)
       const redirect = await redirectStateRoot(root, external, testCase)
       if (redirect === "not_run") return
+
+      // When
+      const outcome = await commitOutcome(root)
+      const escaped = await externalEntries(external)
+
+      // Then
+      expect({ outcome, escaped }).toEqual({ outcome: "rejected", escaped: [] })
+    })
+  }
+
+  for (const testCase of NESTED_REDIRECT_CASES) {
+    test(`Given ${testCase.label} redirects a state mutation outside the repository When committing Then rejection precedes external bytes`, async () => {
+      // Given
+      const root = await canonicalRoot(await sandbox(`nested-${testCase.label}-repo`))
+      const external = await sandbox(`nested-${testCase.label}-external`)
+      await redirectStateRoot(root, external, testCase)
 
       // When
       const outcome = await commitOutcome(root)

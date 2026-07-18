@@ -1,4 +1,5 @@
-import { join, relative, sep } from "node:path"
+import { realpath } from "node:fs/promises"
+import { dirname, join, relative, sep } from "node:path"
 import { type CanonicalRoot, type Uuid, UuidSchema } from "./domain"
 
 export type StatePaths = {
@@ -8,6 +9,15 @@ export type StatePaths = {
   readonly events: string
   readonly runs: string
 }
+
+export class StateRootContainmentError extends Error {
+  readonly name = "StateRootContainmentError"
+  constructor(readonly code: "state_root_escaped" | "state_root_unreadable") {
+    super(code)
+  }
+}
+
+export type StatePathGuard = (path: string) => Promise<void>
 
 export function canonicalComparisonPath(path: string): string {
   const normalized = path.replaceAll("\\", "/").replace(/\/$/, "")
@@ -38,4 +48,39 @@ export function statePaths(root: CanonicalRoot): StatePaths {
 
 export function runSnapshotPath(root: CanonicalRoot, runId: Uuid): string {
   return join(statePaths(root).runs, UuidSchema.parse(runId), "run.json")
+}
+
+function isMissing(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+async function nearestExistingPath(path: string): Promise<string> {
+  let candidate = path
+  while (true) {
+    try {
+      await realpath(candidate)
+      return candidate
+    } catch (error) {
+      if (!isMissing(error)) throw new StateRootContainmentError("state_root_unreadable")
+      const parent = dirname(candidate)
+      if (parent === candidate) throw new StateRootContainmentError("state_root_unreadable")
+      candidate = parent
+    }
+  }
+}
+
+export async function ensureStatePathContained(root: CanonicalRoot, path: string): Promise<void> {
+  const lexical = canonicalComparisonPath(path)
+  if (!isCanonicalPathContained(root.canonicalPath, lexical)) {
+    throw new StateRootContainmentError("state_root_escaped")
+  }
+  const existing = await nearestExistingPath(path)
+  const resolved = canonicalComparisonPath(await realpath(existing))
+  if (!isCanonicalPathContained(root.canonicalPath, resolved)) {
+    throw new StateRootContainmentError("state_root_escaped")
+  }
+}
+
+export async function ensureStateRootContained(root: CanonicalRoot): Promise<void> {
+  await ensureStatePathContained(root, statePaths(root).root)
 }

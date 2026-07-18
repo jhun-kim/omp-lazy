@@ -4,7 +4,12 @@ import { decodeActiveIndex, decodeRun } from "./codec"
 import type { ActiveIndex, AnyRun, CanonicalRoot, StateEvent } from "./domain"
 import { UuidSchema } from "./domain"
 import { EventStore } from "./event-store"
-import { runSnapshotPath, statePaths } from "./paths"
+import {
+  ensureStatePathContained,
+  runSnapshotPath,
+  StateRootContainmentError,
+  statePaths,
+} from "./paths"
 import { type Deadline, RepoLock } from "./repo-lock"
 import { prepareTransition, type TransitionErrorCode } from "./state-transition"
 
@@ -14,6 +19,8 @@ export type TransactionErrorCode =
   | "lock_timeout"
   | "deadline_expired"
   | "state_diverged"
+  | "state_root_escaped"
+  | "state_root_unreadable"
 
 export type TransactionResult =
   | { readonly ok: true; readonly run: AnyRun; readonly index: ActiveIndex }
@@ -30,8 +37,9 @@ export class TransactionStore {
 
   constructor(readonly root: CanonicalRoot) {
     this.paths = statePaths(root)
-    this.events = new EventStore(this.paths.root)
-    this.lock = new RepoLock(this.paths.lock)
+    const guard = (path: string): Promise<void> => ensureStatePathContained(root, path)
+    this.events = new EventStore(this.paths.root, guard)
+    this.lock = new RepoLock(this.paths.lock, guard)
   }
 
   async commit(
@@ -39,6 +47,17 @@ export class TransactionStore {
     options: { readonly deadline: Deadline; readonly crash?: (point: CrashPoint) => void },
   ): Promise<TransactionResult> {
     if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
+    try {
+      await Promise.all([
+        ensureStatePathContained(this.root, this.paths.lock),
+        ensureStatePathContained(this.root, this.events.eventPath(event)),
+        ensureStatePathContained(this.root, runSnapshotPath(this.root, event.runId)),
+        ensureStatePathContained(this.root, this.paths.activeIndex),
+      ])
+    } catch (error) {
+      if (error instanceof StateRootContainmentError) return { ok: false, code: error.code }
+      throw error
+    }
     const handle = await this.lock.tryAcquire({
       deadline: options.deadline,
       purpose: "command",
@@ -68,12 +87,14 @@ export class TransactionStore {
         JSON.stringify(prepared.run),
         {
           deadline: options.deadline,
+          guard: (path) => ensureStatePathContained(this.root, path),
         },
       )
       options.crash?.("after_run")
       if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
       await atomicReplace(this.paths.activeIndex, JSON.stringify(prepared.index), {
         deadline: options.deadline,
+        guard: (path) => ensureStatePathContained(this.root, path),
       })
       options.crash?.("after_index")
       return { ok: true, ...prepared }
@@ -83,6 +104,7 @@ export class TransactionStore {
   }
 
   async readIndex(): Promise<ActiveIndex> {
+    await ensureStatePathContained(this.root, this.paths.activeIndex)
     let bytes: string
     try {
       bytes = await readFile(this.paths.activeIndex, "utf8")
@@ -98,6 +120,7 @@ export class TransactionStore {
   async readRun(runId: string): Promise<AnyRun | null> {
     const parsedId = UuidSchema.safeParse(runId)
     if (!parsedId.success) return null
+    await ensureStatePathContained(this.root, runSnapshotPath(this.root, parsedId.data))
     let bytes: string
     try {
       bytes = await readFile(runSnapshotPath(this.root, parsedId.data), "utf8")
