@@ -1,5 +1,7 @@
 # omp-lazy
 
+English | [한국어](README.ko.md)
+
 `omp-lazy` is a private, source-only TypeScript extension for OMP 17.x. It is not
 published to a package registry. The extension loads from `package.json#omp.extensions`
 under Bun and does not locate, download, or import a different host installation.
