@@ -1,14 +1,24 @@
 # omp-lazy
 
-`omp-lazy` is a private, source-only TypeScript extension for OMP 16.4.x. It is not
+`omp-lazy` is a private, source-only TypeScript extension for OMP 17.x. It is not
 published to a package registry. The extension loads from `package.json#omp.extensions`
 under Bun and does not locate, download, or import a different host installation.
+
+## What it adds to OMP
+
+- Durable planning and execution through `/ulw-plan` and `/start-work`.
+- Capability-checked multi-agent coordination through `/teammode`.
+- Bounded autonomous workflows through `/ulw-loop` and `/ultrawork`.
+- Evidence-saturated investigation through `/ulw-research`.
+- Local, non-delivering LazyCodex diagnostics and contribution drafts.
+- Repository-scoped state, immutable worker identity binding, parent acceptance, and release-grade
+  verification gates.
 
 ## Requirements
 
 - Bun 1.3.14 and the committed `bun.lock`.
 - Git, because candidate and evidence provenance bind to a clean tracked worktree and `HEAD`.
-- OMP 16.4.x. Development and host verification are pinned to OMP 16.4.8; OMP 17 is
+- OMP 17.x. Development and host verification are pinned to OMP 17.0.5; other major versions are
   rejected before plugin or profile operations.
 - A private source checkout obtained through an approved internal channel.
 - Windows Developer Mode or equivalent symlink permission for Windows link-path coverage.
@@ -24,7 +34,7 @@ From the root of the private checkout, install only the locked dependencies:
 bun install --frozen-lockfile
 ```
 
-For an operator-managed source link, run the pinned OMP 16.4.x executable from the checkout:
+For an operator-managed source link, run the pinned OMP 17.x executable from the checkout:
 
 ```sh
 omp plugin link . --json
@@ -68,7 +78,7 @@ ignored local artifacts.
 | Source loader and discovery | No | Yes | Yes | Yes |
 | Committed candidate pack and staged install | No | Yes | Yes | Yes |
 | Hostile G01-G25 replay | No | Yes | Yes | Yes |
-| Pinned OMP 16.4.8 preflight | No | Yes | Yes | Yes |
+| Pinned OMP 17.0.5 preflight | No | Yes | Yes | Yes |
 | OMP link/list/doctor path | No | Windows | Yes | Through dogfood |
 | Pinned OMP dogfood/profile fingerprint | No | POSIX | No | Yes |
 | Publish or registry upload | No | No | No | No |
@@ -210,9 +220,9 @@ operator must separately review and deliver any generated draft outside this plu
 
 ## Troubleshooting
 
-- `unsupported_host_version`: select OMP 16.4.x; release verification is pinned to 16.4.8. Do not
-  bypass the check or widen it to OMP 17.
-- `missing_executable`: run `bun install --frozen-lockfile` and confirm the exact local OMP 16.4.8
+- `unsupported_host_version`: update to OMP 17.x; release verification is pinned to 17.0.5. When
+  OMP updates, update both exact development pins and rerun `bun run verify:release`.
+- `missing_executable`: run `bun install --frozen-lockfile` and confirm the exact local OMP 17.0.5
   development dependency is present, or pass a literal executable only to the underlying host
   diagnostic when investigating.
 - Windows symlink failure: enable Developer Mode or use an elevated environment, then rerun
@@ -223,3 +233,16 @@ operator must separately review and deliver any generated draft outside this plu
   receipts or downgrade a missing subgate to a soft pass.
 - Evidence manifest extra-file failure: use a copied evidence root for experiments and keep the
   canonical root exhaustive. Remove only the undeclared copied artifact, not a required receipt.
+
+## Source and attribution
+
+Workflow concepts and selected skill assets were adapted from
+[LazyCodex](https://github.com/code-yeongyu/lazycodex) at commit
+`f39306f1adab6ff155fd736cc7376d27156472bc`, under the MIT License. OMP compatibility was reviewed
+against [Oh My Pi](https://github.com/can1357/oh-my-pi). Full provenance and third-party notices are
+recorded in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
+[`third_party/SOURCE_COMMITS.json`](third_party/SOURCE_COMMITS.json).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
