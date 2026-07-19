@@ -1,11 +1,11 @@
 ---
-name: lcx-doctor
-description: Diagnose OMP and omp-lazy installation or workflow health without mutation. Use for health checks, post-install drift, broken loading, command or skill discovery failures, and compatibility invocations through /omp-lazy-doctor or /lcx-doctor.
+name: lcx-doctor(omp)
+description: Diagnose OMP and omp-lazy installation or workflow health without mutation. Use for health checks, post-install drift, broken loading, command or skill discovery failures, and compatibility invocations through /omp-lazy-doctor(omp) or /lcx-doctor(omp).
 ---
 
 # Diagnose omp-lazy
 
-Treat `/omp-lazy-doctor` and `/lcx-doctor` as the same `doctor` workflow.
+Treat `/omp-lazy-doctor(omp)` and `/lcx-doctor(omp)` as the same `doctor` workflow.
 
 1. Use the offline adapter unless the user separately authorizes network access.
 2. Resolve the project root, OMP executable, package manifest, and evidence root from literal arguments. Preserve Windows paths as single argv entries.

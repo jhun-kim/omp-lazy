@@ -43,7 +43,7 @@ describe("trusted activation provenance", () => {
 
   test("scopes identical text to its session and rejects reuse or hash mismatch", async () => {
     const controller = inactiveController()
-    const text = "use ultrawork"
+    const text = "use ultrawork(omp)"
     await controller.recordInput({ sessionId: "a", source: "interactive", text })
     await controller.recordInput({ sessionId: "b", source: "interactive", text })
 
@@ -86,7 +86,7 @@ describe("trusted activation provenance", () => {
       "bulwark",
       "ｕｌｗ",
       "ulw_plan",
-      "ulw-plan.md",
+      "ulw-plan(omp).md",
       "dir/ulw-loop(omp)",
       "울w",
     ]) {
@@ -100,7 +100,7 @@ describe("trusted activation provenance", () => {
 
   test("rejects ambiguous text that names multiple workflows", async () => {
     const controller = inactiveController()
-    const text = "use ulw and ulw-loop(omp)"
+    const text = "use ulw(omp) and ulw-loop(omp)"
     await controller.recordInput({ sessionId: "ambiguous", source: "interactive", text })
     expect(
       await controller.consumeBeforeAgentStart({ sessionId: "ambiguous", prompt: text }),
@@ -109,19 +109,23 @@ describe("trusted activation provenance", () => {
 
   test("suppresses exact synthetic prompts without consuming unrelated trusted input", async () => {
     const controller = inactiveController()
-    await controller.recordInput({ sessionId: "s", source: "interactive", text: "use ulw" })
-    await controller.suppressNext({ sessionId: "s", text: "continue ulw", reason: "continuation" })
+    await controller.recordInput({ sessionId: "s", source: "interactive", text: "use ulw(omp)" })
+    await controller.suppressNext({
+      sessionId: "s",
+      text: "continue ulw(omp)",
+      reason: "continuation",
+    })
 
     expect(
-      await controller.consumeBeforeAgentStart({ sessionId: "s", prompt: "continue ulw" }),
+      await controller.consumeBeforeAgentStart({ sessionId: "s", prompt: "continue ulw(omp)" }),
     ).toEqual({ kind: "quiet" })
-    expect(await controller.consumeBeforeAgentStart({ sessionId: "s", prompt: "use ulw" })).toEqual(
-      {
-        kind: "activate",
-        workflow: "ultrawork",
-        command: "/ulw",
-      },
-    )
+    expect(
+      await controller.consumeBeforeAgentStart({ sessionId: "s", prompt: "use ulw(omp)" }),
+    ).toEqual({
+      kind: "activate",
+      workflow: "ultrawork",
+      command: "/ulw(omp)",
+    })
   })
 
   test("consults persisted transaction state and stays quiet for an already-active workflow", async () => {
@@ -189,8 +193,8 @@ describe("command grammar", () => {
       suppression: controller,
       sendUserMessage: (message) => sent.push(message),
     })
-    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw")
-    if (registration === undefined) throw new Error("missing /ulw registration")
+    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw(omp)")
+    if (registration === undefined) throw new Error("missing /ulw(omp) registration")
 
     await executor.execute({
       registration,
@@ -218,8 +222,8 @@ describe("command grammar", () => {
       suppression: inactiveController(),
       sendUserMessage: () => undefined,
     })
-    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work")
-    if (registration === undefined) throw new Error("missing /start-work registration")
+    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work(omp)")
+    if (registration === undefined) throw new Error("missing /start-work(omp) registration")
 
     for (const [args, status] of [
       ["pause", "paused"],
@@ -246,8 +250,8 @@ describe("command grammar", () => {
       suppression: inactiveController(),
       sendUserMessage: () => undefined,
     })
-    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work")
-    if (registration === undefined) throw new Error("missing /start-work registration")
+    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work(omp)")
+    if (registration === undefined) throw new Error("missing /start-work(omp) registration")
     await executor.execute({
       registration,
       args: "pause",

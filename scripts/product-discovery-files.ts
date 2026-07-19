@@ -86,10 +86,10 @@ async function verifySkillFile(root: string, name: string): Promise<string> {
       `skill identity mismatch: ${name} -> ${parsed.data.name}`,
     )
   }
-  if (name === "ulw-research") {
+  if (name === "ulw-research(omp)") {
     await requireFile(
       join(root, "skills", name, "ATTRIBUTION.md"),
-      "skill attribution ulw-research",
+      "skill attribution ulw-research(omp)",
     )
   }
   await verifyRelativeMarkdownReferences(root, path, content)

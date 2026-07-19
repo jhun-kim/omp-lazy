@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 const root = join(import.meta.dir, "..", "..")
-const skillRoot = join(root, "skills", "ulw-plan")
+const skillRoot = join(root, "skills", "ulw-plan(omp)")
 
 async function read(relativePath: string): Promise<string> {
   return readFile(join(root, relativePath), "utf8")
@@ -13,11 +13,11 @@ describe("ulw-plan skill contract", () => {
   it("ships the exact progressive-disclosure surface and namespaced agents", async () => {
     // Given: the Todo14 package paths required by the reviewed plan.
     const paths = [
-      "skills/ulw-plan/SKILL.md",
-      "skills/ulw-plan/references/intent-clear.md",
-      "skills/ulw-plan/references/intent-unclear.md",
-      "skills/ulw-plan/references/full-workflow.md",
-      "skills/ulw-plan/scripts/scaffold-plan.mjs",
+      "skills/ulw-plan(omp)/SKILL.md",
+      "skills/ulw-plan(omp)/references/intent-clear.md",
+      "skills/ulw-plan(omp)/references/intent-unclear.md",
+      "skills/ulw-plan(omp)/references/full-workflow.md",
+      "skills/ulw-plan(omp)/scripts/scaffold-plan.mjs",
       "agents/omp-lazy-planner.md",
       "agents/omp-lazy-metis.md",
       "agents/omp-lazy-momus.md",
@@ -55,9 +55,9 @@ describe("ulw-plan skill contract", () => {
   it("routes CLEAR UNCLEAR and explicit interviews without leaving planning mode", async () => {
     // Given: the primary skill and both routing references.
     const [skill, clear, unclear] = await Promise.all([
-      read("skills/ulw-plan/SKILL.md"),
-      read("skills/ulw-plan/references/intent-clear.md"),
-      read("skills/ulw-plan/references/intent-unclear.md"),
+      read("skills/ulw-plan(omp)/SKILL.md"),
+      read("skills/ulw-plan(omp)/references/intent-clear.md"),
+      read("skills/ulw-plan(omp)/references/intent-unclear.md"),
     ])
     const combined = `${skill}\n${clear}\n${unclear}`
 
@@ -77,7 +77,7 @@ describe("ulw-plan skill contract", () => {
 
   it("requires durable approval before plan creation and resumes after compaction", async () => {
     // Given: the shared workflow mechanics.
-    const workflow = await read("skills/ulw-plan/references/full-workflow.md")
+    const workflow = await read("skills/ulw-plan(omp)/references/full-workflow.md")
 
     // When: durable gate and resume requirements are inspected.
     const requirements = [
@@ -99,7 +99,7 @@ describe("ulw-plan skill contract", () => {
 
   it("defines a decision-complete append-only plan with TLDR filled last", async () => {
     // Given: the shared workflow mechanics.
-    const workflow = await read("skills/ulw-plan/references/full-workflow.md")
+    const workflow = await read("skills/ulw-plan(omp)/references/full-workflow.md")
 
     // When: plan-writing invariants are inspected.
     const requirements = [
@@ -120,7 +120,7 @@ describe("ulw-plan skill contract", () => {
   it("requires two fresh independent review identities and rejects reviewer reuse", async () => {
     // Given: the shared review workflow and both review agents.
     const [workflow, metis, momus] = await Promise.all([
-      read("skills/ulw-plan/references/full-workflow.md"),
+      read("skills/ulw-plan(omp)/references/full-workflow.md"),
       read("agents/omp-lazy-metis.md"),
       read("agents/omp-lazy-momus.md"),
     ])
@@ -139,10 +139,10 @@ describe("ulw-plan skill contract", () => {
   it("removes Codex-only runtime and Goal mutation claims", async () => {
     // Given: every shipped Todo14 planning document and agent definition.
     const paths = [
-      "skills/ulw-plan/SKILL.md",
-      "skills/ulw-plan/references/intent-clear.md",
-      "skills/ulw-plan/references/intent-unclear.md",
-      "skills/ulw-plan/references/full-workflow.md",
+      "skills/ulw-plan(omp)/SKILL.md",
+      "skills/ulw-plan(omp)/references/intent-clear.md",
+      "skills/ulw-plan(omp)/references/intent-unclear.md",
+      "skills/ulw-plan(omp)/references/full-workflow.md",
       "agents/omp-lazy-planner.md",
       "agents/omp-lazy-metis.md",
       "agents/omp-lazy-momus.md",

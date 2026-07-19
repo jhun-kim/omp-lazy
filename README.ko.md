@@ -9,10 +9,10 @@
 
 ## OMP에 추가되는 기능
 
-- `/ulw-plan`과 `/start-work`를 통한 지속 가능한 계획 수립 및 실행.
-- `/teammode`를 통한 capability 검증 기반 multi-agent 조정.
-- `/ulw-loop(omp)`와 `/ultrawork`를 통한 경계가 정해진 자율 workflow.
-- `/ulw-research`를 통한 증거 중심 조사.
+- `/ulw-plan(omp)`과 `/start-work(omp)`를 통한 지속 가능한 계획 수립 및 실행.
+- `/teammode(omp)`를 통한 capability 검증 기반 multi-agent 조정.
+- `/ulw-loop(omp)`와 `/ultrawork(omp)`를 통한 경계가 정해진 자율 workflow.
+- `/ulw-research(omp)`를 통한 증거 중심 조사.
 - 로컬에서만 동작하며 전달하지 않는 LazyCodex 진단 및 contribution 초안.
 - repository 범위 state, 변경 불가능한 worker identity binding, parent acceptance, release-grade
   verification gate.
@@ -127,38 +127,38 @@ canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.
 
 | Command | Workflow |
 | --- | --- |
-| `/lcx-contribute-bug-fix` | Offline dry-run contribution workflow. |
-| `/lcx-doctor` | Read-only health diagnosis. |
-| `/lcx-report-bug` | Local report draft. |
-| `/omp-lazy-contribute-bug-fix` | Canonical contribution command. |
-| `/omp-lazy-doctor` | Canonical doctor command. |
-| `/omp-lazy-report-bug` | Canonical report command. |
-| `/omp-lazy-start-work` | Canonical plan execution command. |
-| `/omp-lazy-teammode` | Canonical durable team command. |
-| `/omp-lazy-ultrawork` | Canonical ultrawork command. |
-| `/omp-lazy-ulw-plan` | Canonical planning command. |
-| `/omp-lazy-ulw-research` | Canonical research command. |
-| `/start-work` | Plan execution alias. |
-| `/teammode` | Durable team alias. |
-| `/ultrawork` | Ultrawork alias. |
-| `/ulw` | Short ultrawork alias. |
+| `/lcx-contribute-bug-fix(omp)` | Offline dry-run contribution workflow. |
+| `/lcx-doctor(omp)` | Read-only health diagnosis. |
+| `/lcx-report-bug(omp)` | Local report draft. |
+| `/omp-lazy-contribute-bug-fix(omp)` | Canonical contribution command. |
+| `/omp-lazy-doctor(omp)` | Canonical doctor command. |
+| `/omp-lazy-report-bug(omp)` | Canonical report command. |
+| `/omp-lazy-start-work(omp)` | Canonical plan execution command. |
+| `/omp-lazy-teammode(omp)` | Canonical durable team command. |
+| `/omp-lazy-ultrawork(omp)` | Canonical ultrawork command. |
+| `/omp-lazy-ulw-plan(omp)` | Canonical planning command. |
+| `/omp-lazy-ulw-research(omp)` | Canonical research command. |
+| `/start-work(omp)` | Plan execution alias. |
+| `/teammode(omp)` | Durable team alias. |
+| `/ultrawork(omp)` | Ultrawork alias. |
+| `/ulw(omp)` | Short ultrawork alias. |
 | `/ulw-loop(omp)` | Bounded loop command. |
-| `/ulw-plan` | Planning alias. |
-| `/ulw-research` | Research alias. |
+| `/ulw-plan(omp)` | Planning alias. |
+| `/ulw-research(omp)` | Research alias. |
 
 ## Skills
 
 | Skill | Purpose |
 | --- | --- |
-| `lcx-contribute-bug-fix` | 로컬 dry-run contribution proposal을 작성합니다. |
-| `lcx-doctor` | 로컬 LazyCodex 및 OMP 상태를 read-only로 진단합니다. |
-| `lcx-report-bug` | 제한된 로컬 bug-report draft를 작성합니다. |
-| `start-work` | 승인된 `.omo/plans`를 evidence 및 parent acceptance와 함께 실행합니다. |
-| `teammode` | capability가 입증되고 겹치지 않는 durable team을 조정합니다. |
-| `ultrawork` | 엄격하고 경계가 정해진 실행을 진행합니다. |
+| `lcx-contribute-bug-fix(omp)` | 로컬 dry-run contribution proposal을 작성합니다. |
+| `lcx-doctor(omp)` | 로컬 LazyCodex 및 OMP 상태를 read-only로 진단합니다. |
+| `lcx-report-bug(omp)` | 제한된 로컬 bug-report draft를 작성합니다. |
+| `start-work(omp)` | 승인된 `.omo/plans`를 evidence 및 parent acceptance와 함께 실행합니다. |
+| `teammode(omp)` | capability가 입증되고 겹치지 않는 durable team을 조정합니다. |
+| `ultrawork(omp)` | 엄격하고 경계가 정해진 실행을 진행합니다. |
 | `ulw-loop(omp)` | 경계가 정해진 goal-independent workflow를 반복합니다. |
-| `ulw-plan` | 실행 전에 decision-complete plan을 만듭니다. |
-| `ulw-research` | retained attribution과 함께 증거 중심 research를 실행합니다. |
+| `ulw-plan(omp)` | 실행 전에 decision-complete plan을 만듭니다. |
+| `ulw-research(omp)` | retained attribution과 함께 증거 중심 research를 실행합니다. |
 
 ## Agents
 
@@ -216,9 +216,9 @@ coordinator는 integration 이후 F1-F4를 dispatch하기 전에 `bun run eviden
 
 ## Offline LCX limits
 
-LCX report 및 contribution workflow는 로컬 전용이며 전달하지 않습니다. `lcx-report-bug`는
-`externalWrite: not_run`을 기록합니다. `lcx-contribute-bug-fix`는 `--dry-run`을 요구합니다. 이 workflow들은 issue,
-pull request, push, release, upload 또는 기타 network write를 만들지 않습니다. `lcx-doctor`는 read-only입니다.
+LCX report 및 contribution workflow는 로컬 전용이며 전달하지 않습니다. `lcx-report-bug(omp)`는
+`externalWrite: not_run`을 기록합니다. `lcx-contribute-bug-fix(omp)`는 `--dry-run`을 요구합니다. 이 workflow들은 issue,
+pull request, push, release, upload 또는 기타 network write를 만들지 않습니다. `lcx-doctor(omp)`는 read-only입니다.
 operator는 생성된 draft를 이 plugin 밖에서 별도로 검토하고 전달해야 합니다.
 
 ## Troubleshooting

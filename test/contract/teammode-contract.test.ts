@@ -111,6 +111,6 @@ describe("teammode contract", () => {
       true,
     )
     expect(skills.warnings).toEqual([])
-    expect(skills.items.map((skill) => skill.name)).toContain("teammode")
+    expect(skills.items.map((skill) => skill.name)).toContain("teammode(omp)")
   })
 })

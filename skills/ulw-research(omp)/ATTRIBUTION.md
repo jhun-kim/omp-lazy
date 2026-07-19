@@ -1,4 +1,4 @@
-# ulw-research attribution
+# ulw-research(omp) attribution
 
 The research-loop vocabulary and the `EXPAND` tail convention are informed by the fivetaku notice provided with the upstream research material. This repository preserves that attribution as provenance for the convention; it does not determine copyright ownership, license obligations, or any other legal conclusion. Consult the source notice and qualified counsel for legal questions.
 

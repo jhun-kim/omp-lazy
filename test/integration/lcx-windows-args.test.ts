@@ -102,7 +102,13 @@ describe("lcx Windows adapter arguments", () => {
     const processResult = Bun.spawnSync(
       [
         "bun",
-        join(process.cwd(), "skills", "lcx-contribute-bug-fix", "scripts", "create-pr-body.mjs"),
+        join(
+          process.cwd(),
+          "skills",
+          "lcx-contribute-bug-fix(omp)",
+          "scripts",
+          "create-pr-body.mjs",
+        ),
         "--dry-run",
         "--input",
         inputPath,

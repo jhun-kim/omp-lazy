@@ -98,14 +98,14 @@ describe("public loader probe", () => {
       const candidate = await productRuntimeCandidate("missing-command")
       const commandFile = join(candidate, "src", "commands", "command-definitions.ts")
       const source = await readFile(commandFile, "utf8")
-      await writeFile(commandFile, source.replace('aliases: ["/teammode"],', "aliases: [],"))
+      await writeFile(commandFile, source.replace('aliases: ["/teammode(omp)"],', "aliases: [],"))
 
       // When: the product-mode loader gate runs against the copied candidate root.
       const result = run(["bun", join(repositoryRoot, "scripts", "probe-loader.ts")], candidate)
 
       // Then: the exact command delta is reported and the process fails.
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toContain('commands inventory mismatch: missing ["teammode"]')
+      expect(result.stderr).toContain('commands inventory mismatch: missing ["teammode(omp)"]')
     },
     loaderTestTimeoutMs,
   )

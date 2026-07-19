@@ -6,39 +6,39 @@ import { COMMAND_DEFINITIONS } from "../src/commands/command-definitions"
 import { expectedProductRuntime } from "./product-runtime-contract"
 
 const workflowSkillNames = {
-  contribute_bug_fix: "lcx-contribute-bug-fix",
-  doctor: "lcx-doctor",
-  report_bug: "lcx-report-bug",
-  start_work: "start-work",
-  teammode: "teammode",
-  ultrawork: "ultrawork",
+  contribute_bug_fix: "lcx-contribute-bug-fix(omp)",
+  doctor: "lcx-doctor(omp)",
+  report_bug: "lcx-report-bug(omp)",
+  start_work: "start-work(omp)",
+  teammode: "teammode(omp)",
+  ultrawork: "ultrawork(omp)",
   ulw_loop: "ulw-loop(omp)",
-  ulw_plan: "ulw-plan",
-  ulw_research: "ulw-research",
+  ulw_plan: "ulw-plan(omp)",
+  ulw_research: "ulw-research(omp)",
 } as const satisfies Record<WorkflowActivationId, string>
 
 const requiredSkillFiles = {
-  "lcx-contribute-bug-fix": [],
-  "lcx-doctor": [],
-  "lcx-report-bug": [],
+  "lcx-contribute-bug-fix(omp)": [],
+  "lcx-doctor(omp)": [],
+  "lcx-report-bug(omp)": [],
   "ulw-loop(omp)": ["references/full-workflow.md"],
-  "ulw-research": ["ATTRIBUTION.md"],
-  "start-work": [],
-  teammode: [],
-  ultrawork: [],
-  "ulw-plan": [],
+  "ulw-research(omp)": ["ATTRIBUTION.md"],
+  "start-work(omp)": [],
+  "teammode(omp)": [],
+  "ultrawork(omp)": [],
+  "ulw-plan(omp)": [],
 } as const satisfies Record<(typeof expectedProductRuntime.skillNames)[number], readonly string[]>
 
 const requiredContentTokens = {
-  "lcx-contribute-bug-fix": [],
-  "lcx-doctor": [],
-  "lcx-report-bug": [],
-  "start-work": [".omo/plans", "omp_lazy_accept_worker_result"],
-  teammode: [],
-  ultrawork: ["ULTRAWORK MODE ENABLED!", "<!-- omp-lazy-ultrawork-contract:v1 -->"],
+  "lcx-contribute-bug-fix(omp)": [],
+  "lcx-doctor(omp)": [],
+  "lcx-report-bug(omp)": [],
+  "start-work(omp)": [".omo/plans", "omp_lazy_accept_worker_result"],
+  "teammode(omp)": [],
+  "ultrawork(omp)": ["ULTRAWORK MODE ENABLED!", "<!-- omp-lazy-ultrawork-contract:v1 -->"],
   "ulw-loop(omp)": ["references/full-workflow.md"],
-  "ulw-plan": [],
-  "ulw-research": ["ATTRIBUTION.md", "EXPAND"],
+  "ulw-plan(omp)": [],
+  "ulw-research(omp)": ["ATTRIBUTION.md", "EXPAND"],
 } as const satisfies Record<(typeof expectedProductRuntime.skillNames)[number], readonly string[]>
 
 const markdownReferencePattern = /\]\((?!https?:|mailto:|#)([^)]+)\)/g

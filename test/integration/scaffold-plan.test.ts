@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const root = join(import.meta.dir, "..", "..")
-const script = join(root, "skills", "ulw-plan", "scripts", "scaffold-plan.mjs")
+const script = join(root, "skills", "ulw-plan(omp)", "scripts", "scaffold-plan.mjs")
 const fixtureRoot = join(root, "test", "fixtures", "ulw-plan")
 const sandboxes: string[] = []
 

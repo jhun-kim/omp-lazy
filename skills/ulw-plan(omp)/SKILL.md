@@ -1,9 +1,9 @@
 ---
-name: ulw-plan
-description: Plan complex or ambiguous work before implementation. Use for ulw-plan, plan mode, interview requests, architecture decisions, multi-module work, five-or-more-step work, vague briefs, or requests to break work down into one decision-complete plan.
+name: ulw-plan(omp)
+description: Plan complex or ambiguous work before implementation. Use for ulw-plan(omp), plan mode, interview requests, architecture decisions, multi-module work, five-or-more-step work, vague briefs, or requests to break work down into one decision-complete plan.
 ---
 
-# ulw-plan
+# ulw-plan(omp)
 
 Act as the `omp-lazy-planner`. Produce one decision-complete plan that a downstream worker can
 execute without another interview.

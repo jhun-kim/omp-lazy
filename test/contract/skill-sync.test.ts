@@ -28,18 +28,29 @@ describe("skill sync contract", () => {
 
     // Then: every command workflow maps to one expected skill and required files are present.
     expect(receipt.status).toBe("PASS")
-    expect(receipt.commandToSkill.start_work).toBe("start-work")
+    expect(receipt.skillNames).toEqual([
+      "lcx-contribute-bug-fix(omp)",
+      "lcx-doctor(omp)",
+      "lcx-report-bug(omp)",
+      "start-work(omp)",
+      "teammode(omp)",
+      "ultrawork(omp)",
+      "ulw-loop(omp)",
+      "ulw-plan(omp)",
+      "ulw-research(omp)",
+    ])
+    expect(receipt.commandToSkill.start_work).toBe("start-work(omp)")
     expect(receipt.commandToSkill.ulw_loop).toBe("ulw-loop(omp)")
     expect(receipt.requiredFiles).toContain("skills/ulw-loop(omp)/references/full-workflow.md")
-    expect(receipt.requiredFiles).toContain("skills/ulw-research/ATTRIBUTION.md")
+    expect(receipt.requiredFiles).toContain("skills/ulw-research(omp)/ATTRIBUTION.md")
   })
 
   it("rejects mismatched skill metadata and missing ULW references with distinct failures", async () => {
     // Given: a copied candidate with one command companion renamed and one required reference removed.
     const candidate = await copiedSkillsCandidate("reject")
     await writeFile(
-      join(candidate, "skills", "start-work", "SKILL.md"),
-      "---\nname: ultrawork\ndescription: mismatched fixture\n---\n\n# Wrong\n",
+      join(candidate, "skills", "start-work(omp)", "SKILL.md"),
+      "---\nname: ultrawork(omp)\ndescription: mismatched fixture\n---\n\n# Wrong\n",
     )
     await rm(join(candidate, "skills", "ulw-loop(omp)", "references", "full-workflow.md"))
 
@@ -48,7 +59,7 @@ describe("skill sync contract", () => {
 
     // Then: structural errors name both independent root causes.
     expect(result.exitCode).toBe(1)
-    expect(result.stderr).toContain("skill identity mismatch: start-work -> ultrawork")
+    expect(result.stderr).toContain("skill identity mismatch: start-work(omp) -> ultrawork(omp)")
     expect(result.stderr).toContain(
       "missing required skill file: ulw-loop(omp)/references/full-workflow.md",
     )
@@ -58,10 +69,10 @@ describe("skill sync contract", () => {
     // Given: copied skills whose generic explanatory prose changes but protocol markers remain.
     const candidate = await copiedSkillsCandidate("prose-variation")
     await writeFile(
-      join(candidate, "skills", "start-work", "SKILL.md"),
+      join(candidate, "skills", "start-work(omp)", "SKILL.md"),
       `---
-name: start-work
-description: start-work fixture
+name: start-work(omp)
+description: start-work(omp) fixture
 ---
 
 # Start work
@@ -82,13 +93,13 @@ Read [the full workflow](references/full-workflow.md) before controlling a run.
 `,
     )
     await writeFile(
-      join(candidate, "skills", "ulw-research", "SKILL.md"),
+      join(candidate, "skills", "ulw-research(omp)", "SKILL.md"),
       `---
-name: ulw-research
-description: ulw-research fixture
+name: ulw-research(omp)
+description: ulw-research(omp) fixture
 ---
 
-# ulw-research
+# ulw-research(omp)
 
 Keep [attribution](ATTRIBUTION.md) and require the protocol marker \`EXPAND\` on axis output.
 `,
@@ -99,6 +110,6 @@ Keep [attribution](ATTRIBUTION.md) and require the protocol marker \`EXPAND\` on
 
     // Then: harmless prose edits do not fail machine validation.
     expect(receipt.status).toBe("PASS")
-    expect(receipt.skillNames).toContain("start-work")
+    expect(receipt.skillNames).toContain("start-work(omp)")
   })
 })

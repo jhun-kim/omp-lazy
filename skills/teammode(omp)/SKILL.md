@@ -1,5 +1,5 @@
 ---
-name: teammode
+name: teammode(omp)
 description: Coordinate two or more OMP workers as a bounded asynchronous team with durable identity, acceptance, and cleanup evidence.
 ---
 

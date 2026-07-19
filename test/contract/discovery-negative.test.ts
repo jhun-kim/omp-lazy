@@ -112,13 +112,13 @@ describe("public discovery negative contract", () => {
       "missing Markdown reference",
     )
 
-    // Given: ulw-research omits its mandatory attribution file.
+    // Given: ulw-research(omp) omits its mandatory attribution file.
     const missingAttribution = await completeDiscoveryCandidate("missing-attribution", sandboxes)
-    await rm(join(missingAttribution, "skills", "ulw-research", "ATTRIBUTION.md"))
+    await rm(join(missingAttribution, "skills", "ulw-research(omp)", "ATTRIBUTION.md"))
 
     // When/Then: attribution is a structural package requirement.
     await expect(assertExactProductDiscovery(missingAttribution)).rejects.toThrow(
-      "missing skill attribution ulw-research",
+      "missing skill attribution ulw-research(omp)",
     )
   })
 

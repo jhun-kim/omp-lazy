@@ -1,11 +1,11 @@
 ---
-name: lcx-contribute-bug-fix
-description: Prepare a verified omp-lazy or OMP bug-fix contribution in mandatory offline dry-run mode. Use when asked to fix and contribute a defect through /omp-lazy-contribute-bug-fix or /lcx-contribute-bug-fix.
+name: lcx-contribute-bug-fix(omp)
+description: Prepare a verified omp-lazy or OMP bug-fix contribution in mandatory offline dry-run mode. Use when asked to fix and contribute a defect through /omp-lazy-contribute-bug-fix(omp) or /lcx-contribute-bug-fix(omp).
 ---
 
 # Prepare a bug-fix contribution
 
-Treat `/omp-lazy-contribute-bug-fix` and `/lcx-contribute-bug-fix` as the same `contribute_bug_fix` workflow. Require `--dry-run <issue-or-bug-ref>`; reject every other V1 form.
+Treat `/omp-lazy-contribute-bug-fix(omp)` and `/lcx-contribute-bug-fix(omp)` as the same `contribute_bug_fix` workflow. Require `--dry-run <issue-or-bug-ref>`; reject every other V1 form.
 
 1. Confirm ownership from reproduction evidence. Stop when the requested target conflicts with the reproduced owner.
 2. Create a fresh disposable workspace under the isolated evidence root. Preserve the user's repository and OMP profile.

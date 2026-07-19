@@ -9,10 +9,10 @@ download, or import a different host installation.
 
 ## What it adds to OMP
 
-- Durable planning and execution through `/ulw-plan` and `/start-work`.
-- Capability-checked multi-agent coordination through `/teammode`.
-- Bounded autonomous workflows through `/ulw-loop(omp)` and `/ultrawork`.
-- Evidence-saturated investigation through `/ulw-research`.
+- Durable planning and execution through `/ulw-plan(omp)` and `/start-work(omp)`.
+- Capability-checked multi-agent coordination through `/teammode(omp)`.
+- Bounded autonomous workflows through `/ulw-loop(omp)` and `/ultrawork(omp)`.
+- Evidence-saturated investigation through `/ulw-research(omp)`.
 - Local, non-delivering LazyCodex diagnostics and contribution drafts.
 - Repository-scoped state, immutable worker identity binding, parent acceptance, and release-grade
   verification gates.
@@ -127,38 +127,38 @@ Both canonical names and aliases are registered exactly once.
 
 | Command | Workflow |
 | --- | --- |
-| `/lcx-contribute-bug-fix` | Offline dry-run contribution workflow. |
-| `/lcx-doctor` | Read-only health diagnosis. |
-| `/lcx-report-bug` | Local report draft. |
-| `/omp-lazy-contribute-bug-fix` | Canonical contribution command. |
-| `/omp-lazy-doctor` | Canonical doctor command. |
-| `/omp-lazy-report-bug` | Canonical report command. |
-| `/omp-lazy-start-work` | Canonical plan execution command. |
-| `/omp-lazy-teammode` | Canonical durable team command. |
-| `/omp-lazy-ultrawork` | Canonical ultrawork command. |
-| `/omp-lazy-ulw-plan` | Canonical planning command. |
-| `/omp-lazy-ulw-research` | Canonical research command. |
-| `/start-work` | Plan execution alias. |
-| `/teammode` | Durable team alias. |
-| `/ultrawork` | Ultrawork alias. |
-| `/ulw` | Short ultrawork alias. |
+| `/lcx-contribute-bug-fix(omp)` | Offline dry-run contribution workflow. |
+| `/lcx-doctor(omp)` | Read-only health diagnosis. |
+| `/lcx-report-bug(omp)` | Local report draft. |
+| `/omp-lazy-contribute-bug-fix(omp)` | Canonical contribution command. |
+| `/omp-lazy-doctor(omp)` | Canonical doctor command. |
+| `/omp-lazy-report-bug(omp)` | Canonical report command. |
+| `/omp-lazy-start-work(omp)` | Canonical plan execution command. |
+| `/omp-lazy-teammode(omp)` | Canonical durable team command. |
+| `/omp-lazy-ultrawork(omp)` | Canonical ultrawork command. |
+| `/omp-lazy-ulw-plan(omp)` | Canonical planning command. |
+| `/omp-lazy-ulw-research(omp)` | Canonical research command. |
+| `/start-work(omp)` | Plan execution alias. |
+| `/teammode(omp)` | Durable team alias. |
+| `/ultrawork(omp)` | Ultrawork alias. |
+| `/ulw(omp)` | Short ultrawork alias. |
 | `/ulw-loop(omp)` | Bounded loop command. |
-| `/ulw-plan` | Planning alias. |
-| `/ulw-research` | Research alias. |
+| `/ulw-plan(omp)` | Planning alias. |
+| `/ulw-research(omp)` | Research alias. |
 
 ## Skills
 
 | Skill | Purpose |
 | --- | --- |
-| `lcx-contribute-bug-fix` | Builds a local dry-run contribution proposal. |
-| `lcx-doctor` | Diagnoses local LazyCodex and OMP health read-only. |
-| `lcx-report-bug` | Builds a contained local bug-report draft. |
-| `start-work` | Executes approved `.omo/plans` with evidence and parent acceptance. |
-| `teammode` | Coordinates capability-proven, non-overlapping durable teams. |
-| `ultrawork` | Drives rigorous bounded execution. |
+| `lcx-contribute-bug-fix(omp)` | Builds a local dry-run contribution proposal. |
+| `lcx-doctor(omp)` | Diagnoses local LazyCodex and OMP health read-only. |
+| `lcx-report-bug(omp)` | Builds a contained local bug-report draft. |
+| `start-work(omp)` | Executes approved `.omo/plans` with evidence and parent acceptance. |
+| `teammode(omp)` | Coordinates capability-proven, non-overlapping durable teams. |
+| `ultrawork(omp)` | Drives rigorous bounded execution. |
 | `ulw-loop(omp)` | Repeats a bounded goal-independent workflow. |
-| `ulw-plan` | Produces a decision-complete plan before execution. |
-| `ulw-research` | Runs evidence-saturated research with retained attribution. |
+| `ulw-plan(omp)` | Produces a decision-complete plan before execution. |
+| `ulw-research(omp)` | Runs evidence-saturated research with retained attribution. |
 
 ## Agents
 
@@ -219,9 +219,9 @@ dispatching F1-F4.
 
 ## Offline LCX limits
 
-LCX report and contribution workflows are local and non-delivering. `lcx-report-bug` records
-`externalWrite: not_run`; `lcx-contribute-bug-fix` requires `--dry-run`. They do not create issues,
-pull requests, pushes, releases, uploads, or other network writes. `lcx-doctor` is read-only. An
+LCX report and contribution workflows are local and non-delivering. `lcx-report-bug(omp)` records
+`externalWrite: not_run`; `lcx-contribute-bug-fix(omp)` requires `--dry-run`. They do not create issues,
+pull requests, pushes, releases, uploads, or other network writes. `lcx-doctor(omp)` is read-only. An
 operator must separately review and deliver any generated draft outside this plugin.
 
 ## Troubleshooting

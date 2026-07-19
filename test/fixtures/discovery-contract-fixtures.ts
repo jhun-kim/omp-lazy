@@ -27,7 +27,7 @@ export async function writeSkill(root: string, name: string): Promise<void> {
     await mkdir(join(skillRoot, "references"), { recursive: true })
     await writeFile(join(skillRoot, "references", "full-workflow.md"), "# Full workflow\n")
   }
-  if (name === "ulw-research") {
+  if (name === "ulw-research(omp)") {
     await writeFile(join(skillRoot, "ATTRIBUTION.md"), "# Attribution\n")
   }
 }
@@ -42,7 +42,7 @@ export async function writeAgent(root: string, name: string): Promise<void> {
 export function skillMarkdown(name: string, description: string): string {
   const body =
     name === "ulw-loop(omp)" ? "Use the [full workflow](references/full-workflow.md)." : "Run."
-  const attribution = name === "ulw-research" ? "\nSee [attribution](ATTRIBUTION.md)." : ""
+  const attribution = name === "ulw-research(omp)" ? "\nSee [attribution](ATTRIBUTION.md)." : ""
   return `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n\n${body}${attribution}\n`
 }
 

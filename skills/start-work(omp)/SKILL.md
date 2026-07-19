@@ -1,11 +1,11 @@
 ---
-name: start-work
+name: start-work(omp)
 description: Execute or resume an approved .omo/plans implementation plan with immutable task identity, parent acceptance, explicit lifecycle controls, and evidence-gated completion. Use for start-work, start work, execute plan, continue plan, or resume plan requests.
 ---
 
 # Start work
 
-Execute only an already approved plan under `.omo/plans`. If no approved plan exists, stop and route planning to `ulw-plan`; do not create, edit, or approve a plan inside this workflow.
+Execute only an already approved plan under `.omo/plans`. If no approved plan exists, stop and route planning to `ulw-plan(omp)`; do not create, edit, or approve a plan inside this workflow.
 
 Operate from plugin-owned state under `.omo/omp-lazy`. Native Goal mode is not authoritative for this workflow, and LCX-compatible paths remain offline and non-delivering unless a separate approved workflow says otherwise.
 

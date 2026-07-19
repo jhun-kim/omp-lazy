@@ -162,9 +162,9 @@ export async function inspectCandidate(
     throw new PackageGuardError(`required asset is not packed: ${missingPackedAsset}`)
   }
 
-  const researchSkill = join(root, "skills", "ulw-research", "SKILL.md")
+  const researchSkill = join(root, "skills", "ulw-research(omp)", "SKILL.md")
   if (await Bun.file(researchSkill).exists()) {
-    await requireFiles(root, ["skills/ulw-research/ATTRIBUTION.md"])
+    await requireFiles(root, ["skills/ulw-research(omp)/ATTRIBUTION.md"])
   }
 
   return {

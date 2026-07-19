@@ -37,21 +37,21 @@ describe("lcx compatibility workflow inventory", () => {
     // Given: the Todo16-owned compatibility contract and Todo7 catalog.
     expect(LCX_WORKFLOW_CONTRACTS).toEqual([
       {
-        alias: "/lcx-doctor",
-        canonical: "/omp-lazy-doctor",
-        skill: "lcx-doctor",
+        alias: "/lcx-doctor(omp)",
+        canonical: "/omp-lazy-doctor(omp)",
+        skill: "lcx-doctor(omp)",
         workflowId: "doctor",
       },
       {
-        alias: "/lcx-report-bug",
-        canonical: "/omp-lazy-report-bug",
-        skill: "lcx-report-bug",
+        alias: "/lcx-report-bug(omp)",
+        canonical: "/omp-lazy-report-bug(omp)",
+        skill: "lcx-report-bug(omp)",
         workflowId: "report_bug",
       },
       {
-        alias: "/lcx-contribute-bug-fix",
-        canonical: "/omp-lazy-contribute-bug-fix",
-        skill: "lcx-contribute-bug-fix",
+        alias: "/lcx-contribute-bug-fix(omp)",
+        canonical: "/omp-lazy-contribute-bug-fix(omp)",
+        skill: "lcx-contribute-bug-fix(omp)",
         workflowId: "contribute_bug_fix",
       },
     ])

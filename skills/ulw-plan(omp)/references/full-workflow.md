@@ -1,4 +1,4 @@
-# Full ulw-plan workflow
+# Full ulw-plan(omp) workflow
 
 ## Contents
 

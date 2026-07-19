@@ -74,16 +74,33 @@ async function loadProductCommand(name: string) {
 
 describe("authoritative command catalog", () => {
   test("contains the exact public command inventory once", () => {
-    expect(COMMAND_REGISTRATIONS.map((entry) => entry.command.slice(1)).sort()).toEqual(
-      expectedProductRuntime.commandNames,
-    )
+    expect(COMMAND_REGISTRATIONS.map((entry) => entry.command.slice(1)).sort()).toEqual([
+      "lcx-contribute-bug-fix(omp)",
+      "lcx-doctor(omp)",
+      "lcx-report-bug(omp)",
+      "omp-lazy-contribute-bug-fix(omp)",
+      "omp-lazy-doctor(omp)",
+      "omp-lazy-report-bug(omp)",
+      "omp-lazy-start-work(omp)",
+      "omp-lazy-teammode(omp)",
+      "omp-lazy-ultrawork(omp)",
+      "omp-lazy-ulw-plan(omp)",
+      "omp-lazy-ulw-research(omp)",
+      "start-work(omp)",
+      "teammode(omp)",
+      "ultrawork(omp)",
+      "ulw(omp)",
+      "ulw-loop(omp)",
+      "ulw-plan(omp)",
+      "ulw-research(omp)",
+    ])
     expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(18)
     expect(
       COMMAND_REGISTRATIONS.filter((entry) => entry.workflow === "ulw_loop").map(
         (entry) => entry.command,
       ),
     ).toEqual(["/ulw-loop(omp)"])
-    expect(COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw")?.workflow).toBe(
+    expect(COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw(omp)")?.workflow).toBe(
       "ultrawork",
     )
   })
@@ -126,21 +143,23 @@ describe("public OMP registration inventory", () => {
     `)
     const later = await fixtureExtension(`
       export default function collision(api) {
-        api.registerCommand("ulw", { handler: async () => {} })
+        api.registerCommand("ulw(omp)", { handler: async () => {} })
       }
     `)
     const loaded = await loadExtensions([product, later], process.cwd())
     const inventories = loaded.extensions.map((extension) => extension.commands)
 
     expect(loaded.errors).toEqual([])
-    expect(diagnoseCommandCollisions(inventories.slice(0, 1), ["teammode"]).status).toBe("FAIL")
+    expect(diagnoseCommandCollisions(inventories.slice(0, 1), ["teammode(omp)"]).status).toBe(
+      "FAIL",
+    )
     expect(diagnoseCommandCollisions(inventories, []).status).toBe("FAIL")
     expect(diagnoseCommandCollisions(inventories.slice(0, 1), []).status).toBe("PASS")
   })
 
   test("starts a valid workflow activation through default public message delivery", async () => {
     // Given: the product extension registered through OMP's public loader while the host is idle.
-    const { command, runtime } = await loadProductCommand("ulw")
+    const { command, runtime } = await loadProductCommand("ulw(omp)")
     const deliveries: Array<{ readonly content: unknown; readonly options: unknown }> = []
     runtime.sendUserMessage = (content, options) => deliveries.push({ content, options })
 
@@ -158,7 +177,7 @@ describe("public OMP registration inventory", () => {
 
   test("rejects malformed public workflow grammar without sending a message", async () => {
     // Given: the product command registered through OMP's public loader.
-    const { command, runtime } = await loadProductCommand("ulw")
+    const { command, runtime } = await loadProductCommand("ulw(omp)")
     const deliveries: unknown[] = []
     runtime.sendUserMessage = (content) => deliveries.push(content)
 
@@ -168,7 +187,7 @@ describe("public OMP registration inventory", () => {
         "--not-in-catalog",
         { cwd: process.cwd(), sessionManager: { getSessionId: () => "public-invalid-session" } },
       ]),
-    ).rejects.toThrow("invalid grammar for /ulw")
+    ).rejects.toThrow("invalid grammar for /ulw(omp)")
     expect(deliveries).toEqual([])
   })
 })

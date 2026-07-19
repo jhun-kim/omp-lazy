@@ -1,11 +1,11 @@
 ---
-name: lcx-report-bug
-description: Route and draft evidence-backed omp-lazy or OMP bug reports without publishing them. Use when asked to report, file, triage, or deduplicate a defect through /omp-lazy-report-bug or /lcx-report-bug.
+name: lcx-report-bug(omp)
+description: Route and draft evidence-backed omp-lazy or OMP bug reports without publishing them. Use when asked to report, file, triage, or deduplicate a defect through /omp-lazy-report-bug(omp) or /lcx-report-bug(omp).
 ---
 
 # Draft an OMP bug report
 
-Treat `/omp-lazy-report-bug` and `/lcx-report-bug` as the same `report_bug` workflow.
+Treat `/omp-lazy-report-bug(omp)` and `/lcx-report-bug(omp)` as the same `report_bug` workflow.
 
 1. Reproduce the defect with the offline adapter and retain exact environment, commands, output, and cleanup evidence.
 2. Route to `omp-lazy` when the failure depends on this package. Route to `omp` only when it reproduces in clean OMP 17.0.5. Stop on ambiguous ownership or an explicit target mismatch.
