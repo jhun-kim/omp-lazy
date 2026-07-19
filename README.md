@@ -2,9 +2,10 @@
 
 English | [한국어](README.ko.md)
 
-`omp-lazy` is a private, source-only TypeScript extension for OMP 17.x. It is not
-published to a package registry. The extension loads from `package.json#omp.extensions`
-under Bun and does not locate, download, or import a different host installation.
+`omp-lazy` is an MIT-licensed, source-only TypeScript extension for OMP 17.x. The source is
+maintained in this public repository, while `package.json#private` prevents accidental registry
+publication. The extension loads from `package.json#omp.extensions` under Bun and does not locate,
+download, or import a different host installation.
 
 ## What it adds to OMP
 
@@ -22,15 +23,15 @@ under Bun and does not locate, download, or import a different host installation
 - Git, because candidate and evidence provenance bind to a clean tracked worktree and `HEAD`.
 - OMP 17.x. Development and host verification are pinned to OMP 17.0.5; other major versions are
   rejected before plugin or profile operations.
-- A private source checkout obtained through an approved internal channel.
+- A source checkout of this repository.
 - Windows Developer Mode or equivalent symlink permission for Windows link-path coverage.
 
 No registry credentials, publishing token, API secret, or network-write permission is needed.
 The deterministic host preflight uses a loopback provider and a non-secret fixture key.
 
-## Private source installation
+## Source installation
 
-From the root of the private checkout, install only the locked dependencies:
+From the repository root, install only the locked dependencies:
 
 ```sh
 bun install --frozen-lockfile
@@ -66,6 +67,10 @@ Every subgate is mandatory and empty or non-PASS structured evidence fails the r
 ```sh
 bun run verify:release
 ```
+
+The release CLI validates full structured receipts internally but prints only per-gate PASS
+summaries. Host profile paths, sandbox roots, and profile fingerprints are not written to public CI
+logs.
 
 `pack:candidate`, `smoke:staged`, and evidence manifests require committed bytes. Run release and
 manifest generation only from a clean tracked worktree. Generated tarballs and receipts remain

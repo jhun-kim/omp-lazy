@@ -47,10 +47,16 @@ describe("isolated runner", () => {
     expect(processResult.exitCode).toBe(0)
     const environment = JSON.parse(await readFile(probe, "utf8"))
     expect(environment.OPENAI_API_KEY).toBeUndefined()
+    expect(environment.OMP_LAZY_HOST_PROFILE).toBeUndefined()
     expect(environment.PI_CONFIG_DIR).toBe(".omp")
     expect(environment.USERPROFILE.startsWith(sandbox)).toBe(true)
-    const receipt = JSON.parse(new TextDecoder().decode(processResult.stdout))
+    const output = new TextDecoder().decode(processResult.stdout)
+    const receipt = JSON.parse(output)
     expect(receipt.cleanup).toEqual({ processTree: "complete", sandbox: "complete" })
+    expect(receipt.cwd).toBeUndefined()
+    expect(receipt.sandboxRoot).toBeUndefined()
+    expect(output).not.toContain(sandbox)
+    expect(output).not.toContain(".omp-lazy-isolated-")
   })
 
   it("fails when bun test collects zero tests", () => {

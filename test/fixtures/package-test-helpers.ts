@@ -38,6 +38,7 @@ export async function copyCandidate(prefix: string): Promise<string> {
     [
       ".gitignore",
       "LICENSE",
+      "README.ko.md",
       "README.md",
       "THIRD_PARTY_NOTICES.md",
       "package.json",

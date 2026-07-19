@@ -2,9 +2,10 @@
 
 [English](README.md) | 한국어
 
-`omp-lazy`는 OMP 17.x용 비공개 소스 전용 TypeScript 확장입니다. 패키지 레지스트리에
-게시되지 않습니다. 이 확장은 Bun에서 `package.json#omp.extensions`를 통해 로드되며,
-다른 호스트 설치를 찾거나 다운로드하거나 가져오지 않습니다.
+`omp-lazy`는 OMP 17.x용 MIT 라이선스 기반 소스 전용 TypeScript 확장입니다. 소스는 이 공개
+저장소에서 관리되며, `package.json#private` 설정이 실수로 패키지 레지스트리에 게시되는 것을
+막습니다. 이 확장은 Bun에서 `package.json#omp.extensions`를 통해 로드되며 다른 호스트 설치를
+찾거나 다운로드하거나 가져오지 않습니다.
 
 ## OMP에 추가되는 기능
 
@@ -22,15 +23,15 @@
 - Git. candidate와 evidence provenance가 깨끗한 tracked worktree 및 `HEAD`에 묶이기 때문입니다.
 - OMP 17.x. 개발 및 host verification은 OMP 17.0.5에 고정되어 있으며, 다른 major version은
   plugin 또는 profile 작업 전에 거부됩니다.
-- 승인된 내부 채널을 통해 받은 비공개 source checkout.
+- 이 저장소의 source checkout.
 - Windows link-path coverage를 위한 Windows Developer Mode 또는 동등한 symlink 권한.
 
 registry credential, publishing token, API secret, network-write 권한은 필요하지 않습니다.
 결정적 host preflight는 loopback provider와 secret이 아닌 fixture key를 사용합니다.
 
-## 비공개 소스 설치
+## 소스 설치
 
-비공개 checkout의 root에서 locked dependency만 설치합니다.
+저장소 root에서 locked dependency만 설치합니다.
 
 ```sh
 bun install --frozen-lockfile
@@ -66,6 +67,10 @@ coverage를 실행합니다. Linux와 기타 POSIX host는 profile fingerprint v
 ```sh
 bun run verify:release
 ```
+
+release CLI는 전체 structured receipt를 내부에서 검증하지만 외부에는 gate별 PASS 요약만
+출력합니다. host profile 경로, sandbox root, profile fingerprint는 공개 CI 로그에 기록하지
+않습니다.
 
 `pack:candidate`, `smoke:staged`, evidence manifest에는 committed byte가 필요합니다. release와
 manifest generation은 clean tracked worktree에서만 실행하세요. 생성된 tarball과 receipt는 ignored local artifact로

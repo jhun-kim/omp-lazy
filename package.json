@@ -21,6 +21,7 @@
     "scripts/assert-skill-sync.ts",
     "LICENSE",
     "README.md",
+    "README.ko.md",
     "THIRD_PARTY_NOTICES.md",
     "third_party"
   ],

@@ -35,9 +35,21 @@ describe("package manifest", () => {
 
     // Then: the T07 sync verifier stays packaged until T10 generalizes all file checks.
     expect(manifest.files).toContain("scripts/assert-skill-sync.ts")
+    expect(manifest.files).toContain("README.ko.md")
     await expect(
       readFile(join(root, "scripts", "assert-skill-sync.ts"), "utf8"),
     ).resolves.toContain("parseFrontmatter")
+  })
+
+  it("keeps public OMP provenance independent of a maintainer home directory", async () => {
+    // Given: the distributable OMP provenance document.
+    const source = await readFile(join(root, "third_party", "omp", "SOURCE.md"), "utf8")
+
+    // When: its public text is inspected.
+    const homePath = /(?:[A-Za-z]:\\Users\\|\/Users\/|\/home\/|AppData[\\/])/u
+
+    // Then: no maintainer-specific home or application-data path is published.
+    expect(source).not.toMatch(homePath)
   })
 
   it("records complete source provenance and required notices", async () => {

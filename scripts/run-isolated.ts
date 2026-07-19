@@ -24,13 +24,10 @@ type CleanupReceipt = {
 }
 
 type RunReceipt = {
-  readonly argv: readonly string[]
   readonly cleanup: CleanupReceipt
-  readonly cwd: string
   readonly durationMs: number
   readonly envProfile: z.infer<typeof profileSchema>
   readonly exitCode: number
-  readonly sandboxRoot: string
   readonly stderr: string
   readonly stdout: string
   readonly timedOut: boolean
@@ -84,7 +81,10 @@ function assertContained(parent: string, child: string): void {
   }
 }
 
-async function createEnvironment(cwd: string): Promise<{
+async function createEnvironment(
+  cwd: string,
+  profile: z.infer<typeof profileSchema>,
+): Promise<{
   readonly environment: Readonly<Record<string, string>>
   readonly sandboxRoot: string
 }> {
@@ -122,7 +122,7 @@ async function createEnvironment(cwd: string): Promise<{
       HOME: home,
       PI_CODING_AGENT_DIR: join(home, ".omp", "agent"),
       PI_CONFIG_DIR: ".omp",
-      OMP_LAZY_HOST_PROFILE: hostProfile,
+      ...(profile === "omp" ? { OMP_LAZY_HOST_PROFILE: hostProfile } : {}),
       OMP_WORKTREE_DIR: join(sandboxRoot, "worktrees"),
       XDG_DATA_HOME: join(sandboxRoot, "xdg", "data"),
       XDG_STATE_HOME: join(sandboxRoot, "xdg", "state"),
@@ -145,7 +145,7 @@ function collectedZeroTests(argv: readonly string[], output: string): boolean {
 async function run(arguments_: RunnerArguments): Promise<RunReceipt> {
   const requestedCwd = resolve(arguments_.cwd)
   const cwd = await realpath(requestedCwd)
-  const { environment, sandboxRoot } = await createEnvironment(cwd)
+  const { environment, sandboxRoot } = await createEnvironment(cwd, arguments_.profile)
   const startedAt = performance.now()
   const child = Bun.spawn([...arguments_.argv], {
     cwd,
@@ -191,13 +191,10 @@ async function run(arguments_: RunnerArguments): Promise<RunReceipt> {
     const output = `${stdout}\n${stderr}`
     const acceptedExit = !timedOut && exitCode === 0 && !collectedZeroTests(arguments_.argv, output)
     return {
-      argv: arguments_.argv,
       cleanup: { processTree: "complete", sandbox: "complete" },
-      cwd,
       durationMs: Math.round(performance.now() - startedAt),
       envProfile: arguments_.profile,
       exitCode: acceptedExit ? 0 : exitCode === 0 ? 1 : exitCode,
-      sandboxRoot,
       stderr,
       stdout,
       timedOut,

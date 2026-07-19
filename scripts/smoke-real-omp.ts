@@ -123,12 +123,7 @@ async function main(): Promise<void> {
       link: receipt.link,
       omp,
       preflight: receipt.preflight,
-      profileFingerprint: {
-        after: realProfileAfter,
-        before: realProfileBefore,
-        path: realProfile,
-        unchanged: true,
-      },
+      profileFingerprint: { unchanged: true },
       route: "pinned-real-omp",
     })}\n`,
   )

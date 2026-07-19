@@ -65,3 +65,8 @@ export function verifyReleaseGateOutput(script: string, output: GateProcessOutpu
     if (!status.success) throw new ReleaseGateError(`release gate did not report PASS: ${script}`)
   }
 }
+
+export function publicReleaseGateOutput(script: string, output: GateProcessOutput): string {
+  verifyReleaseGateOutput(script, output)
+  return `PASS ${script}\n`
+}

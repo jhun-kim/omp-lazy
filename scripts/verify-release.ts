@@ -1,4 +1,4 @@
-import { releaseGatePlan, verifyReleaseGateOutput } from "./release-gates"
+import { publicReleaseGateOutput, releaseGatePlan } from "./release-gates"
 
 async function run(script: string): Promise<void> {
   const child = Bun.spawn(["bun", "run", script], {
@@ -11,9 +11,7 @@ async function run(script: string): Promise<void> {
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
-  process.stdout.write(stdout)
-  process.stderr.write(stderr)
-  verifyReleaseGateOutput(script, { exitCode, stderr, stdout })
+  process.stdout.write(publicReleaseGateOutput(script, { exitCode, stderr, stdout }))
 }
 
 // no-excuse-ok: catch -- release CLI must stop at the first failed mandatory gate.
