@@ -12,7 +12,7 @@ const workflowSkillNames = {
   start_work: "start-work",
   teammode: "teammode",
   ultrawork: "ultrawork",
-  ulw_loop: "ulw-loop",
+  ulw_loop: "ulw-loop(omp)",
   ulw_plan: "ulw-plan",
   ulw_research: "ulw-research",
 } as const satisfies Record<WorkflowActivationId, string>
@@ -21,7 +21,7 @@ const requiredSkillFiles = {
   "lcx-contribute-bug-fix": [],
   "lcx-doctor": [],
   "lcx-report-bug": [],
-  "ulw-loop": ["references/full-workflow.md"],
+  "ulw-loop(omp)": ["references/full-workflow.md"],
   "ulw-research": ["ATTRIBUTION.md"],
   "start-work": [],
   teammode: [],
@@ -36,7 +36,7 @@ const requiredContentTokens = {
   "start-work": [".omo/plans", "omp_lazy_accept_worker_result"],
   teammode: [],
   ultrawork: ["ULTRAWORK MODE ENABLED!", "<!-- omp-lazy-ultrawork-contract:v1 -->"],
-  "ulw-loop": ["references/full-workflow.md"],
+  "ulw-loop(omp)": ["references/full-workflow.md"],
   "ulw-plan": [],
   "ulw-research": ["ATTRIBUTION.md", "EXPAND"],
 } as const satisfies Record<(typeof expectedProductRuntime.skillNames)[number], readonly string[]>

@@ -82,7 +82,14 @@ describe("trusted activation provenance", () => {
   })
 
   test("rejects Unicode and filename boundary near misses", async () => {
-    for (const text of ["bulwark", "ｕｌｗ", "ulw_plan", "ulw-plan.md", "dir/ulw-loop", "울w"]) {
+    for (const text of [
+      "bulwark",
+      "ｕｌｗ",
+      "ulw_plan",
+      "ulw-plan.md",
+      "dir/ulw-loop(omp)",
+      "울w",
+    ]) {
       const controller = inactiveController()
       await controller.recordInput({ sessionId: text, source: "interactive", text })
       expect(await controller.consumeBeforeAgentStart({ sessionId: text, prompt: text })).toEqual({
@@ -93,7 +100,7 @@ describe("trusted activation provenance", () => {
 
   test("rejects ambiguous text that names multiple workflows", async () => {
     const controller = inactiveController()
-    const text = "use ulw and ulw-loop"
+    const text = "use ulw and ulw-loop(omp)"
     await controller.recordInput({ sessionId: "ambiguous", source: "interactive", text })
     expect(
       await controller.consumeBeforeAgentStart({ sessionId: "ambiguous", prompt: text }),

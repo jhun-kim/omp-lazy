@@ -51,7 +51,7 @@ export const expectedProductRuntime = {
     "start-work",
     "teammode",
     "ultrawork",
-    "ulw-loop",
+    "ulw-loop(omp)",
     "ulw-plan",
     "ulw-research",
   ],

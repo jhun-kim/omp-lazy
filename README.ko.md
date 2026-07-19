@@ -11,7 +11,7 @@
 
 - `/ulw-plan`과 `/start-work`를 통한 지속 가능한 계획 수립 및 실행.
 - `/teammode`를 통한 capability 검증 기반 multi-agent 조정.
-- `/ulw-loop`와 `/ultrawork`를 통한 경계가 정해진 자율 workflow.
+- `/ulw-loop(omp)`와 `/ultrawork`를 통한 경계가 정해진 자율 workflow.
 - `/ulw-research`를 통한 증거 중심 조사.
 - 로컬에서만 동작하며 전달하지 않는 LazyCodex 진단 및 contribution 초안.
 - repository 범위 state, 변경 불가능한 worker identity binding, parent acceptance, release-grade
@@ -136,14 +136,13 @@ canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.
 | `/omp-lazy-start-work` | Canonical plan execution command. |
 | `/omp-lazy-teammode` | Canonical durable team command. |
 | `/omp-lazy-ultrawork` | Canonical ultrawork command. |
-| `/omp-lazy-ulw-loop` | Canonical bounded loop command. |
 | `/omp-lazy-ulw-plan` | Canonical planning command. |
 | `/omp-lazy-ulw-research` | Canonical research command. |
 | `/start-work` | Plan execution alias. |
 | `/teammode` | Durable team alias. |
 | `/ultrawork` | Ultrawork alias. |
 | `/ulw` | Short ultrawork alias. |
-| `/ulw-loop` | Bounded loop alias. |
+| `/ulw-loop(omp)` | Bounded loop command. |
 | `/ulw-plan` | Planning alias. |
 | `/ulw-research` | Research alias. |
 
@@ -157,7 +156,7 @@ canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.
 | `start-work` | 승인된 `.omo/plans`를 evidence 및 parent acceptance와 함께 실행합니다. |
 | `teammode` | capability가 입증되고 겹치지 않는 durable team을 조정합니다. |
 | `ultrawork` | 엄격하고 경계가 정해진 실행을 진행합니다. |
-| `ulw-loop` | 경계가 정해진 goal-independent workflow를 반복합니다. |
+| `ulw-loop(omp)` | 경계가 정해진 goal-independent workflow를 반복합니다. |
 | `ulw-plan` | 실행 전에 decision-complete plan을 만듭니다. |
 | `ulw-research` | retained attribution과 함께 증거 중심 research를 실행합니다. |
 

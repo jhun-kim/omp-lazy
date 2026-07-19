@@ -11,7 +11,7 @@ download, or import a different host installation.
 
 - Durable planning and execution through `/ulw-plan` and `/start-work`.
 - Capability-checked multi-agent coordination through `/teammode`.
-- Bounded autonomous workflows through `/ulw-loop` and `/ultrawork`.
+- Bounded autonomous workflows through `/ulw-loop(omp)` and `/ultrawork`.
 - Evidence-saturated investigation through `/ulw-research`.
 - Local, non-delivering LazyCodex diagnostics and contribution drafts.
 - Repository-scoped state, immutable worker identity binding, parent acceptance, and release-grade
@@ -136,14 +136,13 @@ Both canonical names and aliases are registered exactly once.
 | `/omp-lazy-start-work` | Canonical plan execution command. |
 | `/omp-lazy-teammode` | Canonical durable team command. |
 | `/omp-lazy-ultrawork` | Canonical ultrawork command. |
-| `/omp-lazy-ulw-loop` | Canonical bounded loop command. |
 | `/omp-lazy-ulw-plan` | Canonical planning command. |
 | `/omp-lazy-ulw-research` | Canonical research command. |
 | `/start-work` | Plan execution alias. |
 | `/teammode` | Durable team alias. |
 | `/ultrawork` | Ultrawork alias. |
 | `/ulw` | Short ultrawork alias. |
-| `/ulw-loop` | Bounded loop alias. |
+| `/ulw-loop(omp)` | Bounded loop command. |
 | `/ulw-plan` | Planning alias. |
 | `/ulw-research` | Research alias. |
 
@@ -157,7 +156,7 @@ Both canonical names and aliases are registered exactly once.
 | `start-work` | Executes approved `.omo/plans` with evidence and parent acceptance. |
 | `teammode` | Coordinates capability-proven, non-overlapping durable teams. |
 | `ultrawork` | Drives rigorous bounded execution. |
-| `ulw-loop` | Repeats a bounded goal-independent workflow. |
+| `ulw-loop(omp)` | Repeats a bounded goal-independent workflow. |
 | `ulw-plan` | Produces a decision-complete plan before execution. |
 | `ulw-research` | Runs evidence-saturated research with retained attribution. |
 

@@ -32,7 +32,7 @@ describe("README runtime contract", () => {
     // Then
     expect(receipt.status).toBe("PASS")
     expect(receipt.packageScripts.length).toBeGreaterThan(0)
-    expect(receipt.commandNames).toHaveLength(19)
+    expect(receipt.commandNames).toHaveLength(18)
     expect(receipt.skillNames).toHaveLength(9)
     expect(receipt.agentNames).toHaveLength(11)
   })

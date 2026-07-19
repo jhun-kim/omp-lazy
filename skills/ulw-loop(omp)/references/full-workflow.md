@@ -8,8 +8,8 @@ The extension works with Goal mode disabled and never activates Goal mode. Nativ
 
 ## Create and inspect
 
-1. Create one run with `/omp-lazy-ulw-loop create <objective>` or `/ulw-loop create <objective>`.
-2. Read `/omp-lazy-ulw-loop status [run-id]` before acting and after context loss.
+1. Create one run with `/ulw-loop(omp) create <objective>`.
+2. Read `/ulw-loop(omp) status [run-id]` before acting and after context loss.
 3. Record the run ID, owner session and epoch, revision, active goal, criteria, cycle count, identical failure counts, and continuation count.
 4. Keep checkpoint, receipt, and steering files under `.omo/evidence/ulw/<run-id>/`. Files must be nonempty regular files, not symlinks, and must remain inside that directory by real path.
 
@@ -26,7 +26,7 @@ For each cycle:
 3. Bind returned agent and job IDs from the installed observer. Never reconstruct them from requested names.
 4. Verify worker output at the parent. Required worker settlement occurs only after `omp_lazy_accept_worker_result` returns `accepted` or idempotent `replayed` for the current run, generation, task, HEAD, artifact, and cleanup bindings.
 5. Drive the named product, CLI, data, browser, terminal, or desktop surface. Capture the raw observable and clean every spawned resource before recording PASS.
-6. Write a checkpoint document and invoke `/omp-lazy-ulw-loop checkpoint <run-id> <criterion-id> <document-path>`.
+6. Write a checkpoint document and invoke `/ulw-loop(omp) checkpoint <run-id> <criterion-id> <document-path>`.
 
 Checkpoint documents are structured JSON with schema version, run ID, run revision, capture commit, criterion ID, status, evidence or receipt references, and an optional failure fingerprint. A `fail` requires a stable SHA-256 failure fingerprint. Replaying an exact durable checkpoint is a no-op; conflicting stale revision, HEAD, evidence, receipt, or failure data fails closed.
 
@@ -43,7 +43,7 @@ Checkpoint documents are structured JSON with schema version, run ID, run revisi
 
 Steering is structured, additive, evidence-backed, and idempotent. Natural-language steering is rejected. V1 permits only audit annotation or adding a new criterion; it cannot delete, relax, pass, reclassify, reorder, or rewrite an existing gate.
 
-Invoke `/omp-lazy-ulw-loop steer <run-id> <document-path>`. Repeating an identical idempotency key and document is a no-op; reusing the key for different content is a conflict.
+Invoke `/ulw-loop(omp) steer <run-id> <document-path>`. Repeating an identical idempotency key and document is a no-op; reusing the key for different content is a conflict.
 
 ## Explicit control
 

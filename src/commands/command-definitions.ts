@@ -49,8 +49,8 @@ export const COMMAND_DEFINITIONS = [
   },
   {
     workflow: "ulw_loop",
-    canonical: "/omp-lazy-ulw-loop",
-    aliases: ["/ulw-loop"],
+    canonical: "/ulw-loop(omp)",
+    aliases: [],
     description: "Run or control a bounded ULW goal-independent loop",
     grammar: [
       "create <objective-text>",

@@ -73,11 +73,16 @@ async function loadProductCommand(name: string) {
 }
 
 describe("authoritative command catalog", () => {
-  test("contains the exact canonical and alias inventory once", () => {
+  test("contains the exact public command inventory once", () => {
     expect(COMMAND_REGISTRATIONS.map((entry) => entry.command.slice(1)).sort()).toEqual(
       expectedProductRuntime.commandNames,
     )
-    expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(19)
+    expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(18)
+    expect(
+      COMMAND_REGISTRATIONS.filter((entry) => entry.workflow === "ulw_loop").map(
+        (entry) => entry.command,
+      ),
+    ).toEqual(["/ulw-loop(omp)"])
     expect(COMMAND_REGISTRATIONS.find((entry) => entry.command === "/ulw")?.workflow).toBe(
       "ultrawork",
     )
@@ -91,7 +96,7 @@ describe("authoritative command catalog", () => {
 })
 
 describe("public OMP registration inventory", () => {
-  test("loads all 19 registrations through the public loader", async () => {
+  test("loads all 18 registrations through the public loader", async () => {
     const moduleUrl = pathToFileURL(
       join(process.cwd(), "src", "commands", "register-workflow-commands.ts"),
     ).href

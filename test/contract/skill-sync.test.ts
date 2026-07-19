@@ -29,8 +29,8 @@ describe("skill sync contract", () => {
     // Then: every command workflow maps to one expected skill and required files are present.
     expect(receipt.status).toBe("PASS")
     expect(receipt.commandToSkill.start_work).toBe("start-work")
-    expect(receipt.commandToSkill.ulw_loop).toBe("ulw-loop")
-    expect(receipt.requiredFiles).toContain("skills/ulw-loop/references/full-workflow.md")
+    expect(receipt.commandToSkill.ulw_loop).toBe("ulw-loop(omp)")
+    expect(receipt.requiredFiles).toContain("skills/ulw-loop(omp)/references/full-workflow.md")
     expect(receipt.requiredFiles).toContain("skills/ulw-research/ATTRIBUTION.md")
   })
 
@@ -41,7 +41,7 @@ describe("skill sync contract", () => {
       join(candidate, "skills", "start-work", "SKILL.md"),
       "---\nname: ultrawork\ndescription: mismatched fixture\n---\n\n# Wrong\n",
     )
-    await rm(join(candidate, "skills", "ulw-loop", "references", "full-workflow.md"))
+    await rm(join(candidate, "skills", "ulw-loop(omp)", "references", "full-workflow.md"))
 
     // When: the standalone sync CLI checks the copied surface.
     const result = run(["bun", "scripts/assert-skill-sync.ts", "--root", candidate])
@@ -50,7 +50,7 @@ describe("skill sync contract", () => {
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain("skill identity mismatch: start-work -> ultrawork")
     expect(result.stderr).toContain(
-      "missing required skill file: ulw-loop/references/full-workflow.md",
+      "missing required skill file: ulw-loop(omp)/references/full-workflow.md",
     )
   })
 
@@ -70,10 +70,10 @@ Run an accepted plan from \`.omo/plans\` and settle worker evidence through \`om
 `,
     )
     await writeFile(
-      join(candidate, "skills", "ulw-loop", "SKILL.md"),
+      join(candidate, "skills", "ulw-loop(omp)", "SKILL.md"),
       `---
-name: ulw-loop
-description: ulw-loop fixture
+name: ulw-loop(omp)
+description: ulw-loop(omp) fixture
 ---
 
 # ULW loop
