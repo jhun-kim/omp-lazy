@@ -13,7 +13,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe("OMP 16.4.8 task input parsing", () => {
+describe("OMP 17.0.5 task input parsing", () => {
   test("Given a flat task When parsed Then fan-out is one", () => {
     // Given / When
     const parsed = parseTaskSpawn({ name: "worker", agent: "reviewer", task: "Review" })

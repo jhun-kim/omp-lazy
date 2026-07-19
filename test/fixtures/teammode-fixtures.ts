@@ -55,7 +55,7 @@ export async function teamRuntime(label: string) {
   const caller = {
     sessionId: run.owner.sessionId,
     cwd: displayPath,
-    toolNames: ["task", "job", "irc"],
+    toolNames: ["task", "hub"],
   }
   return { displayPath, store, run, ledger, contract, caller }
 }

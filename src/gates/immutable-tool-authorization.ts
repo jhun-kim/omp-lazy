@@ -1,17 +1,21 @@
 import { type ToolCallId, ToolCallIdSchema } from "../contracts/agent-ids"
 import {
+  isHubProcessControl,
+  type ParsedHubWaitControl,
   type ParsedIrcControl,
   type ParsedJobControl,
+  parseHubWaitControl,
   parseIrcControl,
   parseJobControl,
 } from "./task-control-parser"
 import { type ParsedTaskSpawn, parseTaskSpawn } from "./task-spawn-parser"
 
-const CONTROLLED_TOOL_NAMES = ["task", "job", "irc"] as const
+const CONTROLLED_TOOL_NAMES = ["task", "job", "irc", "hub"] as const
 
 type ControlledToolName = (typeof CONTROLLED_TOOL_NAMES)[number]
 type ParsedJobAuthorization = Extract<ParsedJobControl, { readonly ok: true }>
 type ParsedIrcAuthorization = Extract<ParsedIrcControl, { readonly ok: true }>
+type ParsedHubWaitAuthorization = Extract<ParsedHubWaitControl, { readonly ok: true }>
 
 export type ImmutableToolAuthorization =
   | { readonly kind: "pass_through" }
@@ -30,6 +34,11 @@ export type ImmutableToolAuthorization =
       readonly kind: "irc"
       readonly toolCallId: ToolCallId
       readonly control: ParsedIrcAuthorization
+    }
+  | {
+      readonly kind: "hub_wait"
+      readonly toolCallId: ToolCallId
+      readonly control: ParsedHubWaitAuthorization
     }
 
 export type ImmutableToolAuthorizationRequest = {
@@ -54,6 +63,8 @@ function malformedReason(toolName: ControlledToolName): string {
       return "omp-lazy: malformed job control"
     case "irc":
       return "omp-lazy: malformed IRC control"
+    case "hub":
+      return "omp-lazy: malformed hub control"
     default:
       return assertNever(toolName)
   }
@@ -85,6 +96,17 @@ export function authorizeImmutableToolCall(
       const control = parseIrcControl(request.input)
       return control.ok
         ? { kind: "irc", toolCallId: toolCallId.data, control }
+        : { kind: "denied", reason: malformedReason(toolName) }
+    }
+    case "hub": {
+      if (isHubProcessControl(request.input)) return { kind: "pass_through" }
+      const wait = parseHubWaitControl(request.input)
+      if (wait.ok) return { kind: "hub_wait", toolCallId: toolCallId.data, control: wait }
+      const job = parseJobControl(request.input)
+      if (job.ok) return { kind: "job", toolCallId: toolCallId.data, control: job }
+      const irc = parseIrcControl(request.input)
+      return irc.ok
+        ? { kind: "irc", toolCallId: toolCallId.data, control: irc }
         : { kind: "denied", reason: malformedReason(toolName) }
     }
     default:

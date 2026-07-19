@@ -9,7 +9,7 @@ import {
 
 const cleanDoctorInput = {
   checks: [
-    { id: "omp-version", verdict: "pass", evidence: "omp/16.4.8" },
+    { id: "omp-version", verdict: "pass", evidence: "omp/17.0.5" },
     { id: "package-manifest", verdict: "pass", evidence: "omp-lazy@0.1.0" },
   ],
   deep: false,
@@ -26,7 +26,7 @@ const completeContribution = {
   evidence: [
     { exitCode: 1, stage: "red", surface: "bun-test" },
     { exitCode: 0, stage: "green", surface: "bun-test" },
-    { exitCode: 0, stage: "real_surface", surface: "omp-16.4.8" },
+    { exitCode: 0, stage: "real_surface", surface: "omp-17.0.5" },
   ],
   ownership: "omp-lazy",
   target: "omp-lazy",
@@ -228,7 +228,7 @@ describe("contribution dry-run contract", () => {
   test("rejects a fabricated OMP surface prefix", () => {
     // Given: otherwise-complete evidence whose surface is only a forged prefix.
     const evidence = completeContribution.evidence.map((entry) =>
-      entry.stage === "real_surface" ? { ...entry, surface: "omp-16.4.8-fabricated" } : entry,
+      entry.stage === "real_surface" ? { ...entry, surface: "omp-17.0.5-fabricated" } : entry,
     )
 
     // When: the contribution is evaluated.

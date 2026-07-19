@@ -22,7 +22,7 @@ const taskResultSchema = z
         jobId: JobIdSchema,
         type: z.literal("task"),
       })
-      .strict()
+      .passthrough()
       .optional(),
   })
   .passthrough()
@@ -31,11 +31,11 @@ export type TaskResultDetails = z.infer<typeof taskResultSchema>
 
 export type TaskResultDecode =
   | { readonly ok: true; readonly value: TaskResultDetails }
-  | { readonly ok: false; readonly code: "malformed_omp_16_4_8_task_result" }
+  | { readonly ok: false; readonly code: "malformed_omp_17_0_5_task_result" }
 
 export function decodeTaskResult(details: unknown): TaskResultDecode {
   const parsed = taskResultSchema.safeParse(details)
   return parsed.success
     ? { ok: true, value: parsed.data }
-    : { ok: false, code: "malformed_omp_16_4_8_task_result" }
+    : { ok: false, code: "malformed_omp_17_0_5_task_result" }
 }

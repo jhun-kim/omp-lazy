@@ -71,7 +71,7 @@ describe("package route labels", () => {
       npmInstallProof: false,
       ompExecutable,
       route: "pinned-real-omp",
-      version: "16.4.8",
+      version: "17.0.5",
     })
   })
 

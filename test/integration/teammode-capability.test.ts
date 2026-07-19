@@ -27,12 +27,14 @@ function taskDetails(ids: readonly string[], asyncJobId?: string) {
 
 function jobDetails(ids: readonly string[]) {
   return {
+    op: "jobs",
     jobs: ids.map((id) => ({
       id,
       type: "task",
       status: "running",
       label: id,
       durationMs: 1,
+      resolvedModel: "openai/gpt-5.6-sol:high",
     })),
   }
 }
@@ -78,11 +80,11 @@ test("Given the public extension surface When loaded Then one result observer is
 })
 
 describe("honest async capability", () => {
-  test("Given active tools When task or job is absent Then the surface is blocked", () => {
-    expect(checkTaskSurfaces(["task", "job"])).toEqual({ status: "surface_available" })
+  test("Given active tools When task or hub is absent Then the surface is blocked", () => {
+    expect(checkTaskSurfaces(["task", "hub"])).toEqual({ status: "surface_available" })
     expect(checkTaskSurfaces(["task"])).toEqual({
       status: "blocked",
-      reason: "task_or_job_surface_missing",
+      reason: "task_or_hub_surface_missing",
     })
   })
 
@@ -102,16 +104,16 @@ describe("honest async capability", () => {
     const value = await runtime("capability-proven")
     await reserveAndObserve(value, taskDetails(["worker", "worker-2"], "worker"))
     await value.guard.handle({
-      toolName: "job",
+      toolName: "hub",
       toolCallId: "tool-job",
-      input: { list: true },
+      input: { op: "jobs" },
       sessionId: "session-a",
     })
 
     const result = await value.observer.observe({
-      toolName: "job",
+      toolName: "hub",
       toolCallId: "tool-job",
-      input: { list: true },
+      input: { op: "jobs" },
       details: jobDetails(["worker", "worker-2"]),
       isError: false,
       sessionId: "session-a",
@@ -148,6 +150,25 @@ describe("honest async capability", () => {
       status: "blocked",
       reason: "identity_mapping_incomplete",
     })
+  })
+
+  test("Given an ids-only hub wait When a peer message wins Then observation stays valid", async () => {
+    const value = await runtime("hub-wait-message")
+
+    const result = await value.observer.observe({
+      toolName: "hub",
+      toolCallId: "hub-wait",
+      input: { op: "wait", ids: ["worker"] },
+      details: {
+        op: "wait",
+        from: "main",
+        waited: { id: "message-1", from: "worker", to: "main", body: "done", ts: 1 },
+      },
+      isError: false,
+      sessionId: "session-a",
+    })
+
+    expect(result).toEqual({ kind: "quiet" })
   })
 
   test("Given malformed or stale task results When observed Then they fail closed", async () => {

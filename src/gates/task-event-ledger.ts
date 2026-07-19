@@ -37,6 +37,11 @@ import {
 export type ReserveStatus = "reserved" | "replayed" | "limit" | "fact_conflict"
 export type BindingStatus = "pending" | "blocked" | "fact_conflict" | "missing_reservation"
 export type AuthorizationStatus = "authorized" | "unowned" | "no_generation"
+export type HubWaitAuthorizationStatus =
+  | "authorized"
+  | "unowned_agent"
+  | "unowned_job"
+  | "no_generation"
 
 export type ControlAuthorization = {
   readonly toolCallId: ToolCallId
@@ -161,6 +166,50 @@ export class TaskEventLedger {
             kind: "task_control_authorized",
             ...authorization,
             taskGeneration: generation,
+          },
+        ],
+        value: "authorized",
+      }
+    })
+  }
+
+  async authorizeHubWait(
+    sessionId: string,
+    authorization: {
+      readonly toolCallId: ToolCallId
+      readonly inputKey: string
+      readonly jobTargets: readonly string[]
+      readonly agentTargets: readonly string[]
+    },
+  ): Promise<TaskLedgerTransaction<HubWaitAuthorizationStatus>> {
+    return this.sidecar.transact(sessionId, (scope) => {
+      const generation = taskGeneration(scope)
+      if (generation === 0) return { kind: "return", value: "no_generation" }
+      const identities = runtimeIdentities(scope, generation)
+      const ownedJobs = new Set(
+        identities.flatMap((identity) =>
+          identity.actualJobId === null ? [] : [runtimeIdValue(identity.actualJobId)],
+        ),
+      )
+      if (authorization.jobTargets.some((target) => !ownedJobs.has(target))) {
+        return { kind: "return", value: "unowned_job" }
+      }
+      const ownedAgents = new Set(
+        identities.map((identity) => runtimeIdValue(identity.actualAgentId)),
+      )
+      if (authorization.agentTargets.some((target) => !ownedAgents.has(target))) {
+        return { kind: "return", value: "unowned_agent" }
+      }
+      return {
+        kind: "append",
+        facts: [
+          {
+            kind: "task_control_authorized",
+            toolCallId: authorization.toolCallId,
+            control: "job_snapshot",
+            taskGeneration: generation,
+            inputKey: authorization.inputKey,
+            targets: authorization.jobTargets,
           },
         ],
         value: "authorized",

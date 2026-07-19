@@ -4,11 +4,16 @@ import {
   runtimeIdValue,
   ToolCallIdSchema,
 } from "../contracts/agent-ids"
-import { parseIrcControl, parseJobControl } from "../gates/task-control-parser"
+import {
+  hubJobOperation,
+  parseHubWaitControl,
+  parseIrcControl,
+  parseJobControl,
+} from "../gates/task-control-parser"
 import type { TaskEventLedger } from "../gates/task-event-ledger"
 import type { ReceiptWriteStatus } from "../gates/task-receipt-writer"
 import type { TaskLedgerTransaction } from "../gates/task-sidecar-store"
-import { decodeIrcResult } from "./irc-result-codec"
+import { decodeIrcResult, isHubWaitMessageResult } from "./irc-result-codec"
 import { decodeJobResult } from "./job-result-codec"
 import { decodeTaskResult, type TaskResultDetails } from "./task-result-codec"
 
@@ -28,13 +33,13 @@ export type ObservationResult =
 
 export type TaskSurfaceCapability =
   | { readonly status: "surface_available" }
-  | { readonly status: "blocked"; readonly reason: "task_or_job_surface_missing" }
+  | { readonly status: "blocked"; readonly reason: "task_or_hub_surface_missing" }
 
 export function checkTaskSurfaces(activeTools: readonly string[]): TaskSurfaceCapability {
   const tools = new Set(activeTools)
-  return tools.has("task") && tools.has("job")
+  return tools.has("task") && tools.has("hub")
     ? { status: "surface_available" }
-    : { status: "blocked", reason: "task_or_job_surface_missing" }
+    : { status: "blocked", reason: "task_or_hub_surface_missing" }
 }
 
 export class ToolResultObserver {
@@ -45,11 +50,28 @@ export class ToolResultObserver {
       if (observation.toolName === "task") return this.#observeTask(observation)
       if (observation.toolName === "job") return this.#observeJob(observation)
       if (observation.toolName === "irc") return this.#observeIrc(observation)
+      if (observation.toolName === "hub") return this.#observeHub(observation)
       return { kind: "quiet" }
     } catch (error) {
       if (error instanceof Error) return { kind: "blocked", reason: "task state conflict" }
       throw error
     }
+  }
+
+  async #observeHub(observation: ToolResultObservation): Promise<ObservationResult> {
+    const operation = hubJobOperation(observation.input)
+    const details = decodeJobResult(observation.details)
+    if (details.ok) {
+      if (operation === null || details.value.op !== operation) {
+        return { kind: "blocked", reason: "invalid job result" }
+      }
+      return this.#observeJob(observation)
+    }
+    const wait = parseHubWaitControl(observation.input)
+    if (wait.ok && isHubWaitMessageResult(observation.details)) return { kind: "quiet" }
+    const irc = parseIrcControl(observation.input)
+    if (!irc.ok || irc.kind === "passive") return { kind: "quiet" }
+    return this.#observeIrc(observation)
   }
 
   async #observeTask(observation: ToolResultObservation): Promise<ObservationResult> {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { rm } from "node:fs/promises"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
 import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
+import { decodeIrcResult } from "../../src/observers/irc-result-codec"
 import { decodeJobResult } from "../../src/observers/job-result-codec"
 import { decodeTaskResult } from "../../src/observers/task-result-codec"
 import { ToolResultObserver } from "../../src/observers/tool-result-observer"
@@ -58,7 +59,7 @@ async function runtime(label: string) {
   }
 }
 
-describe("OMP 16.4.8 result codecs", () => {
+describe("OMP 17.0.5 result codecs", () => {
   test("Given pinned task and job details When decoded Then actual IDs remain typed", () => {
     // Given / When
     const task = decodeTaskResult(taskDetails(["worker-2"], "worker-2"))
@@ -75,6 +76,27 @@ describe("OMP 16.4.8 result codecs", () => {
   ])("Given malformed %s details When decoded Then misleading shapes fail closed", (_name, decode) => {
     // Given / When / Then
     expect(decode().ok).toBeFalse()
+  })
+
+  test("Given additive OMP 17 fields When decoded Then consumed identity fields remain valid", () => {
+    const task = decodeTaskResult({
+      ...taskDetails(["worker"], "worker"),
+      async: { state: "running", jobId: "worker", type: "task", future: true },
+    })
+    const job = decodeJobResult({
+      op: "cancel",
+      jobs: [],
+      cancelled: [{ id: "worker", status: "cancelled", future: true }],
+      agents: [{ id: "worker", ageMs: 1, future: true }],
+    })
+    const irc = decodeIrcResult({
+      op: "send",
+      receipts: [{ to: "worker", outcome: "injected", future: true }],
+    })
+
+    expect(task.ok).toBeTrue()
+    expect(job.ok).toBeTrue()
+    expect(irc.ok).toBeTrue()
   })
 })
 

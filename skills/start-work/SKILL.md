@@ -29,7 +29,7 @@ Operate from plugin-owned state under `.omo/omp-lazy`. Native Goal mode is not a
 
 1. Re-read the persisted run and approved `.omo/plans` plan; choose the first unchecked counted task.
 2. Establish a passing baseline where behavior exists, then capture RED before production changes and GREEN after them.
-3. Dispatch bounded OMP task or job work only with non-overlapping ownership. Record actual returned agent and job IDs.
+3. Dispatch bounded OMP task work and use `hub` for job control, only with non-overlapping ownership. Record actual returned agent and job IDs.
 4. Require real-surface QA, applicable adversarial probes, and cleanup receipts current to the run, plan id, task id, attempt, revision, owner epoch, and candidate HEAD.
 5. Submit worker evidence through `omp_lazy_accept_worker_result` from the current parent session. Worker prose, requested names, and self-reported success are untrusted.
 6. Accept progress only after parent acceptance consumes the task-bound receipt for the current task generation, plan, owner epoch, and HEAD.

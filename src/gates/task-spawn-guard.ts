@@ -57,6 +57,8 @@ export class TaskSpawnGuard {
         return this.#handleJob(request.sessionId, authorization)
       case "irc":
         return this.#handleIrc(request.sessionId, authorization)
+      case "hub_wait":
+        return this.#handleHubWait(request.sessionId, authorization)
       default:
         return authorization satisfies never
     }
@@ -135,6 +137,30 @@ export class TaskSpawnGuard {
     return authorized.kind === "scope" && authorized.value === "authorized"
       ? undefined
       : { block: true, reason: "omp-lazy: unowned agent" }
+  }
+
+  async #handleHubWait(
+    sessionId: string,
+    authorization: Extract<ImmutableToolAuthorization, { readonly kind: "hub_wait" }>,
+  ): Promise<TaskSpawnGuardResult> {
+    const authorized = await this.ledger.authorizeHubWait(sessionId, {
+      toolCallId: authorization.toolCallId,
+      inputKey: authorization.control.inputKey,
+      jobTargets: authorization.control.jobTargets,
+      agentTargets: authorization.control.agentTargets,
+    })
+    if (authorized.kind !== "scope") {
+      return { block: true, reason: "omp-lazy: task state conflict" }
+    }
+    if (authorized.value === "unowned_job") {
+      return { block: true, reason: "omp-lazy: unowned job" }
+    }
+    if (authorized.value === "unowned_agent") {
+      return { block: true, reason: "omp-lazy: unowned agent" }
+    }
+    return authorized.value === "authorized"
+      ? undefined
+      : { block: true, reason: "omp-lazy: task state conflict" }
   }
 }
 

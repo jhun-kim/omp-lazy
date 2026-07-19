@@ -19,7 +19,7 @@ describe("forbidden runtime dependencies", () => {
     const candidate = await copyCandidate("runtime-host")
     candidates.push(candidate)
     const manifest = JSON.parse(await readFile(join(candidate, "package.json"), "utf8"))
-    manifest.dependencies = { "@oh-my-pi/pi-coding-agent": "16.4.8" }
+    manifest.dependencies = { "@oh-my-pi/pi-coding-agent": "17.0.5" }
     await writeJson(join(candidate, "package.json"), manifest)
 
     // When: the package inspector evaluates the candidate.

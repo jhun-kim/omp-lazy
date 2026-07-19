@@ -73,7 +73,7 @@ describe("teammode contract", () => {
     const bytes = JSON.stringify(await runtime.contract.read(teamDefinition.teamName))
     const replay = await runtime.contract.initialize(runtime.caller, teamDefinition)
     const blocked = await runtime.contract.initialize(
-      { ...runtime.caller, toolNames: ["task", "job"] },
+      { ...runtime.caller, toolNames: ["task"] },
       { ...teamDefinition, teamName: "blocked-team" },
     )
 
@@ -84,7 +84,7 @@ describe("teammode contract", () => {
     expect(await runtime.contract.read("blocked-team")).toBeNull()
   })
 
-  test("OMP 16.4.8 discovers every namespaced team agent", async () => {
+  test("OMP 17.0.5 discovers every namespaced team agent", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "omp-lazy-team-discovery-"))
     const home = join(sandbox, "home")
     await mkdir(join(sandbox, ".omp"), { recursive: true })

@@ -11,7 +11,7 @@ import {
 
 const EXPECTED_SOURCE_COMMITS = {
   lazycodex: "f39306f1adab6ff155fd736cc7376d27156472bc",
-  omp: "d0f90f35ae0f4aba48430b51a7203013dc0c5ff3",
+  omp: "9fd6e97113f5ed3a847e66d346970efdf8afcad9",
 } as const
 
 const REQUIRED_ASSETS = [

@@ -183,6 +183,22 @@ describe("composed OMP tool dispatch authorization", () => {
       },
       context(root),
     )
+    const mixedWait = await dispatch(
+      {
+        toolName: "hub",
+        toolCallId: "hub-mixed-wait",
+        input: { op: "wait", ids: ["actual-worker"], from: "actual-worker" },
+      },
+      context(root),
+    )
+    const foreignMixedWait = await dispatch(
+      {
+        toolName: "hub",
+        toolCallId: "hub-foreign-wait",
+        input: { op: "wait", ids: ["actual-worker"], from: "foreign-worker" },
+      },
+      context(root),
+    )
     await dispatch(
       { toolName: "task", toolCallId: "task-new", input: { task: "new" } },
       context(root),
@@ -201,6 +217,8 @@ describe("composed OMP tool dispatch authorization", () => {
     expect(ownedJob).toBeUndefined()
     expect(unownedJob).toEqual({ block: true, reason: "omp-lazy: unowned job" })
     expect(staleIrc).toBeUndefined()
+    expect(mixedWait).toBeUndefined()
+    expect(foreignMixedWait).toEqual({ block: true, reason: "omp-lazy: unowned agent" })
     expect(staleResult).toEqual({ kind: "blocked", reason: "stale task generation" })
   })
 

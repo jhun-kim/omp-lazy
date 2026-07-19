@@ -87,14 +87,14 @@ describe("lcx Windows adapter arguments", () => {
       inputPath,
       `\uFEFF${JSON.stringify({
         approach: "Apply the smallest contract correction.",
-        confidence: "RED, GREEN, and OMP 16.4.8 surface evidence agree.",
+        confidence: "RED, GREEN, and OMP 17.0.5 surface evidence agree.",
         problem: "The compatibility alias selected a different workflow.",
         reproductionLogs: "RED: alias workflow ids differ.",
         risks: "Low; command registration remains unchanged.",
         targetRepository: "omp-lazy",
         title: "Keep compatibility aliases on one workflow",
         userVisibleBehaviorChanges: "Canonical and compatibility commands behave identically.",
-        verification: ["RED contract test", "GREEN contract test", "OMP 16.4.8 discovery"],
+        verification: ["RED contract test", "GREEN contract test", "OMP 17.0.5 discovery"],
       })}`,
     )
 

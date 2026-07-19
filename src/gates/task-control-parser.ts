@@ -5,6 +5,18 @@ const jobListSchema = z.object({ list: z.literal(true) }).strict()
 const jobDefaultSchema = z.object({}).strict()
 const jobPollSchema = z.object({ poll: z.array(JobIdSchema).min(1) }).strict()
 const jobCancelSchema = z.object({ cancel: z.array(JobIdSchema).min(1) }).strict()
+const hubJobsSchema = z.object({ op: z.literal("jobs") }).strict()
+const hubWaitSchema = z
+  .object({
+    op: z.literal("wait"),
+    ids: z.array(JobIdSchema).min(1).optional(),
+    from: AgentIdSchema.optional(),
+    timeoutMs: z.number().nonnegative().optional(),
+  })
+  .strict()
+const hubCancelSchema = z
+  .object({ op: z.literal("cancel"), ids: z.array(JobIdSchema).min(1) })
+  .strict()
 
 export type ParsedJobControl =
   | {
@@ -15,7 +27,61 @@ export type ParsedJobControl =
     }
   | { readonly ok: false }
 
+export type ParsedHubWaitControl =
+  | {
+      readonly ok: true
+      readonly inputKey: string
+      readonly jobTargets: readonly string[]
+      readonly agentTargets: readonly string[]
+    }
+  | { readonly ok: false }
+
+export function parseHubWaitControl(input: unknown): ParsedHubWaitControl {
+  const parsed = hubWaitSchema.safeParse(input)
+  if (!parsed.success) return { ok: false }
+  return {
+    ok: true,
+    inputKey: JSON.stringify(parsed.data),
+    jobTargets: (parsed.data.ids ?? []).map(runtimeIdValue),
+    agentTargets: parsed.data.from === undefined ? [] : [runtimeIdValue(parsed.data.from)],
+  }
+}
+
+export function hubJobOperation(input: unknown): "jobs" | "wait" | "cancel" | null {
+  if (hubJobsSchema.safeParse(input).success) return "jobs"
+  if (hubWaitSchema.safeParse(input).success) return "wait"
+  if (hubCancelSchema.safeParse(input).success) return "cancel"
+  return null
+}
+
 export function parseJobControl(input: unknown): ParsedJobControl {
+  const hubJobs = hubJobsSchema.safeParse(input)
+  if (hubJobs.success) {
+    return {
+      ok: true,
+      control: "job_snapshot",
+      inputKey: JSON.stringify(hubJobs.data),
+      targets: [],
+    }
+  }
+  const hubWait = parseHubWaitControl(input)
+  if (hubWait.ok) {
+    return {
+      ok: true,
+      control: "job_snapshot",
+      inputKey: hubWait.inputKey,
+      targets: hubWait.jobTargets,
+    }
+  }
+  const hubCancel = hubCancelSchema.safeParse(input)
+  if (hubCancel.success) {
+    return {
+      ok: true,
+      control: "job_cancel",
+      inputKey: JSON.stringify(hubCancel.data),
+      targets: hubCancel.data.ids.map(runtimeIdValue),
+    }
+  }
   const list = jobListSchema.safeParse(input)
   if (list.success) {
     return { ok: true, control: "job_snapshot", inputKey: JSON.stringify(list.data), targets: [] }
@@ -68,6 +134,24 @@ const ircPassiveSchema = z.discriminatedUnion("op", [
     })
     .strict(),
 ])
+const hubSendSchema = z
+  .object({
+    op: z.literal("send"),
+    to: AgentIdSchema,
+    message: z.string().trim().min(1),
+    replyTo: z.string().trim().min(1).optional(),
+    await: z.boolean().optional(),
+    timeoutMs: z.number().nonnegative().optional(),
+  })
+  .strict()
+const hubPassiveSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("list") }).strict(),
+  z.object({ op: z.literal("inbox"), peek: z.boolean().optional() }).strict(),
+])
+const hubProcessSchema = z.union([
+  z.object({ op: z.enum(["start", "ps", "logs", "stop", "restart", "describe"]) }).passthrough(),
+  z.object({ op: z.enum(["send", "wait"]), name: z.string().trim().min(1) }).passthrough(),
+])
 
 export type ParsedIrcControl =
   | {
@@ -85,6 +169,33 @@ export type ParsedIrcControl =
   | { readonly ok: false }
 
 export function parseIrcControl(input: unknown): ParsedIrcControl {
+  const hubSend = hubSendSchema.safeParse(input)
+  if (hubSend.success) {
+    return {
+      ok: true,
+      kind: "send",
+      inputKey: JSON.stringify(hubSend.data),
+      targets: [runtimeIdValue(hubSend.data.to)],
+    }
+  }
+  const hubPassive = hubPassiveSchema.safeParse(input)
+  if (hubPassive.success) {
+    return {
+      ok: true,
+      kind: "passive",
+      inputKey: JSON.stringify(hubPassive.data),
+      targets: [],
+    }
+  }
+  const hubWait = parseHubWaitControl(input)
+  if (hubWait.ok) {
+    return {
+      ok: true,
+      kind: "passive",
+      inputKey: hubWait.inputKey,
+      targets: hubWait.agentTargets,
+    }
+  }
   const send = ircSendSchema.safeParse(input)
   if (send.success) {
     return {
@@ -105,4 +216,8 @@ export function parseIrcControl(input: unknown): ParsedIrcControl {
         ? [runtimeIdValue(passive.data.from)]
         : [],
   }
+}
+
+export function isHubProcessControl(input: unknown): boolean {
+  return hubProcessSchema.safeParse(input).success
 }

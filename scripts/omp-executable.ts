@@ -2,7 +2,7 @@ import { realpath, stat } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
 import { sha256File } from "./artifact-hash"
 
-export const expectedOmpVersion = "16.4.8"
+export const expectedOmpVersion = "17.0.5"
 export const defaultLocalOmpExecutable = join(
   import.meta.dir,
   "..",

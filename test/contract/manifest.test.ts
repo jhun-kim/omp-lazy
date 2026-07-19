@@ -15,13 +15,13 @@ describe("package manifest", () => {
     // Then: the host stays optional and the source extension entry is exact.
     expect(manifest.omp).toEqual({ extensions: ["./src/index.ts"] })
     expect(manifest.peerDependencies).toEqual({
-      "@oh-my-pi/pi-coding-agent": ">=16.4.8 <17",
+      "@oh-my-pi/pi-coding-agent": ">=17.0.5 <18",
     })
     expect(manifest.peerDependenciesMeta).toEqual({
       "@oh-my-pi/pi-coding-agent": { optional: true },
     })
     expect(manifest.dependencies).toEqual({ zod: "4.4.3" })
-    expect(manifest.devDependencies["@oh-my-pi/pi-coding-agent"]).toBe("16.4.8")
+    expect(manifest.devDependencies["@oh-my-pi/pi-coding-agent"]).toBe("17.0.5")
     expect(manifest.devDependencies.zod).toBeUndefined()
     expect(manifest.dependencies?.["@oh-my-pi/pi-coding-agent"]).toBeUndefined()
   })
@@ -51,7 +51,7 @@ describe("package manifest", () => {
     // Then: both reviewed full commit hashes and the LazyCodex notice are present.
     expect(sources).toEqual({
       lazycodex: "f39306f1adab6ff155fd736cc7376d27156472bc",
-      omp: "d0f90f35ae0f4aba48430b51a7203013dc0c5ff3",
+      omp: "9fd6e97113f5ed3a847e66d346970efdf8afcad9",
     })
     expect(notice).toContain("LazyCodex")
     expect(notice).toContain("MIT License")

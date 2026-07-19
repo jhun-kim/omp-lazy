@@ -199,7 +199,7 @@ export function evaluateContribution(request: ContributionRequest): Contribution
   const green = request.evidence.find((entry) => entry.stage === "green")
   if (green === undefined || green.exitCode !== 0) return blockedContribution("green_required")
   const surface = request.evidence.find((entry) => entry.stage === "real_surface")
-  if (surface === undefined || surface.exitCode !== 0 || surface.surface !== "omp-16.4.8") {
+  if (surface === undefined || surface.exitCode !== 0 || surface.surface !== "omp-17.0.5") {
     return blockedContribution("real_surface_required")
   }
   if (

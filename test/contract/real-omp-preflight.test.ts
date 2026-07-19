@@ -13,8 +13,8 @@ afterEach(async () => {
 })
 
 describe("real OMP executable preflight", () => {
-  it("rejects OMP 17 before profile commands run", async () => {
-    // Given: a deterministic OMP 17 executable fixture and disposable profile roots.
+  it("rejects an outdated OMP before profile commands run", async () => {
+    // Given: a deterministic outdated OMP executable fixture and disposable profile roots.
     const root = await mkdtemp(join(repositoryRoot, ".t13 real omp "))
     roots.push(root)
     const fixture = await createOmpExecutableStub(root)
@@ -33,7 +33,7 @@ describe("real OMP executable preflight", () => {
     // Then: version rejection is distinct and happens before profile command writes.
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain("unsupported_host_version")
-    expect(result.stderr).toContain("expected OMP 16.4.8, received omp/17.0.2")
+    expect(result.stderr).toContain("expected OMP 17.0.5, received omp/16.4.8")
     await expect(readFile(fixture.argvLog, "utf8")).rejects.toThrow()
     await expect(readFile(join(profile, "models.yml"), "utf8")).rejects.toThrow()
   })

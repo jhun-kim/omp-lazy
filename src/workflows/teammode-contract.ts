@@ -37,7 +37,7 @@ export class TeammodeContract {
   async initialize(caller: TeamCaller, input: unknown): Promise<TeamResult> {
     const parsed = TeamDefinitionSchema.safeParse(input)
     if (!parsed.success) return { ok: false, code: "invalid_team" }
-    if (!["task", "job", "irc"].every((tool) => caller.toolNames.includes(tool))) {
+    if (!["task", "hub"].every((tool) => caller.toolNames.includes(tool))) {
       return { ok: false, code: "async_team_surfaces_unavailable" }
     }
     return this.#transact(caller, parsed.data.teamName, async (current, scope) => {

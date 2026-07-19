@@ -11,7 +11,7 @@ class OmpExecutableStubError extends Error {
 }
 
 export async function createOmpExecutableStub(root: string): Promise<OmpExecutableStub> {
-  const runtime = join(root, "OMP 17 Runtime With Spaces")
+  const runtime = join(root, "Outdated OMP Runtime With Spaces")
   const argvLog = join(root, "post version argv.jsonl")
   const stub = join(import.meta.dir, "omp-version-stub.ts")
   const bun = Bun.which("bun")
