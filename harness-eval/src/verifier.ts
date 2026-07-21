@@ -68,6 +68,53 @@ function hasExactValues(values: readonly string[], expected: readonly string[]):
   return JSON.stringify(values) === JSON.stringify(expected)
 }
 
+function expectedCommand(id: string): string {
+  if (id.startsWith("plan.")) return "ulw-plan"
+  if (id.startsWith("start-work")) return "start-work"
+  if (id.startsWith("teammode")) return "teammode"
+  if (id.startsWith("ultrawork")) return "ultrawork"
+  if (id.startsWith("ulw-loop") || id.startsWith("cross.")) return "ulw-loop"
+  if (id.startsWith("research")) return "ulw-research"
+  if (id.startsWith("doctor")) return "doctor"
+  return "report"
+}
+
+function rowIsFrozen(row: Manifest["scenarios"][number]): boolean {
+  const policy = FROZEN_SCENARIO_POLICIES[row.id]
+  const retrieval =
+    policy.tier === "FAST" ? [4, 16384] : policy.tier === "DEEP" ? [20, 163840] : [10, 65536]
+  return (
+    row.workflowCallCount === policy.workflowCallCount &&
+    row.actorCalls.length === policy.actors.length &&
+    row.actorCalls.every(
+      (call, index) => call.actorId === policy.actors[index] && call.maxCalls === 1,
+    ) &&
+    row.tier === policy.tier &&
+    row.retrieval.maxCalls === retrieval[0] &&
+    row.retrieval.maxBytes === retrieval[1] &&
+    JSON.stringify(row.receipts) ===
+      JSON.stringify([`${row.id}.result`, `${row.id}.calls`, `${row.id}.cleanup`]) &&
+    JSON.stringify(row.steps) ===
+      JSON.stringify([{ command: expectedCommand(row.id), source: "interactive" }]) &&
+    JSON.stringify(row.expected) === JSON.stringify([{ kind: "event", value: "terminal" }]) &&
+    JSON.stringify(row.constraints) ===
+      JSON.stringify({
+        allowedPathIds: [],
+        allowedStateEvents: ["terminal"],
+        network: ["proxy"],
+      }) &&
+    JSON.stringify(row.predicates) ===
+      JSON.stringify([
+        { hard: true, id: `${row.id}.outcome`, oracleId: "outcome", points: 60 },
+        { hard: true, id: `${row.id}.scope_safety`, oracleId: "scope", points: 20 },
+        { hard: true, id: `${row.id}.evidence_cleanup`, oracleId: "cleanup", points: 10 },
+        { hard: true, id: `${row.id}.bounded_process`, oracleId: "bounds", points: 10 },
+      ]) &&
+    row.fixture.templateId === "empty-repo" &&
+    row.fixture.expectedTreeHash === "7".repeat(64)
+  )
+}
+
 function verifyManifest(manifest: Manifest): RejectionCode | undefined {
   if (!hasExactValues(manifest.scenarioIds, SCENARIO_IDS)) return "scenario_cardinality"
   if (new Set(manifest.actorMappings.map((mapping) => mapping.actorId)).size !== ACTOR_IDS.length) {
@@ -93,28 +140,7 @@ function verifyManifest(manifest: Manifest): RejectionCode | undefined {
     )
   )
     return "scenario_cardinality"
-  if (
-    manifest.scenarios.some((row) => {
-      const policy = FROZEN_SCENARIO_POLICIES[row.id]
-      return (
-        row.workflowCallCount !== policy.workflowCallCount ||
-        row.actorCalls.length !== policy.actors.length ||
-        row.actorCalls.some(
-          (call, index) => call.actorId !== policy.actors[index] || call.maxCalls !== 1,
-        ) ||
-        row.tier !== policy.tier ||
-        row.retrieval.maxCalls !==
-          (policy.tier === "FAST" ? 4 : policy.tier === "DEEP" ? 20 : 10) ||
-        row.retrieval.maxBytes !==
-          (policy.tier === "FAST" ? 16384 : policy.tier === "DEEP" ? 163840 : 65536) ||
-        JSON.stringify(row.receipts) !==
-          JSON.stringify([`${row.id}.result`, `${row.id}.calls`, `${row.id}.cleanup`]) ||
-        row.predicates.length !== 4 ||
-        row.fixture.templateId !== "empty-repo" ||
-        row.fixture.expectedTreeHash !== "7".repeat(64)
-      )
-    })
-  ) {
+  if (manifest.scenarios.some((row) => !rowIsFrozen(row))) {
     return "actor_route_policy"
   }
   return undefined

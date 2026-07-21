@@ -216,4 +216,50 @@ describe("harness evaluator CLI", () => {
     expect(exitCode).toBe(2)
     expect(JSON.parse(stdout)).toEqual({ code: "manifest_unavailable", status: "BLOCKED" })
   })
+
+  it("rejects invalid comma selectors and verify target commits before manifest lookup", async () => {
+    // Given
+    const invalidScenarios = Bun.spawn(
+      [
+        "bun",
+        "harness-eval/src/cli.ts",
+        "run",
+        "--mode",
+        "deterministic",
+        "--manifest",
+        "harness-eval/manifest.v1.json",
+        "--scenarios",
+        "plan.clear,rogue",
+        "--target-commit",
+        "HEAD",
+      ],
+      { cwd: process.cwd(), stdout: "pipe" },
+    )
+    const invalidTarget = Bun.spawn(
+      [
+        "bun",
+        "harness-eval/src/cli.ts",
+        "verify",
+        "--manifest",
+        "harness-eval/manifest.v1.json",
+        "--target-commit",
+        "not-a-commit",
+      ],
+      { cwd: process.cwd(), stdout: "pipe" },
+    )
+
+    // When
+    const [scenarioCode, scenarioOutput, targetCode, targetOutput] = await Promise.all([
+      invalidScenarios.exited,
+      new Response(invalidScenarios.stdout).text(),
+      invalidTarget.exited,
+      new Response(invalidTarget.stdout).text(),
+    ])
+
+    // Then
+    expect(scenarioCode).toBe(1)
+    expect(JSON.parse(scenarioOutput)).toEqual({ code: "malformed_cli", status: "FAIL" })
+    expect(targetCode).toBe(1)
+    expect(JSON.parse(targetOutput)).toEqual({ code: "malformed_cli", status: "FAIL" })
+  })
 })

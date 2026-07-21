@@ -1,7 +1,7 @@
 import { access, readFile } from "node:fs/promises"
+import { SCENARIO_IDS } from "./constants"
 import { writeSyntheticHarnessBundle } from "./synthetic-bundle"
 import { verifyHarnessBundle } from "./verifier"
-import { SCENARIO_IDS } from "./constants"
 
 type CliReceipt =
   | { readonly status: "PASS" }
@@ -43,7 +43,12 @@ function selectorIsValid(flags: Flags): boolean {
   if (["--scenario", "--scenarios", "--all"].filter((flag) => flags.has(flag)).length !== 1)
     return false
   const scenario = value(flags, "--scenario")
-  return scenario === undefined || SCENARIO_IDS.includes(scenario)
+  const scenarios = value(flags, "--scenarios")
+  return (
+    (scenario === undefined || SCENARIO_IDS.includes(scenario)) &&
+    (scenarios === undefined ||
+      scenarios.split(",").every((candidate) => SCENARIO_IDS.includes(candidate)))
+  )
 }
 
 async function unavailableManifest(path: string): Promise<CliReceipt> {
@@ -119,7 +124,8 @@ async function execute(argv: readonly string[]): Promise<CliReceipt> {
     const manifest = value(flags, "--manifest")
     if (
       manifest === undefined ||
-      value(flags, "--target-commit") === undefined ||
+      (value(flags, "--target-commit") !== "HEAD" &&
+        !/^[a-f0-9]{40}$/.test(value(flags, "--target-commit") ?? "")) ||
       !hasExactKeys(flags, ["--manifest", "--target-commit"])
     )
       return { code: "malformed_cli", status: "FAIL" }
