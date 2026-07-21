@@ -1,6 +1,14 @@
+import { createHash } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { ACTOR_IDS, isMetricScenario, PROFILE_IDS, SCENARIO_IDS } from "./constants"
+import {
+  ACTOR_IDS,
+  FROZEN_SCENARIO_POLICIES,
+  frozenActorRoute,
+  isMetricScenario,
+  PROFILE_IDS,
+  SCENARIO_IDS,
+} from "./constants"
 import { type HarnessBundle, harnessBundleSchema, manifestSchema } from "./schema"
 import { hashManifest } from "./verifier"
 
@@ -8,6 +16,7 @@ const hash = (character: string): string => character.repeat(64)
 const commit = "a".repeat(40)
 const settingsHash = hash("b")
 const modelConfigHash = hash("c")
+const scopeHash = (scopeId: string): string => createHash("sha256").update(scopeId).digest("hex")
 
 export type SyntheticMutation =
   | "bad_manifest_hash"
@@ -33,15 +42,14 @@ function buildBundle(): HarnessBundle {
     for (const [profileIndex, profileId] of PROFILE_IDS.entries()) {
       for (const trial of [1, 2, 3]) {
         const scopeId = scope(scenarioIndex, profileIndex, trial)
-        const calls = isMetricScenario(scenarioId)
-          ? [1, 2].map((attempt) => ({
-              actorId: attempt === 2 ? "worker-low" : "parent",
-              configuredActorRoute: attempt === 2 ? "/actor/worker-low" : "/actor/parent",
-              metricBucket: "workflow",
-              proxyCallId: callId++,
-              scopeId,
-            }))
-          : []
+        const policy = FROZEN_SCENARIO_POLICIES[scenarioId]
+        const calls = policy.actors.map((actorId) => ({
+          actorId,
+          configuredActorRoute: frozenActorRoute(actorId),
+          metricBucket: actorId === "momus" ? "critic" : "workflow",
+          proxyCallId: callId++,
+          scopeId,
+        }))
         for (const call of calls) {
           const reconciliation = {
             configuredActorRoute: call.configuredActorRoute,
@@ -71,8 +79,10 @@ function buildBundle(): HarnessBundle {
             seed: 0,
             seedSource: "compat.extraBody",
             settingsHash,
+            targetCommit: commit,
             temperature: 0,
             topP: 1,
+            terminal: "responded",
           })
         }
         trials.push({
@@ -84,7 +94,14 @@ function buildBundle(): HarnessBundle {
           scopeId,
           targetCommit: commit,
           trial,
-          workflow: { calls, modelConfigHash, settingsHash, workflowTokens: calls.length * 15 },
+          workflow: {
+            calls,
+            evaluationTokens: 0,
+            modelConfigHash,
+            scopeHash: scopeHash(scopeId),
+            settingsHash,
+            workflowTokens: calls.length * 15,
+          },
         })
       }
     }
@@ -114,6 +131,47 @@ function buildBundle(): HarnessBundle {
       sourceSha256: hash("5"),
       sourceUrl: `https://example.invalid/${profileId}`,
     })),
+    scenarios: SCENARIO_IDS.map((id) => {
+      const policy = FROZEN_SCENARIO_POLICIES[id]
+      const command = id.startsWith("plan.")
+        ? "ulw-plan"
+        : id.startsWith("start-work")
+          ? "start-work"
+          : id.startsWith("teammode")
+            ? "teammode"
+            : id.startsWith("ultrawork")
+              ? "ultrawork"
+              : id.startsWith("ulw-loop")
+                ? "ulw-loop"
+                : id.startsWith("research")
+                  ? "ulw-research"
+                  : id.startsWith("doctor")
+                    ? "doctor"
+                    : id.startsWith("report") || id.startsWith("contribute")
+                      ? "report"
+                      : "ulw-loop"
+      return {
+        actorCalls: policy.actors.map((actorId) => ({ actorId, maxCalls: 1 })),
+        constraints: { allowedPathIds: [], allowedStateEvents: ["terminal"], network: ["proxy"] },
+        expected: [{ kind: "event", value: "terminal" }],
+        fixture: { expectedTreeHash: hash("7"), templateId: "empty-repo" },
+        id,
+        predicates: [
+          { hard: true, id: `${id}.outcome`, oracleId: "outcome", points: 60 },
+          { hard: true, id: `${id}.scope_safety`, oracleId: "scope", points: 20 },
+          { hard: true, id: `${id}.evidence_cleanup`, oracleId: "cleanup", points: 10 },
+          { hard: true, id: `${id}.bounded_process`, oracleId: "bounds", points: 10 },
+        ],
+        receipts: [`${id}.result`, `${id}.calls`, `${id}.cleanup`],
+        retrieval: {
+          maxBytes: policy.tier === "FAST" ? 16384 : policy.tier === "DEEP" ? 163840 : 65536,
+          maxCalls: policy.tier === "FAST" ? 4 : policy.tier === "DEEP" ? 20 : 10,
+        },
+        steps: [{ command, source: "interactive" }],
+        tier: policy.tier,
+        workflowCallCount: policy.workflowCallCount,
+      }
+    }),
     scenarioIds: SCENARIO_IDS,
     schemaVersion: 1,
     settingsHash,
@@ -126,6 +184,7 @@ function buildBundle(): HarnessBundle {
     proxy,
     trials,
     usage,
+    sourceBinding: { targetCommit: commit, targetSourceHash: hash("8") },
   })
 }
 

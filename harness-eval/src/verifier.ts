@@ -1,15 +1,24 @@
 import { createHash } from "node:crypto"
-import { ACTOR_IDS, isMetricScenario, PROFILE_IDS, SCENARIO_IDS } from "./constants"
+import {
+  ACTOR_IDS,
+  FROZEN_SCENARIO_POLICIES,
+  frozenActorRoute,
+  isMetricScenario,
+  PROFILE_IDS,
+  SCENARIO_IDS,
+} from "./constants"
 import { type HarnessBundle, harnessBundleSchema, type Manifest } from "./schema"
 
 export const rejectionCodes = [
   "actor_mapping_cardinality",
+  "actor_route_policy",
   "actor_route_mismatch",
   "hard_gate_failed",
   "manifest_hash_mismatch",
   "model_config_hash_mismatch",
   "scenario_cardinality",
   "settings_hash_mismatch",
+  "scope_binding_mismatch",
   "target_commit_mismatch",
   "trial_cardinality",
   "unknown_field",
@@ -67,6 +76,35 @@ function verifyManifest(manifest: Manifest): RejectionCode | undefined {
   if (new Set(manifest.priceCatalog.map((price) => price.modelId)).size !== PROFILE_IDS.length) {
     return "unknown_model"
   }
+  if (
+    manifest.actorMappings.some(
+      (mapping) =>
+        mapping.legacyLowRoute !== frozenActorRoute(mapping.actorId) ||
+        mapping.candidateHighRoute !== frozenActorRoute(mapping.actorId) ||
+        mapping.candidateLowRoute !== frozenActorRoute(mapping.actorId),
+    )
+  ) {
+    return "actor_route_policy"
+  }
+  if (
+    !hasExactValues(
+      manifest.scenarios.map((row) => row.id),
+      SCENARIO_IDS,
+    )
+  )
+    return "scenario_cardinality"
+  if (
+    manifest.scenarios.some((row) => {
+      const policy = FROZEN_SCENARIO_POLICIES[row.id]
+      return (
+        row.workflowCallCount !== policy.workflowCallCount ||
+        row.actorCalls.length !== policy.actors.length ||
+        row.actorCalls.some((call, index) => call.actorId !== policy.actors[index])
+      )
+    })
+  ) {
+    return "actor_route_policy"
+  }
   return undefined
 }
 
@@ -100,6 +138,8 @@ function verifyCalls(bundle: HarnessBundle): RejectionCode | undefined {
   ) {
     return "usage_call_unexpected"
   }
+  if (bundle.proxy.some((proxy, index) => proxy.proxyCallId !== index + 1))
+    return "usage_call_unexpected"
   if (
     expectedKeys.size !== workflowCalls.length ||
     usageKeys.size !== bundle.usage.length ||
@@ -114,22 +154,28 @@ function verifyUsageAndProxy(bundle: HarnessBundle): RejectionCode | undefined {
   const usageByKey = new Map(bundle.usage.map((usage) => [keyOf(usage), usage]))
   const proxyByKey = new Map(bundle.proxy.map((proxy) => [keyOf(proxy), proxy]))
   for (const trial of bundle.trials) {
+    const policy = FROZEN_SCENARIO_POLICIES[trial.scenarioId]
+    if (createHash("sha256").update(trial.scopeId).digest("hex") !== trial.workflow.scopeHash)
+      return "scope_binding_mismatch"
+    if (trial.workflow.calls.some((call) => call.scopeId !== trial.scopeId))
+      return "scope_binding_mismatch"
+    if (trial.workflow.calls.length !== policy.workflowCallCount) return "usage_call_unexpected"
+    if (trial.workflow.calls.some((call, index) => call.actorId !== policy.actors[index]))
+      return "actor_route_policy"
     if (trial.workflow.settingsHash !== bundle.manifest.settingsHash)
       return "settings_hash_mismatch"
     if (trial.workflow.modelConfigHash !== bundle.manifest.modelConfigHash)
       return "model_config_hash_mismatch"
     let total = 0
     for (const call of trial.workflow.calls) {
-      const mapping = bundle.manifest.actorMappings.find(
-        (candidate) => candidate.actorId === call.actorId,
+      if (call.configuredActorRoute !== frozenActorRoute(call.actorId)) return "actor_route_policy"
+      if (call.metricBucket === "critic" && call.actorId !== "momus" && call.actorId !== "reviewer")
+        return "actor_route_policy"
+      if (
+        call.metricBucket === "workflow" &&
+        (call.actorId === "evaluator" || call.actorId === "critic")
       )
-      const expectedRoute =
-        trial.profileId === "legacy-low"
-          ? mapping?.legacyLowRoute
-          : trial.profileId === "candidate-high"
-            ? mapping?.candidateHighRoute
-            : mapping?.candidateLowRoute
-      if (expectedRoute !== call.configuredActorRoute) return "actor_route_mismatch"
+        return "actor_route_policy"
       const key = keyOf(call)
       const usage = usageByKey.get(key)
       const proxy = proxyByKey.get(key)
@@ -146,6 +192,8 @@ function verifyUsageAndProxy(bundle: HarnessBundle): RejectionCode | undefined {
       if (proxy.settingsHash !== trial.workflow.settingsHash) return "settings_hash_mismatch"
       if (proxy.modelConfigHash !== trial.workflow.modelConfigHash)
         return "model_config_hash_mismatch"
+      if (proxy.targetCommit !== trial.targetCommit || proxy.terminal !== "responded")
+        return "target_commit_mismatch"
       const price = bundle.manifest.priceCatalog[PROFILE_IDS.indexOf(trial.profileId)]
       if (
         price === undefined ||
@@ -218,6 +266,12 @@ export function verifyHarnessBundle(input: unknown): VerificationReceipt {
   const bundle = parsed.data
   if (hashManifest(bundle.manifest) !== bundle.manifestHash)
     return failure("manifest_hash_mismatch")
+  if (
+    bundle.sourceBinding.targetCommit !== bundle.manifest.targetCommit ||
+    bundle.trials.some((trial) => trial.targetCommit !== bundle.sourceBinding.targetCommit)
+  ) {
+    return failure("target_commit_mismatch")
+  }
   const checks = [
     verifyManifest(bundle.manifest),
     verifyTrialCardinality(bundle),
