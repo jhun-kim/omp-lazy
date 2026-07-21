@@ -1,5 +1,15 @@
 import { z } from "zod"
 import { ACTOR_IDS, PROFILE_IDS, SCENARIO_IDS } from "./constants"
+import {
+  EVENT_KINDS,
+  NETWORK_IDS,
+  PATH_IDS,
+  REFUSAL_CODES,
+  STATE_EVENT_IDS,
+  STEP_COMMANDS,
+  STEP_SOURCES,
+  TEMPLATE_IDS,
+} from "./scenarios"
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
 const commitSchema = z.string().regex(/^[a-f0-9]{40}$/)
@@ -44,41 +54,118 @@ export const priceRecordSchema = z
   })
   .strict()
 
+const fixtureParametersSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z.object({ count: z.literal(2), kind: z.literal("criterion-count") }).strict(),
+  z
+    .object({ decisionId: z.literal("fixture-owner-decision"), kind: z.literal("owner-decision") })
+    .strict(),
+  z.object({ kind: z.literal("plan-fingerprint"), value: z.literal("changed") }).strict(),
+  z
+    .object({ kind: z.literal("failure-fingerprint"), value: z.literal("semantic_mismatch") })
+    .strict(),
+  z.object({ kind: z.literal("boundary"), value: z.literal("authorization") }).strict(),
+  z.object({ kind: z.literal("ownership"), relation: z.enum(["disjoint", "ancestor"]) }).strict(),
+  z.object({ kind: z.literal("host-probe"), value: z.literal("unavailable") }).strict(),
+  z
+    .object({
+      kind: z.literal("defect-mode"),
+      value: z.enum(["reproducible", "external-write-request", "disposable", "missing-dry-run"]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("cross-case"),
+      value: z.enum(["replay-cas", "stale-owner-head", "no-progress", "retry-isolation"]),
+    })
+    .strict(),
+])
+const stepArgumentSchema = z.enum([
+  "--",
+  "--deep",
+  "--dry-run",
+  "--target",
+  "FIX-1",
+  "$reservation",
+  "$run",
+  ".omo/evidence/fixture/criterion-1",
+  ".omo/evidence/fixture/criterion-2",
+  ".omo/plans/fixture.md",
+  ".omo/team-input/fixture.json",
+  "accept",
+  "accepted",
+  "activation-injection",
+  "auto",
+  "checkpoint",
+  "command-event",
+  "create",
+  "criterion-1",
+  "criterion-2",
+  "fixture-defect",
+  "fixture-extension-tool-text",
+  "fixture-hostile-external-write-request",
+  "fixture-objective",
+  "fixture-plan-clear",
+  "fixture-plan-owner-decision",
+  "fixture-query-injection",
+  "fixture-query-single-wave",
+  "fixture-replay-key",
+  "fixture-run",
+  "fixture-stale-key",
+  "fixture-task-fast",
+  "fixture-task-security",
+  "fixture-team",
+  "leaf-a",
+  "leaf-b",
+  "leaf-c",
+  "migration-status",
+  "old-head",
+  "old-owner-epoch",
+  "pause",
+  "prepare",
+  "resume",
+  "semantic_mismatch",
+  "start",
+  "status",
+  "worker-a",
+  "worker-b",
+])
 const scenarioRowSchema = z
   .object({
     actorCalls: z
       .array(
-        z.object({ actorId: actorIdSchema, maxCalls: z.number().int().min(0).max(28) }).strict(),
+        z
+          .object({
+            actorId: actorIdSchema,
+            maxCalls: z.number().int().min(0).max(28),
+            metricBucket: z.enum(["workflow", "critic"]),
+          })
+          .strict(),
       )
       .max(5)
       .readonly(),
     constraints: z
       .object({
-        allowedPathIds: z.array(runtimeIdSchema).max(8).readonly(),
-        allowedStateEvents: z.array(runtimeIdSchema).max(8).readonly(),
-        network: z
-          .array(z.enum(["package-registry", "proxy"]))
-          .max(2)
-          .readonly(),
+        allowedPathIds: z.array(z.enum(PATH_IDS)).max(8).readonly(),
+        allowedStateEvents: z.array(z.enum(STATE_EVENT_IDS)).max(8).readonly(),
+        network: z.array(z.enum(NETWORK_IDS)).max(2).readonly(),
       })
       .strict(),
     expected: z
-      .array(z.object({ kind: z.enum(["event", "refusal"]), value: runtimeIdSchema }).strict())
+      .array(
+        z.union([
+          z.object({ eventKind: z.enum(EVENT_KINDS) }).strict(),
+          z.object({ refusalCode: z.enum(REFUSAL_CODES) }).strict(),
+        ]),
+      )
       .min(1)
       .max(3)
       .readonly(),
     fixture: z
       .object({
-        expectedTreeHash: sha256Schema,
-        templateId: z.enum([
-          "approved-plan-v2",
-          "empty-repo",
-          "hostile-source",
-          "lcx-defect",
-          "legacy-state-v1",
-          "team-two-slice",
-          "ulw-v1",
-        ]),
+        expectedTreeHash: sha256Schema.nullable(),
+        parameters: fixtureParametersSchema,
+        templateId: z.enum(TEMPLATE_IDS),
       })
       .strict(),
     id: scenarioIdSchema,
@@ -106,17 +193,9 @@ const scenarioRowSchema = z
       .array(
         z
           .object({
-            command: z.enum([
-              "doctor",
-              "report",
-              "start-work",
-              "teammode",
-              "ultrawork",
-              "ulw-loop",
-              "ulw-plan",
-              "ulw-research",
-            ]),
-            source: z.literal("interactive"),
+            args: z.array(stepArgumentSchema).max(5).readonly(),
+            command: z.enum(STEP_COMMANDS),
+            source: z.enum(STEP_SOURCES),
           })
           .strict(),
       )

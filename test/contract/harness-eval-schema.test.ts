@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { SCENARIOS } from "../../harness-eval/src/scenarios"
 import {
   createSyntheticHarnessBundle,
   writeSyntheticHarnessBundle,
@@ -9,6 +10,113 @@ import {
 import { hashManifest, verifyHarnessBundle } from "../../harness-eval/src/verifier"
 
 describe("harness evaluator v1 schema", () => {
+  // Given the independently specified T01 scenario authority
+  it("preserves the Oracle's literal 24-row scenario order and cross adapters", () => {
+    // When the authority is inspected
+    const rows = SCENARIOS
+
+    // Then every cross row remains a cross-source adapter and report/contribute differ
+    expect(rows).toHaveLength(24)
+    expect(rows.map((row) => row.id)).toEqual([
+      "plan.clear",
+      "plan.owner-decision",
+      "start-work.complete",
+      "start-work.stale-plan",
+      "ulw-loop.complete",
+      "ulw-loop.repeat-failure",
+      "ultrawork.fast",
+      "ultrawork.security",
+      "teammode.parallel",
+      "teammode.overlap",
+      "research.single-wave",
+      "research.injection",
+      "doctor.shallow",
+      "doctor.deep-unavailable",
+      "report.local",
+      "report.external-write",
+      "contribute.dry-run",
+      "contribute.non-dry",
+      "cross.activation-injection",
+      "cross.replay-cas",
+      "cross.stale-owner-head",
+      "cross.no-progress",
+      "cross.retry-isolation",
+      "cross.legacy-migration",
+    ])
+    expect(
+      rows
+        .filter((row) => row.id.startsWith("cross."))
+        .every((row) => row.steps.every((step) => step.command === "cross")),
+    ).toBe(true)
+    expect(rows.find((row) => row.id === "report.local")?.steps[0]?.command).toBe(
+      "/lcx-report-bug(omp)",
+    )
+    expect(rows.find((row) => row.id === "contribute.dry-run")?.steps[0]?.command).toBe(
+      "/lcx-contribute-bug-fix(omp)",
+    )
+  })
+
+  for (const [name, mutate] of [
+    [
+      "steps",
+      (row: { steps: [{ args: string[] }, ...{ args: string[] }[]] }) =>
+        (row.steps[0].args = ["--", "fixture-plan-owner-decision"]),
+    ],
+    [
+      "expected",
+      (row: { expected: [{ eventKind: string }, ...{ eventKind: string }[]] }) =>
+        (row.expected[0].eventKind = "owner-decision-required"),
+    ],
+    [
+      "constraints",
+      (row: { constraints: { allowedPathIds: string[] } }) => (row.constraints.allowedPathIds = []),
+    ],
+    [
+      "predicate",
+      (row: { predicates: [{ hard: boolean }, ...{ hard: boolean }[]] }) =>
+        (row.predicates[0].hard = false),
+    ],
+    [
+      "fixture template",
+      (row: { fixture: { templateId: string } }) => (row.fixture.templateId = "hostile-source"),
+    ],
+    [
+      "fixture parameters",
+      (row: { fixture: { parameters: unknown } }) =>
+        (row.fixture.parameters = { decisionId: "fixture-owner-decision", kind: "owner-decision" }),
+    ],
+    ["tier", (row: { tier: string }) => (row.tier = "STANDARD")],
+    [
+      "actor ceiling",
+      (row: { actorCalls: [{ maxCalls: number }, ...{ maxCalls: number }[]] }) =>
+        (row.actorCalls[0].maxCalls = 2),
+    ],
+    [
+      "actor metric bucket",
+      (row: { actorCalls: [{ metricBucket: string }, ...{ metricBucket: string }[]] }) =>
+        (row.actorCalls[0].metricBucket = "critic"),
+    ],
+    ["actor order", (row: { actorCalls: unknown[] }) => row.actorCalls.reverse()],
+    ["retrieval", (row: { retrieval: { maxCalls: number } }) => (row.retrieval.maxCalls = 10)],
+    [
+      "receipts",
+      (row: { receipts: [string, ...string[]] }) => (row.receipts[0] = "plan.clear.calls"),
+    ],
+  ] as const) {
+    it(`rejects a literal ${name} authority mutation`, () => {
+      // Given
+      const bundle = JSON.parse(JSON.stringify(createSyntheticHarnessBundle()))
+      const row = bundle.manifest.scenarios[0]
+      mutate(row)
+      bundle.manifestHash = hashManifest(bundle.manifest)
+
+      // When
+      const receipt = verifyHarnessBundle(bundle)
+
+      // Then
+      expect(receipt).toEqual({ code: "scenario_authority_mismatch", status: "FAIL" })
+    })
+  }
   it("verifies the complete deterministic 24 scenario x 3 profile x 3 trial bundle", () => {
     // Given
     const bundle = createSyntheticHarnessBundle()

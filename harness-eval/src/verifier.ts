@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto"
 import {
   ACTOR_IDS,
-  FROZEN_SCENARIO_POLICIES,
   frozenActorRoute,
   isMetricScenario,
   PROFILE_IDS,
   SCENARIO_IDS,
 } from "./constants"
+import { SCENARIOS } from "./scenarios"
 import { type HarnessBundle, harnessBundleSchema, type Manifest } from "./schema"
 
 export const rejectionCodes = [
@@ -17,6 +17,7 @@ export const rejectionCodes = [
   "manifest_hash_mismatch",
   "model_config_hash_mismatch",
   "scenario_cardinality",
+  "scenario_authority_mismatch",
   "settings_hash_mismatch",
   "scope_binding_mismatch",
   "target_commit_mismatch",
@@ -68,53 +69,6 @@ function hasExactValues(values: readonly string[], expected: readonly string[]):
   return JSON.stringify(values) === JSON.stringify(expected)
 }
 
-function expectedCommand(id: string): string {
-  if (id.startsWith("plan.")) return "ulw-plan"
-  if (id.startsWith("start-work")) return "start-work"
-  if (id.startsWith("teammode")) return "teammode"
-  if (id.startsWith("ultrawork")) return "ultrawork"
-  if (id.startsWith("ulw-loop") || id.startsWith("cross.")) return "ulw-loop"
-  if (id.startsWith("research")) return "ulw-research"
-  if (id.startsWith("doctor")) return "doctor"
-  return "report"
-}
-
-function rowIsFrozen(row: Manifest["scenarios"][number]): boolean {
-  const policy = FROZEN_SCENARIO_POLICIES[row.id]
-  const retrieval =
-    policy.tier === "FAST" ? [4, 16384] : policy.tier === "DEEP" ? [20, 163840] : [10, 65536]
-  return (
-    row.workflowCallCount === policy.workflowCallCount &&
-    row.actorCalls.length === policy.actors.length &&
-    row.actorCalls.every(
-      (call, index) => call.actorId === policy.actors[index] && call.maxCalls === 1,
-    ) &&
-    row.tier === policy.tier &&
-    row.retrieval.maxCalls === retrieval[0] &&
-    row.retrieval.maxBytes === retrieval[1] &&
-    JSON.stringify(row.receipts) ===
-      JSON.stringify([`${row.id}.result`, `${row.id}.calls`, `${row.id}.cleanup`]) &&
-    JSON.stringify(row.steps) ===
-      JSON.stringify([{ command: expectedCommand(row.id), source: "interactive" }]) &&
-    JSON.stringify(row.expected) === JSON.stringify([{ kind: "event", value: "terminal" }]) &&
-    JSON.stringify(row.constraints) ===
-      JSON.stringify({
-        allowedPathIds: [],
-        allowedStateEvents: ["terminal"],
-        network: ["proxy"],
-      }) &&
-    JSON.stringify(row.predicates) ===
-      JSON.stringify([
-        { hard: true, id: `${row.id}.outcome`, oracleId: "outcome", points: 60 },
-        { hard: true, id: `${row.id}.scope_safety`, oracleId: "scope", points: 20 },
-        { hard: true, id: `${row.id}.evidence_cleanup`, oracleId: "cleanup", points: 10 },
-        { hard: true, id: `${row.id}.bounded_process`, oracleId: "bounds", points: 10 },
-      ]) &&
-    row.fixture.templateId === "empty-repo" &&
-    row.fixture.expectedTreeHash === "7".repeat(64)
-  )
-}
-
 function verifyManifest(manifest: Manifest): RejectionCode | undefined {
   if (!hasExactValues(manifest.scenarioIds, SCENARIO_IDS)) return "scenario_cardinality"
   if (new Set(manifest.actorMappings.map((mapping) => mapping.actorId)).size !== ACTOR_IDS.length) {
@@ -140,8 +94,10 @@ function verifyManifest(manifest: Manifest): RejectionCode | undefined {
     )
   )
     return "scenario_cardinality"
-  if (manifest.scenarios.some((row) => !rowIsFrozen(row))) {
-    return "actor_route_policy"
+  if (
+    manifest.scenarios.some((row, index) => canonicalJson(row) !== canonicalJson(SCENARIOS[index]))
+  ) {
+    return "scenario_authority_mismatch"
   }
   return undefined
 }
@@ -194,13 +150,26 @@ function verifyUsageAndProxy(bundle: HarnessBundle): RejectionCode | undefined {
   const usageByKey = new Map(bundle.usage.map((usage) => [keyOf(usage), usage]))
   const proxyByKey = new Map(bundle.proxy.map((proxy) => [keyOf(proxy), proxy]))
   for (const trial of bundle.trials) {
-    const policy = FROZEN_SCENARIO_POLICIES[trial.scenarioId]
+    const authority = SCENARIOS[SCENARIO_IDS.indexOf(trial.scenarioId)]
+    if (authority === undefined) return "scenario_authority_mismatch"
     if (createHash("sha256").update(trial.scopeId).digest("hex") !== trial.workflow.scopeHash)
       return "scope_binding_mismatch"
     if (trial.workflow.calls.some((call) => call.scopeId !== trial.scopeId))
       return "scope_binding_mismatch"
-    if (trial.workflow.calls.length !== policy.workflowCallCount) return "usage_call_unexpected"
-    if (trial.workflow.calls.some((call, index) => call.actorId !== policy.actors[index]))
+    if (trial.workflow.calls.length > authority.workflowCallCount) return "usage_call_unexpected"
+    for (const allowed of authority.actorCalls) {
+      const observed = trial.workflow.calls.filter((call) => call.actorId === allowed.actorId)
+      if (
+        observed.length > allowed.maxCalls ||
+        observed.some((call) => call.metricBucket !== allowed.metricBucket)
+      )
+        return "actor_route_policy"
+    }
+    if (
+      trial.workflow.calls.some(
+        (call) => !authority.actorCalls.some((allowed) => allowed.actorId === call.actorId),
+      )
+    )
       return "actor_route_policy"
     if (trial.workflow.settingsHash !== bundle.manifest.settingsHash)
       return "settings_hash_mismatch"

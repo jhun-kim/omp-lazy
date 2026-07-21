@@ -3,12 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import {
   ACTOR_IDS,
-  FROZEN_SCENARIO_POLICIES,
   frozenActorRoute,
   isMetricScenario,
   PROFILE_IDS,
   SCENARIO_IDS,
 } from "./constants"
+import { SCENARIOS } from "./scenarios"
 import { type HarnessBundle, harnessBundleSchema, manifestSchema } from "./schema"
 import { hashManifest } from "./verifier"
 
@@ -47,11 +47,12 @@ function buildBundle(): HarnessBundle {
     for (const [profileIndex, profileId] of PROFILE_IDS.entries()) {
       for (const trial of [1, 2, 3]) {
         const scopeId = scope(scenarioIndex, profileIndex, trial)
-        const policy = FROZEN_SCENARIO_POLICIES[scenarioId]
-        const calls = policy.actors.map((actorId) => ({
-          actorId,
-          configuredActorRoute: frozenActorRoute(actorId),
-          metricBucket: actorId === "momus" ? "critic" : "workflow",
+        const authority = SCENARIOS[scenarioIndex]
+        if (authority === undefined) throw new Error("synthetic scenario authority is unavailable")
+        const calls = authority.actorCalls.map((actor) => ({
+          actorId: actor.actorId,
+          configuredActorRoute: frozenActorRoute(actor.actorId),
+          metricBucket: actor.metricBucket,
           proxyCallId: callId++,
           scopeId,
         }))
@@ -136,47 +137,7 @@ function buildBundle(): HarnessBundle {
       sourceSha256: hash("5"),
       sourceUrl: `https://example.invalid/${profileId}`,
     })),
-    scenarios: SCENARIO_IDS.map((id) => {
-      const policy = FROZEN_SCENARIO_POLICIES[id]
-      const command = id.startsWith("plan.")
-        ? "ulw-plan"
-        : id.startsWith("start-work")
-          ? "start-work"
-          : id.startsWith("teammode")
-            ? "teammode"
-            : id.startsWith("ultrawork")
-              ? "ultrawork"
-              : id.startsWith("ulw-loop")
-                ? "ulw-loop"
-                : id.startsWith("research")
-                  ? "ulw-research"
-                  : id.startsWith("doctor")
-                    ? "doctor"
-                    : id.startsWith("report") || id.startsWith("contribute")
-                      ? "report"
-                      : "ulw-loop"
-      return {
-        actorCalls: policy.actors.map((actorId) => ({ actorId, maxCalls: 1 })),
-        constraints: { allowedPathIds: [], allowedStateEvents: ["terminal"], network: ["proxy"] },
-        expected: [{ kind: "event", value: "terminal" }],
-        fixture: { expectedTreeHash: hash("7"), templateId: "empty-repo" },
-        id,
-        predicates: [
-          { hard: true, id: `${id}.outcome`, oracleId: "outcome", points: 60 },
-          { hard: true, id: `${id}.scope_safety`, oracleId: "scope", points: 20 },
-          { hard: true, id: `${id}.evidence_cleanup`, oracleId: "cleanup", points: 10 },
-          { hard: true, id: `${id}.bounded_process`, oracleId: "bounds", points: 10 },
-        ],
-        receipts: [`${id}.result`, `${id}.calls`, `${id}.cleanup`],
-        retrieval: {
-          maxBytes: policy.tier === "FAST" ? 16384 : policy.tier === "DEEP" ? 163840 : 65536,
-          maxCalls: policy.tier === "FAST" ? 4 : policy.tier === "DEEP" ? 20 : 10,
-        },
-        steps: [{ command, source: "interactive" }],
-        tier: policy.tier,
-        workflowCallCount: policy.workflowCallCount,
-      }
-    }),
+    scenarios: SCENARIOS,
     scenarioIds: SCENARIO_IDS,
     schemaVersion: 1,
     settingsHash,
