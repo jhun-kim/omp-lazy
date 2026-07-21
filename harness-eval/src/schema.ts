@@ -240,7 +240,7 @@ export const harnessBundleSchema = z
     trials: z.array(trialReceiptSchema).readonly(),
     usage: z.array(usageReceiptSchema).readonly(),
     sourceBinding: z
-      .object({ targetCommit: commitSchema, targetSourceHash: sha256Schema })
+      .object({ targetCommit: commitSchema, targetSourceHash: commitSchema })
       .strict(),
   })
   .strict()

@@ -1,6 +1,7 @@
 import { access, readFile } from "node:fs/promises"
 import { writeSyntheticHarnessBundle } from "./synthetic-bundle"
 import { verifyHarnessBundle } from "./verifier"
+import { SCENARIO_IDS } from "./constants"
 
 type CliReceipt =
   | { readonly status: "PASS" }
@@ -39,7 +40,10 @@ function hasExactKeys(flags: Flags, allowed: readonly string[]): boolean {
 }
 
 function selectorIsValid(flags: Flags): boolean {
-  return ["--scenario", "--scenarios", "--all"].filter((flag) => flags.has(flag)).length === 1
+  if (["--scenario", "--scenarios", "--all"].filter((flag) => flags.has(flag)).length !== 1)
+    return false
+  const scenario = value(flags, "--scenario")
+  return scenario === undefined || SCENARIO_IDS.includes(scenario)
 }
 
 async function unavailableManifest(path: string): Promise<CliReceipt> {
@@ -83,6 +87,7 @@ async function run(flags: Flags): Promise<CliReceipt> {
     !modes.has(mode) ||
     manifest === undefined ||
     targetCommit === undefined ||
+    (targetCommit !== "HEAD" && !/^[a-f0-9]{40}$/.test(targetCommit)) ||
     !selectorIsValid(flags)
   )
     return { code: "malformed_cli", status: "FAIL" }
@@ -126,7 +131,24 @@ async function execute(argv: readonly string[]): Promise<CliReceipt> {
     (value(flags, "--mode") === "source" || value(flags, "--mode") === "review")
   )
     return { code: "manifest_unavailable", status: "BLOCKED" }
-  if (command === "audit") return { code: "auditor_unavailable", status: "BLOCKED" }
+  if (
+    command === "audit" &&
+    hasExactKeys(flags, [
+      "--actor",
+      "--plan",
+      "--source-manifest",
+      "--profile",
+      "--output-logical-id",
+      "--output",
+    ]) &&
+    value(flags, "--actor") !== undefined &&
+    value(flags, "--plan") !== undefined &&
+    value(flags, "--source-manifest") !== undefined &&
+    value(flags, "--profile") !== undefined &&
+    value(flags, "--output-logical-id") !== undefined &&
+    value(flags, "--output") !== undefined
+  )
+    return { code: "auditor_unavailable", status: "BLOCKED" }
   if (command === "synthetic" && hasExactKeys(flags, ["--output"])) {
     const output = value(flags, "--output")
     if (output === undefined) return { code: "malformed_cli", status: "FAIL" }

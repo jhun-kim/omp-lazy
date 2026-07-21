@@ -13,7 +13,12 @@ import { type HarnessBundle, harnessBundleSchema, manifestSchema } from "./schem
 import { hashManifest } from "./verifier"
 
 const hash = (character: string): string => character.repeat(64)
-const commit = "a".repeat(40)
+const gitValue = (arguments_: readonly string[]): string =>
+  new TextDecoder()
+    .decode(Bun.spawnSync(["git", ...arguments_], { cwd: process.cwd() }).stdout)
+    .trim()
+const commit = gitValue(["rev-parse", "HEAD"])
+const targetSourceHash = gitValue(["rev-parse", "HEAD^{tree}"])
 const settingsHash = hash("b")
 const modelConfigHash = hash("c")
 const scopeHash = (scopeId: string): string => createHash("sha256").update(scopeId).digest("hex")
@@ -184,7 +189,7 @@ function buildBundle(): HarnessBundle {
     proxy,
     trials,
     usage,
-    sourceBinding: { targetCommit: commit, targetSourceHash: hash("8") },
+    sourceBinding: { targetCommit: commit, targetSourceHash },
   })
 }
 

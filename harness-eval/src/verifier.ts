@@ -99,7 +99,19 @@ function verifyManifest(manifest: Manifest): RejectionCode | undefined {
       return (
         row.workflowCallCount !== policy.workflowCallCount ||
         row.actorCalls.length !== policy.actors.length ||
-        row.actorCalls.some((call, index) => call.actorId !== policy.actors[index])
+        row.actorCalls.some(
+          (call, index) => call.actorId !== policy.actors[index] || call.maxCalls !== 1,
+        ) ||
+        row.tier !== policy.tier ||
+        row.retrieval.maxCalls !==
+          (policy.tier === "FAST" ? 4 : policy.tier === "DEEP" ? 20 : 10) ||
+        row.retrieval.maxBytes !==
+          (policy.tier === "FAST" ? 16384 : policy.tier === "DEEP" ? 163840 : 65536) ||
+        JSON.stringify(row.receipts) !==
+          JSON.stringify([`${row.id}.result`, `${row.id}.calls`, `${row.id}.cleanup`]) ||
+        row.predicates.length !== 4 ||
+        row.fixture.templateId !== "empty-repo" ||
+        row.fixture.expectedTreeHash !== "7".repeat(64)
       )
     })
   ) {
@@ -120,6 +132,8 @@ function verifyTrialCardinality(bundle: HarnessBundle): RejectionCode | undefine
   const actual = new Set(
     bundle.trials.map((trial) => `${trial.scenarioId}:${trial.profileId}:${trial.trial}`),
   )
+  if (new Set(bundle.trials.map((trial) => trial.scopeId)).size !== bundle.trials.length)
+    return "scope_binding_mismatch"
   return actual.size === expected.size && [...expected].every((key) => actual.has(key))
     ? undefined
     : "trial_cardinality"
@@ -176,6 +190,7 @@ function verifyUsageAndProxy(bundle: HarnessBundle): RejectionCode | undefined {
         (call.actorId === "evaluator" || call.actorId === "critic")
       )
         return "actor_route_policy"
+      if (call.actorId === "momus" && call.metricBucket !== "critic") return "actor_route_policy"
       const key = keyOf(call)
       const usage = usageByKey.get(key)
       const proxy = proxyByKey.get(key)
@@ -272,6 +287,19 @@ export function verifyHarnessBundle(input: unknown): VerificationReceipt {
   ) {
     return failure("target_commit_mismatch")
   }
+  const actualCommit = new TextDecoder()
+    .decode(Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout)
+    .trim()
+  const actualTree = new TextDecoder()
+    .decode(Bun.spawnSync(["git", "rev-parse", "HEAD^{tree}"]).stdout)
+    .trim()
+  if (
+    bundle.sourceBinding.targetCommit !== actualCommit ||
+    bundle.sourceBinding.targetSourceHash !== actualTree
+  )
+    return failure("target_commit_mismatch")
+  if (bundle.manifest.priceCatalog.some((price) => /^(sk-|api[-_]?key|token)/i.test(price.modelId)))
+    return failure("unknown_model")
   const checks = [
     verifyManifest(bundle.manifest),
     verifyTrialCardinality(bundle),
