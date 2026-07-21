@@ -115,6 +115,12 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 | `verify:readme` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun scripts/verify-readme-contract.ts` | README/package/runtime contract. |
 | `evidence:source` | `bun scripts/build-evidence-manifest.ts --mode source --root .omo/evidence/plugin-completion-60 --commit-from-git-head` | T01-T15 evidence를 clean `HEAD`에 binding. |
 | `evidence:review` | `bun scripts/build-evidence-manifest.ts --mode review --root .omo/evidence/plugin-completion-60 --commit-from-git-head` | source 및 F1-F4 receipt binding. |
+| `eval:harness:deterministic` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts run --mode deterministic` | 결정적 harness corpus를 실행합니다. |
+| `eval:harness:baseline` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts run --mode baseline` | 고정된 baseline harness defect를 실행합니다. |
+| `eval:harness:live` | `bun scripts/run-isolated.ts --timeout-ms 7200000 --cwd . --env-profile omp -- bun harness-eval/src/cli.ts run --mode live` | credentialed live harness evaluation을 실행합니다. |
+| `verify:harness` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts verify` | 고정된 harness receipt를 검증합니다. |
+| `evidence:harness:source` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts evidence --mode source` | harness source evidence manifest를 생성합니다. |
+| `evidence:harness:review` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts evidence --mode review` | harness review evidence manifest를 생성합니다. |
 | `check` | `bun scripts/check.ts` | 빠른 local gate. |
 | `verify:release` | `bun scripts/verify-release.ts` | 권위 있는 platform release gate. |
 
