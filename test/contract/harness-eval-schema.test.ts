@@ -251,6 +251,54 @@ describe("harness evaluator v1 schema", () => {
     expect(detachedReceipt).toEqual({ code: "scope_binding_mismatch", status: "FAIL" })
     expect(rewrittenReceipt).toEqual({ code: "target_commit_mismatch", status: "FAIL" })
   })
+
+  it("rejects a coordinated omitted required planner call after reindexing", () => {
+    // Given
+    const bundle = JSON.parse(JSON.stringify(createSyntheticHarnessBundle()))
+    const trial = bundle.trials.find(
+      (candidate: { readonly profileId: string; readonly scenarioId: string }) =>
+        candidate.profileId === "candidate-low" && candidate.scenarioId === "plan.clear",
+    )
+    const plannerCall = trial.workflow.calls.find(
+      (candidate: { readonly actorId: string }) => candidate.actorId === "planner",
+    )
+    trial.workflow.calls = trial.workflow.calls.filter(
+      (candidate: { readonly proxyCallId: number }) =>
+        candidate.proxyCallId !== plannerCall.proxyCallId,
+    )
+    trial.workflow.workflowTokens -= 15
+    bundle.usage = bundle.usage.filter(
+      (candidate: { readonly proxyCallId: number }) =>
+        candidate.proxyCallId !== plannerCall.proxyCallId,
+    )
+    bundle.proxy = bundle.proxy.filter(
+      (candidate: { readonly proxyCallId: number }) =>
+        candidate.proxyCallId !== plannerCall.proxyCallId,
+    )
+    let nextProxyCallId = 1
+    for (const candidateTrial of bundle.trials) {
+      for (const call of candidateTrial.workflow.calls) {
+        const usage = bundle.usage.find(
+          (candidate: { readonly proxyCallId: number }) =>
+            candidate.proxyCallId === call.proxyCallId,
+        )
+        const proxy = bundle.proxy.find(
+          (candidate: { readonly proxyCallId: number }) =>
+            candidate.proxyCallId === call.proxyCallId,
+        )
+        call.proxyCallId = nextProxyCallId
+        usage.proxyCallId = nextProxyCallId
+        proxy.proxyCallId = nextProxyCallId
+        nextProxyCallId += 1
+      }
+    }
+
+    // When
+    const receipt = verifyHarnessBundle(bundle)
+
+    // Then
+    expect(receipt).toEqual({ code: "usage_call_missing", status: "FAIL" })
+  })
 })
 
 describe("harness evaluator CLI", () => {

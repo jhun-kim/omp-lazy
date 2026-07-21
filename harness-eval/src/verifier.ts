@@ -69,6 +69,11 @@ function hasExactValues(values: readonly string[], expected: readonly string[]):
   return JSON.stringify(values) === JSON.stringify(expected)
 }
 
+function authorityCallsAreBounded(authority: (typeof SCENARIOS)[number]): boolean {
+  const actorCapacity = authority.actorCalls.reduce((total, actor) => total + actor.maxCalls, 0)
+  return authority.workflowCallCount >= actorCapacity
+}
+
 function verifyManifest(manifest: Manifest): RejectionCode | undefined {
   if (!hasExactValues(manifest.scenarioIds, SCENARIO_IDS)) return "scenario_cardinality"
   if (new Set(manifest.actorMappings.map((mapping) => mapping.actorId)).size !== ACTOR_IDS.length) {
@@ -97,6 +102,9 @@ function verifyManifest(manifest: Manifest): RejectionCode | undefined {
   if (
     manifest.scenarios.some((row, index) => canonicalJson(row) !== canonicalJson(SCENARIOS[index]))
   ) {
+    return "scenario_authority_mismatch"
+  }
+  if (SCENARIOS.some((authority) => !authorityCallsAreBounded(authority))) {
     return "scenario_authority_mismatch"
   }
   return undefined
@@ -159,6 +167,10 @@ function verifyUsageAndProxy(bundle: HarnessBundle): RejectionCode | undefined {
     if (trial.workflow.calls.length > authority.workflowCallCount) return "usage_call_unexpected"
     for (const allowed of authority.actorCalls) {
       const observed = trial.workflow.calls.filter((call) => call.actorId === allowed.actorId)
+      const requiredCalls = authority.actorCalls.filter(
+        (required) => required.actorId === allowed.actorId,
+      ).length
+      if (observed.length < requiredCalls) return "usage_call_missing"
       if (
         observed.length > allowed.maxCalls ||
         observed.some((call) => call.metricBucket !== allowed.metricBucket)
