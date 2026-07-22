@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { z } from "zod"
 import { validateDeterministicCorpus } from "../../harness-eval/src/corpus"
 
 const manifestPath = join("harness-eval", "manifest.v1.json")
@@ -9,8 +10,15 @@ const fixtureRoot = join("harness-eval", "fixtures", "synthetic-target")
 
 type CliResult = { readonly exitCode: number; readonly receipt: unknown }
 
-async function deterministicCorpus(argv: readonly string[]): Promise<CliResult> {
-  const child = Bun.spawn(["bun", "harness-eval/src/cli.ts", "run", ...argv], {
+const isolatedReceiptSchema = z.object({
+  exitCode: z.number(),
+  stdout: z.string(),
+})
+
+async function executeCli(
+  command: readonly string[],
+): Promise<CliResult & { readonly stderr: string }> {
+  const child = Bun.spawn([...command], {
     cwd: process.cwd(),
     stderr: "pipe",
     stdout: "pipe",
@@ -20,11 +28,39 @@ async function deterministicCorpus(argv: readonly string[]): Promise<CliResult> 
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
+  return { exitCode, receipt: JSON.parse(stdout), stderr }
+}
+
+async function deterministicCorpus(argv: readonly string[]): Promise<CliResult> {
+  const { exitCode, receipt, stderr } = await executeCli([
+    "bun",
+    "harness-eval/src/cli.ts",
+    "run",
+    ...argv,
+  ])
   expect(stderr).toBe("")
-  return { exitCode, receipt: JSON.parse(stdout) }
+  return { exitCode, receipt }
 }
 
 describe("frozen deterministic corpus CLI", () => {
+  it("reports structured PASS from the bare package script", async () => {
+    // Given the documented deterministic package alias
+    const command = ["bun", "run", "eval:harness:deterministic"]
+
+    // When it runs without caller-supplied arguments
+    const result = await executeCli(command)
+
+    // Then the alias executes the complete canonical corpus
+    const isolatedReceipt = isolatedReceiptSchema.parse(result.receipt)
+    expect({
+      exitCode: result.exitCode,
+      receipt: JSON.parse(isolatedReceipt.stdout),
+    }).toEqual({
+      exitCode: 0,
+      receipt: { status: "PASS" },
+    })
+  })
+
   it("reports structured PASS for the complete contained corpus", async () => {
     // Given the committed manifest and synthetic target fixture closure
     const argv = [
