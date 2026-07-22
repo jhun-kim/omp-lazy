@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { validateDeterministicCorpus } from "../../harness-eval/src/corpus"
 
 const manifestPath = join("harness-eval", "manifest.v1.json")
 const fixtureRoot = join("harness-eval", "fixtures", "synthetic-target")
@@ -72,37 +73,15 @@ describe("frozen deterministic corpus CLI", () => {
     await cp(fixtureRoot, join(root, "fixtures"), { recursive: true })
 
     try {
-      // When each invalid manifest reaches corpus validation
+      // When each invalid manifest reaches corpus validation below the immutable lock boundary
       const [duplicate, missing] = await Promise.all([
-        deterministicCorpus([
-          "--mode",
-          "deterministic",
-          "--manifest",
-          duplicatePath,
-          "--validate-corpus",
-          "--synthetic-target",
-          join(root, "fixtures"),
-        ]),
-        deterministicCorpus([
-          "--mode",
-          "deterministic",
-          "--manifest",
-          missingPath,
-          "--validate-corpus",
-          "--synthetic-target",
-          join(root, "fixtures"),
-        ]),
+        validateDeterministicCorpus(duplicatePath, join(root, "fixtures")),
+        validateDeterministicCorpus(missingPath, join(root, "fixtures")),
       ])
 
       // Then stable authority failures cannot produce a false PASS
-      expect(duplicate).toEqual({
-        exitCode: 1,
-        receipt: { code: "duplicate_scenario_id", status: "FAIL" },
-      })
-      expect(missing).toEqual({
-        exitCode: 1,
-        receipt: { code: "required_scenario_missing", status: "FAIL" },
-      })
+      expect(duplicate).toEqual({ code: "duplicate_scenario_id", status: "FAIL" })
+      expect(missing).toEqual({ code: "required_scenario_missing", status: "FAIL" })
     } finally {
       await rm(root, { force: true, recursive: true })
     }

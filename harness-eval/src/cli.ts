@@ -1,5 +1,6 @@
 import { access, readFile } from "node:fs/promises"
 import { SCENARIO_IDS } from "./constants"
+import { validateClosureLock } from "./closure-lock"
 import { validateDeterministicCorpus } from "./corpus"
 import { readLiveProfileInput } from "./live-profile"
 import { writeSyntheticHarnessBundle } from "./synthetic-bundle"
@@ -86,7 +87,8 @@ async function run(flags: Flags): Promise<CliReceipt> {
     syntheticTarget !== undefined &&
     hasExactKeys(flags, ["--mode", "--manifest", "--validate-corpus", "--synthetic-target"])
   ) {
-    return validateDeterministicCorpus(manifest, syntheticTarget)
+    const lock = await validateClosureLock(manifest)
+    return lock.status === "PASS" ? validateDeterministicCorpus(manifest, syntheticTarget) : lock
   }
   if (
     !hasExactKeys(flags, [
@@ -147,6 +149,8 @@ async function execute(argv: readonly string[]): Promise<CliReceipt> {
       !hasExactKeys(flags, ["--manifest", "--target-commit"])
     )
       return { code: "malformed_cli", status: "FAIL" }
+    const lock = await validateClosureLock(manifest)
+    if (lock.status === "FAIL") return lock
     return unavailableManifest(manifest)
   }
   if (

@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { createHash, randomUUID } from "node:crypto"
+import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { basename, dirname, join } from "node:path"
 import { ACTOR_IDS, PROFILE_IDS, SCENARIO_IDS } from "./constants"
+import { validateDeterministicCorpus } from "./corpus"
 import { fixtureFilesForScenario, fixtureHashes } from "./fixture-tree-v1"
 import { SCENARIOS } from "./scenarios"
 
@@ -57,20 +58,43 @@ async function writeNew(path: string, bytes: Uint8Array | string): Promise<void>
   await writeFile(path, bytes, { flag: "wx" })
 }
 
-async function rootInputEntries(): Promise<
-  readonly { readonly path: string; readonly sha256: string }[]
-> {
-  const paths = ["package.json", "bun.lock", "tsconfig.json", "biome.json"] as const
-  return Promise.all(paths.map(async (path) => ({ path, sha256: sha256(await readFile(path)) })))
+const failpoints = ["after_fixture_write", "before_publish"] as const
+type MaterializeFailpoint = (typeof failpoints)[number]
+
+export type MaterializeOptions = {
+  readonly failpoint?: MaterializeFailpoint
+  readonly sourceRoot?: string
 }
 
-async function materialize(root: string): Promise<void> {
+function failpoint(options: MaterializeOptions): MaterializeFailpoint | undefined {
+  const candidate = options.failpoint ?? process.env.OMP_HARNESS_MATERIALIZE_FAILPOINT
+  return failpoints.find((value) => value === candidate)
+}
+
+function interruptAt(
+  expected: MaterializeFailpoint,
+  configured: MaterializeFailpoint | undefined,
+): void {
+  if (configured === expected) throw new TypeError(`materialization failpoint: ${expected}`)
+}
+
+async function rootInputEntries(
+  sourceRoot: string,
+): Promise<readonly { readonly path: string; readonly sha256: string }[]> {
+  const paths = ["package.json", "bun.lock", "tsconfig.json", "biome.json"] as const
+  return Promise.all(
+    paths.map(async (path) => ({ path, sha256: sha256(await readFile(join(sourceRoot, path))) })),
+  )
+}
+
+async function writeMaterializedFiles(root: string, options: MaterializeOptions): Promise<void> {
   const fixtureRoot = join(root, "fixtures", "synthetic-target")
   const hashes = fixtureHashes()
   for (const scenario of SCENARIOS) {
     for (const file of fixtureFilesForScenario(scenario)) {
       await writeNew(join(fixtureRoot, scenario.id, file.path), file.bytes)
     }
+    interruptAt("after_fixture_write", failpoint(options))
   }
   const schemaBytes = text(liveProfileInputSchema)
   const manifest = {
@@ -109,7 +133,10 @@ async function materialize(root: string): Promise<void> {
     targetCommit: baselineTargetCommit,
   }
   const manifestBytes = text(manifest)
-  const closureInputs = text({ schemaVersion: 1, entries: await rootInputEntries() })
+  const closureInputs = text({
+    schemaVersion: 1,
+    entries: await rootInputEntries(options.sourceRoot ?? process.cwd()),
+  })
   await Promise.all([
     writeNew(join(root, "manifest.v1.json"), manifestBytes),
     writeNew(join(root, "manifest.v1.sha256"), `${sha256(manifestBytes)}\n`),
@@ -119,5 +146,54 @@ async function materialize(root: string): Promise<void> {
   ])
 }
 
+async function ensureAbsent(path: string): Promise<void> {
+  try {
+    await lstat(path)
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return
+    throw error
+  }
+  throw new TypeError(`materialization destination already exists: ${path}`)
+}
+
+async function verifyMaterializedFiles(root: string): Promise<void> {
+  const checks = [
+    ["manifest.v1.json", "manifest.v1.sha256"],
+    ["live-profile-input.schema.v1.json", "live-profile-input.schema.v1.sha256"],
+  ] as const
+  for (const [payload, sidecar] of checks) {
+    const [bytes, expected] = await Promise.all([
+      readFile(join(root, payload)),
+      readFile(join(root, sidecar), "utf8"),
+    ])
+    if (sha256(bytes) !== expected.trim())
+      throw new TypeError(`invalid materialized hash: ${payload}`)
+  }
+  const receipt = await validateDeterministicCorpus(
+    join(root, "manifest.v1.json"),
+    join(root, "fixtures", "synthetic-target"),
+  )
+  if (receipt.status !== "PASS") throw new TypeError(`invalid materialized corpus: ${receipt.code}`)
+}
+
+export async function materializeHarnessEval(
+  destination: string,
+  options: MaterializeOptions = {},
+): Promise<void> {
+  await ensureAbsent(destination)
+  const temporary = join(dirname(destination), `.${basename(destination)}.tmp-${randomUUID()}`)
+  try {
+    await mkdir(temporary)
+    await writeMaterializedFiles(temporary, options)
+    await verifyMaterializedFiles(temporary)
+    interruptAt("before_publish", failpoint(options))
+    await ensureAbsent(destination)
+    await rename(temporary, destination)
+  } catch (error) {
+    await rm(temporary, { force: true, recursive: true })
+    throw error
+  }
+}
+
 if (Bun.argv.slice(2).length !== 0) throw new TypeError("materialize accepts no arguments")
-await materialize(join(process.cwd(), "harness-eval"))
+await materializeHarnessEval(join(process.cwd(), "harness-eval"))
