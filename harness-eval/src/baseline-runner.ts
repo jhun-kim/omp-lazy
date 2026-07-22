@@ -127,18 +127,26 @@ export async function runBaselineEvaluation(options: {
     manifest.baselineTargetTree
   )
     throw new TypeError("baseline commit mismatch")
-  const root = join(repositoryRoot, ".omo", `.baseline-${randomUUID()}`)
-  const worktree = join(root, "target")
+  const root = join(
+    process.env["TEMP"] ?? process.env["TMP"] ?? repositoryRoot,
+    `.baseline-${randomUUID()}`,
+  )
+  const target = join(root, "target")
   try {
     await mkdir(root, { recursive: true })
     if (
-      git(
-        ["worktree", "add", "--detach", worktree, manifest.baselineTargetCommit],
-        repositoryRoot,
-      ) === undefined
+      git(["clone", "--no-checkout", "--shared", repositoryRoot, target], repositoryRoot) ===
+      undefined
     )
-      throw new TypeError("baseline worktree unavailable")
-    if (!observed(await executeAdapters(worktree, manifest)))
+      throw new TypeError("baseline clone unavailable")
+    if (
+      git(["checkout", "--detach", manifest.baselineTargetCommit], target) === undefined ||
+      git(["rev-parse", "HEAD"], target) !== manifest.baselineTargetCommit ||
+      git(["rev-parse", "HEAD^{tree}"], target) !== manifest.baselineTargetTree ||
+      git(["status", "--porcelain"], target) !== ""
+    )
+      throw new TypeError("baseline checkout mismatch")
+    if (!observed(await executeAdapters(target, manifest)))
       throw new TypeError("baseline defect not observed")
     const receipt = baselineReceiptSchema.parse({
       baseline: {
@@ -162,8 +170,6 @@ export async function runBaselineEvaluation(options: {
     await publish(options.outputPath, receipt)
     return receipt
   } finally {
-    git(["worktree", "remove", "--force", worktree], repositoryRoot)
     await rm(root, { force: true, recursive: true })
-    git(["worktree", "prune"], repositoryRoot)
   }
 }
