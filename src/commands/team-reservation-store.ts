@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { z } from "zod"
+import type { GitEvidenceBinding } from "../contracts/git-evidence-binding"
 import { atomicReplace } from "../state/atomic-file"
 import type { AnyRun } from "../state/domain"
 import { deadlineAfter } from "../state/repo-lock"
@@ -29,9 +30,18 @@ const reservationSchema = z.strictObject({
 })
 
 type TeamReservation = z.infer<typeof reservationSchema>
+type GitEvidenceFailureCode = Extract<GitEvidenceBinding, { readonly ok: false }>["code"]
+type TeamReservationFailureCode =
+  | GitEvidenceFailureCode
+  | "state_conflict"
+  | "idempotency_conflict"
+  | "missing_target"
+  | "owner_mismatch"
+  | "owner_epoch_mismatch"
+  | "stale_head"
 export type TeamReservationResult =
   | { readonly ok: true; readonly reservationId: string; readonly state?: TeamState }
-  | { readonly ok: false; readonly code: string }
+  | { readonly ok: false; readonly code: TeamReservationFailureCode }
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex")
@@ -114,8 +124,9 @@ export async function consumeTeamReservation(input: {
   readonly callerSessionId: string
   readonly teamName: string
   readonly reservationId: string
+  readonly readGit: () => Promise<GitEvidenceBinding>
 }): Promise<TeamReservationResult> {
-  const { store, callerSessionId, teamName, reservationId } = input
+  const { store, callerSessionId, teamName, reservationId, readGit } = input
   const deadline = deadlineAfter(2_000)
   const handle = await store.lock.tryAcquire({
     deadline,
@@ -148,6 +159,9 @@ export async function consumeTeamReservation(input: {
         ? { ok: true, reservationId, state: current }
         : { ok: false, code: "idempotency_conflict" }
     }
+    const git = await readGit()
+    if (!git.ok) return git
+    if (git.head !== reservation.expectedHead) return { ok: false, code: "stale_head" }
     if (reservation.consumed) return { ok: false, code: "idempotency_conflict" }
     const state = TeamStateSchema.parse({
       schemaVersion: 1,

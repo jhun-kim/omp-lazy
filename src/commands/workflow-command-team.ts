@@ -75,6 +75,7 @@ export async function executeTeamCommand(
       callerSessionId: context.sessionId,
       teamName: words[0] ?? "",
       reservationId: words[1] ?? "",
+      readGit: () => readGitEvidenceBinding(context.store.root),
     })
     return created.ok
       ? result(operation, "PASS", {

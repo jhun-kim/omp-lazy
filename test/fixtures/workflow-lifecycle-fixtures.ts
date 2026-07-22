@@ -41,6 +41,11 @@ export async function workflowRepository(label: string): Promise<string> {
   return root
 }
 
+export async function advanceWorkflowHead(root: string): Promise<void> {
+  await writeFile(join(root, "tracked.txt"), "advanced\n")
+  git(root, ["commit", "--quiet", "-am", "advance head"])
+}
+
 export async function publicWorkflowRuntime(root: string) {
   const loaded = await loadExtensions([join(process.cwd(), "src", "index.ts")], process.cwd())
   const extension = loaded.extensions[0]

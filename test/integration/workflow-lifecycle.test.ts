@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader"
 import {
+  advanceWorkflowHead,
   cleanupWorkflowRoots,
   publicWorkflowRuntime,
   workflowPlan,
@@ -161,6 +162,62 @@ describe("typed workflow lifecycle public surface", () => {
     expect(runtime.prompts).toEqual([])
   })
 
+  test("Given a prepared team reservation When Git HEAD advances before create Then stale HEAD blocks without team mutation", async () => {
+    // Given: a reservation prepared against the active run and repository HEAD.
+    const root = await workflowRepository("team-stale-head")
+    const runtime = await publicWorkflowRuntime(root)
+    await runtime.invoke("ulw-loop(omp)", "create coordinate the stale fixture")
+    await mkdir(join(root, ".omo"), { recursive: true })
+    await writeFile(
+      join(root, ".omo", "team.json"),
+      JSON.stringify({
+        teamName: "alpha",
+        members: [
+          {
+            requestedName: "alpha-one",
+            agentType: "omp-lazy-worker-low",
+            focus: "stale slice",
+            ownership: ["src/one"],
+            deliverable: "stale result",
+            isolated: false,
+          },
+          {
+            requestedName: "alpha-two",
+            agentType: "omp-lazy-worker-low",
+            focus: "second stale slice",
+            ownership: ["src/two"],
+            deliverable: "second stale result",
+            isolated: false,
+          },
+        ],
+      }),
+    )
+    await runtime.invoke("teammode(omp)", "prepare alpha .omo/team.json")
+    expect(runtime.results[1]).toMatchObject({ operation: "prepare", status: "PASS" })
+    const reservationId = runtime.results[1]?.runId
+    if (reservationId === null || reservationId === undefined) {
+      throw new Error("reservation missing")
+    }
+    await advanceWorkflowHead(root)
+
+    // When: create consumes the prepared reservation after the repository HEAD changed.
+    await runtime.invoke("teammode(omp)", `create alpha ${reservationId}`)
+    await runtime.invoke("teammode(omp)", "status alpha")
+
+    // Then: create reports typed stale HEAD and status proves no team state was created.
+    expect(runtime.results[2]).toMatchObject({
+      operation: "create",
+      status: "BLOCKED",
+      code: "stale_head",
+    })
+    expect(runtime.results[3]).toMatchObject({
+      operation: "status",
+      status: "BLOCKED",
+      code: "missing_target",
+    })
+    expect(runtime.prompts).toEqual([])
+  })
+
   test("Given a contained team roster When prepared and created Then controls are coordinator-owned", async () => {
     // Given: an active parent run and a non-overlapping two-member roster.
     const root = await workflowRepository("team-lifecycle")
@@ -193,11 +250,14 @@ describe("typed workflow lifecycle public surface", () => {
       }),
     )
 
-    // When: trusted team commands prepare, consume, inspect, cancel, archive, and delete.
+    // When: trusted team commands prepare, consume, replay after HEAD advances, and control state.
     await runtime.invoke("teammode(omp)", "prepare alpha .omo/team.json")
     const reservationId = runtime.results[1]?.runId
     if (reservationId === null || reservationId === undefined)
       throw new Error("reservation missing")
+    await runtime.invoke("teammode(omp)", `create alpha ${reservationId}`)
+    const createdRunId = runtime.results[2]?.runId
+    await advanceWorkflowHead(root)
     await runtime.invoke("teammode(omp)", `create alpha ${reservationId}`)
     await runtime.invoke("teammode(omp)", "status alpha")
     await runtime.invoke("teammode(omp)", "cancel alpha")
@@ -208,12 +268,14 @@ describe("typed workflow lifecycle public surface", () => {
     expect(runtime.results.slice(1).map((result) => result.operation)).toEqual([
       "prepare",
       "create",
+      "create",
       "status",
       "cancel",
       "archive",
       "delete",
     ])
     expect(runtime.results.slice(1).every((result) => result.status === "PASS")).toBeTrue()
+    expect(runtime.results[3]?.runId).toBe(createdRunId)
     expect(runtime.prompts).toEqual([])
   })
 })
