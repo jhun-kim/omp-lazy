@@ -8,8 +8,8 @@ import {
   baselineReceiptSchema,
   baselineRows,
   digest,
-  readClosureBinding,
   readBaselineManifest,
+  readClosureBinding,
 } from "./baseline-contract"
 
 const adapterScript = `import { COMMAND_REGISTRATIONS } from "./src/commands/command-definitions.ts"
