@@ -231,3 +231,44 @@ export const stateEventSchema = z
       context.addIssue({ code: "custom", message: "event mutation mismatch" })
     }
   })
+
+export const stateEventV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    eventId: UuidSchema,
+    sequence: counter,
+    runId: UuidSchema,
+    workflow: z.enum(["start_work", "ulw_loop"]),
+    kind: z.enum([
+      "run_created",
+      "workflow_controlled",
+      "owner_adopted",
+      "plan_reconciled",
+      "continuation_attempted",
+      "continuation_stuck",
+      "goal_cycle_started",
+      "criterion_failure_recorded",
+    ]),
+    expected: z
+      .object({
+        indexRevision: counter,
+        runRevision: counter.nullable(),
+        ownerSessionId: nonempty.nullable(),
+        ownerEpoch: counter.nullable(),
+        expectedHead: nonempty.nullable(),
+        taskGeneration: counter.positive().nullable(),
+      })
+      .strict(),
+    mutation: mutationSchema,
+    legacyHeadUnbound: z.boolean(),
+    at: timestamp,
+  })
+  .strict()
+  .superRefine((event, context) => {
+    if (event.kind !== event.mutation.kind) {
+      context.addIssue({ code: "custom", message: "event mutation mismatch" })
+    }
+    if (event.legacyHeadUnbound && event.expected.expectedHead !== null) {
+      context.addIssue({ code: "custom", message: "legacy event cannot bind a head" })
+    }
+  })

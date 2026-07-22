@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { atomicCreate } from "./atomic-file"
 import { decodeStateEvent } from "./codec"
-import type { StateEvent } from "./domain"
+import type { PersistedStateEvent, StateEvent } from "./domain"
 import type { StatePathGuard } from "./paths"
 import type { Deadline } from "./repo-lock"
 
@@ -10,6 +10,17 @@ const EVENT_FILE = /^(\d{16})-([0-9a-f-]{36})\.json$/
 
 function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+function runtimeEvent(event: PersistedStateEvent): StateEvent {
+  if (event.schemaVersion === 1) return event
+  const {
+    expectedHead: _expectedHead,
+    taskGeneration: _taskGeneration,
+    ...expected
+  } = event.expected
+  const { legacyHeadUnbound: _legacyHeadUnbound, ...base } = event
+  return { ...base, schemaVersion: 1, expected }
 }
 
 export class EventStoreError extends Error {
@@ -74,10 +85,11 @@ export class EventStore {
       await this.guard?.(path)
       const decoded = decodeStateEvent(await readFile(path, "utf8"))
       if (!decoded.ok) throw new EventStoreError("malformed_event")
-      if (decoded.value.sequence !== Number(sequenceText) || decoded.value.eventId !== eventId) {
+      const event = runtimeEvent(decoded.value)
+      if (event.sequence !== Number(sequenceText) || event.eventId !== eventId) {
         throw new EventStoreError("event_filename_mismatch")
       }
-      events.push(decoded.value)
+      events.push(event)
     }
     events.sort((left, right) => left.sequence - right.sequence)
     for (const [index, event] of events.entries()) {

@@ -23,7 +23,7 @@ export type RecoveryInspection =
 export async function inspectRecovery(root: CanonicalRoot): Promise<RecoveryInspection> {
   try {
     const store = new TransactionStore(root)
-    const index = await store.readIndex()
+    const index = await store.readIndex(false)
     const events = await store.events.readAll()
     const highest = events.at(-1)?.sequence ?? 0
     if (highest === index.revision) return { kind: "healthy", revision: index.revision }
@@ -65,7 +65,7 @@ export async function repairState(
   if (handle === null) return { ok: false, code: "lock_timeout" }
   try {
     const store = new TransactionStore(root)
-    const index = await store.readIndex()
+    const index = await store.readIndex(false)
     const events = await store.events.readAll()
     const event = events.at(-1)
     if (event === undefined || event.sequence !== index.revision + 1) {
@@ -74,7 +74,7 @@ export async function repairState(
     if (event.expected.indexRevision !== index.revision) {
       return { ok: false, code: "index_revision_conflict" }
     }
-    const current = await store.readRun(event.runId)
+    const current = await store.readRun(event.runId, false)
     let run: AnyRun
     let runPublished = false
     if (current?.transactionRevision === event.sequence) {

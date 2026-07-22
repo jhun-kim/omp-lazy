@@ -1,6 +1,6 @@
 import { validateActiveIndex } from "./active-index"
-import { activeIndexSchema, runSchema, stateEventSchema } from "./codec-schemas"
-import type { ActiveIndex, AnyRun, CanonicalRoot, StateEvent } from "./domain"
+import { activeIndexSchema, runSchema, stateEventSchema, stateEventV2Schema } from "./codec-schemas"
+import type { ActiveIndex, AnyRun, CanonicalRoot, PersistedStateEvent } from "./domain"
 import { isCanonicalPathContained } from "./paths"
 
 type JsonRecord = Record<string, unknown> & {
@@ -43,17 +43,6 @@ function v1IndexView(value: unknown): unknown {
     : value
 }
 
-function v1EventView(value: unknown): unknown {
-  const input = record(value)
-  const expected = input === null ? null : record(input.expected)
-  if (input?.schemaVersion !== 2 || expected === null) return value
-  return {
-    ...without(input, ["legacyAuditOnly"]),
-    schemaVersion: 1,
-    expected: { ...without(expected, ["expectedHead", "taskGeneration"]) },
-  }
-}
-
 function parseJson(bytes: string): DecodeResult<unknown> {
   try {
     const value: unknown = JSON.parse(bytes)
@@ -94,10 +83,14 @@ export function decodeActiveIndex(bytes: string): DecodeResult<ActiveIndex> {
     : { ok: false, error: new StateDecodeError(invariant.code) }
 }
 
-export function decodeStateEvent(bytes: string): DecodeResult<StateEvent> {
+export function decodeStateEvent(bytes: string): DecodeResult<PersistedStateEvent> {
   const json = parseJson(bytes)
   if (!json.ok) return json
-  const parsed = stateEventSchema.safeParse(v1EventView(json.value))
+  const input = record(json.value)
+  const parsed =
+    input?.schemaVersion === 2
+      ? stateEventV2Schema.safeParse(json.value)
+      : stateEventSchema.safeParse(json.value)
   return parsed.success
     ? { ok: true, value: parsed.data }
     : { ok: false, error: new StateDecodeError("malformed_event") }

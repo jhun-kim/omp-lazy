@@ -158,6 +158,17 @@ export type StateEvent = {
   readonly at: string
 }
 
+export type StateEventV2 = Omit<StateEvent, "schemaVersion" | "expected"> & {
+  readonly schemaVersion: 2
+  readonly expected: StateEvent["expected"] & {
+    readonly expectedHead: string | null
+    readonly taskGeneration: number | null
+  }
+  readonly legacyHeadUnbound: boolean
+}
+
+export type PersistedStateEvent = StateEvent | StateEventV2
+
 export function newRunId(): Uuid {
   return UuidSchema.parse(crypto.randomUUID())
 }

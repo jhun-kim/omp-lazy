@@ -127,4 +127,47 @@ describe("start-work plan identity", () => {
     // Then
     expect(result).toEqual({ ok: false, code: "plan_identity_mismatch" })
   })
+
+  test("Given a v2 plan repeats a required heading When normalized Then strict identity rejects it", () => {
+    // Given
+    const plan = `<!-- omp-lazy-ulw-plan:plan:v2 -->
+## TL;DR (For humans)
+## Scope
+## Verification strategy
+## Execution strategy
+## Todos
+- [ ] **T05. State migration**
+## Final verification wave
+## Commit strategy
+## Scope
+## Success criteria
+`
+
+    // When
+    const result = normalizeStartWorkPlan(plan)
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "plan_identity_mismatch" })
+  })
+
+  test("Given a v2 plan task lacks an explicit identity When normalized Then strict identity rejects it", () => {
+    // Given
+    const plan = `<!-- omp-lazy-ulw-plan:plan:v2 -->
+## TL;DR (For humans)
+## Scope
+## Verification strategy
+## Execution strategy
+## Todos
+- [ ] Repair migration
+## Final verification wave
+## Commit strategy
+## Success criteria
+`
+
+    // When
+    const result = normalizeStartWorkPlan(plan)
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "plan_identity_mismatch" })
+  })
 })

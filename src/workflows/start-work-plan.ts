@@ -36,6 +36,7 @@ type ChecklistLine = {
   readonly id: string
   readonly checked: boolean
   readonly section: Section
+  readonly explicit: boolean
 }
 
 function legacyId(line: string): string {
@@ -44,6 +45,9 @@ function legacyId(line: string): string {
 }
 
 function v2HeadingsAreOrdered(lines: readonly string[]): boolean {
+  if (V2_HEADINGS.some((heading) => lines.filter((line) => line === heading).length !== 1)) {
+    return false
+  }
   let position = 0
   for (const line of lines) {
     if (line === V2_HEADINGS[position]) position += 1
@@ -79,7 +83,7 @@ function parseChecklist(
     const explicit = EXPLICIT_ID.exec(label.normalize("NFC"))
     const id =
       explicit?.[1] ?? (assignsLegacyIds ? legacyId(line) : label.trim().replace(/\s+/g, " "))
-    tasks.push({ id, checked: mark !== " ", section })
+    tasks.push({ id, checked: mark !== " ", section, explicit: explicit !== null })
   }
   return tasks
 }
@@ -92,6 +96,9 @@ export function normalizeStartWorkPlan(markdown: string): NormalizePlanResult {
     return { ok: false, code: "plan_identity_mismatch" }
   }
   const tasks = parseChecklist(lines, version, hasV1Marker)
+  if (version === 2 && tasks.some((task) => !task.explicit)) {
+    return { ok: false, code: "plan_identity_mismatch" }
+  }
   const identities = tasks.map((task) => ({ section: task.section, id: task.id }))
   if (new Set(tasks.map((task) => task.id)).size !== tasks.length) {
     return { ok: false, code: "duplicate_normalized_task_identity" }

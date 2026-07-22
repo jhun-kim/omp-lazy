@@ -30,6 +30,14 @@ function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
 }
 
+function record(
+  value: unknown,
+): (Record<string, unknown> & { readonly schemaVersion?: unknown }) | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : null
+}
+
 function sameFact(left: TaskFact, right: TaskFact): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
@@ -130,13 +138,13 @@ export class TaskSidecarStore {
   }
 
   async #resolveUnlocked(sessionId: string): Promise<TaskScopeResult> {
-    const index = await this.store.readIndex()
+    const index = await this.store.readIndex(false)
     const entries = index.entries.filter((entry) => entry.sessionId === sessionId)
     if (entries.length === 0) return { kind: "none" }
     if (entries.length !== 1) return { kind: "conflict" }
     const entry = entries[0]
     if (entry === undefined) return { kind: "conflict" }
-    const run = await this.store.readRun(entry.runId)
+    const run = await this.store.readRun(entry.runId, false)
     if (
       run === null ||
       run.revision !== entry.runRevision ||
@@ -168,7 +176,13 @@ export class TaskSidecarStore {
       }
       throw error
     }
-    return taskLedgerSchema.parse(JSON.parse(bytes))
+    const raw: unknown = JSON.parse(bytes)
+    const current = taskLedgerSchema.safeParse(raw)
+    if (current.success) return current.data
+    const migrated = record(raw)
+    if (migrated?.schemaVersion !== 2) return taskLedgerSchema.parse(raw)
+    const { packetHash: _packetHash, reservationId: _reservationId, tier: _tier, ...v1 } = migrated
+    return taskLedgerSchema.parse({ ...v1, schemaVersion: 1 })
   }
 
   #ledgerPath(runId: string): string {

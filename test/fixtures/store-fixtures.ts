@@ -29,6 +29,7 @@ export function startRun(root: CanonicalRoot): StartWorkRun {
 function eventFrom(value: unknown): StateEvent {
   const decoded = decodeStateEvent(JSON.stringify(value))
   if (!decoded.ok) throw decoded.error
+  if (decoded.value.schemaVersion !== 1) throw new Error("fixture event version mismatch")
   return decoded.value
 }
 

@@ -1,12 +1,15 @@
 import { z } from "zod"
 import {
   acceptanceEventSchema,
+  acceptanceEventV2Schema,
   acceptanceLedgerSchema,
+  acceptanceLedgerV2Schema,
   rejectionLedgerSchema,
+  rejectionLedgerV2Schema,
 } from "../contracts/worker-acceptance-ledger"
 import { taskLedgerSchema } from "../gates/task-ledger-codec"
 import { TeamNameSchema, TeamStateSchema } from "../workflows/teammode-domain"
-import { activeIndexSchema, runSchema, stateEventSchema } from "./codec-schemas"
+import { activeIndexSchema, runSchema, stateEventSchema, stateEventV2Schema } from "./codec-schemas"
 import { type TaskIdentity, taskIdentities } from "./migration-identities"
 
 const TombstoneSchema = z.strictObject({
@@ -20,10 +23,7 @@ type JsonRecord = Record<string, unknown> & {
   readonly entries?: unknown
   readonly expected?: unknown
   readonly status?: unknown
-}
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
+  readonly kind?: unknown
 }
 
 export type MigrationRecordResult =
@@ -55,16 +55,6 @@ function currentV2(value: JsonRecord, parser: z.ZodType): boolean {
   return parser.safeParse({ ...omit(value, ["schemaVersion"]), schemaVersion: 1 }).success
 }
 
-function currentLedger(
-  value: JsonRecord,
-  parser: z.ZodType,
-  entryFields: readonly string[],
-): boolean {
-  if (schemaVersion(value) !== 2 || !Array.isArray(value.entries)) return false
-  const entries = value.entries.map((entry) => (isRecord(entry) ? omit(entry, entryFields) : entry))
-  return parser.safeParse({ ...omit(value, ["schemaVersion"]), schemaVersion: 1, entries }).success
-}
-
 function identityFor(
   identities: readonly TaskIdentity[],
   agentId: string,
@@ -80,7 +70,7 @@ function migrateAcceptance(
   value: JsonRecord,
   identities: readonly TaskIdentity[],
 ): MigrationRecordResult {
-  if (currentLedger(value, acceptanceLedgerSchema, ["taskId", "role", "semanticAttempt"]))
+  if (acceptanceLedgerV2Schema.safeParse(value).success)
     return { kind: "current", bytes: JSON.stringify(value) }
   if (schemaVersion(value) !== 1) return { kind: "invalid" }
   const parsed = acceptanceLedgerSchema.safeParse(value)
@@ -99,7 +89,7 @@ function migrateRejections(
   value: JsonRecord,
   identities: readonly TaskIdentity[],
 ): MigrationRecordResult {
-  if (currentLedger(value, rejectionLedgerSchema, ["taskId", "role", "semanticAttempt"]))
+  if (rejectionLedgerV2Schema.safeParse(value).success)
     return { kind: "current", bytes: JSON.stringify(value) }
   if (schemaVersion(value) !== 1) return { kind: "invalid" }
   const parsed = rejectionLedgerSchema.safeParse(value)
@@ -121,8 +111,7 @@ function migrateWal(bytes: string, identities: readonly TaskIdentity[]): Migrati
   const migrated = entries.map((entry) => {
     if (entry === null) return null
     if (entry.schemaVersion === 2) {
-      const v1 = omit(entry, ["schemaVersion", "taskId", "role", "semanticAttempt"])
-      return acceptanceEventSchema.safeParse(v1).success ? entry : null
+      return acceptanceEventV2Schema.safeParse(entry).success ? entry : null
     }
     const parsed = acceptanceEventSchema.safeParse(entry)
     if (!parsed.success) return null
@@ -172,22 +161,27 @@ export function migrateLifecycleRecord(
     }
   }
   if (path.startsWith("events/")) {
-    const v2 = omit(value, ["legacyAuditOnly"])
-    if (schemaVersion(v2) === 2 && isRecord(v2.expected)) {
-      const expected = omit(v2.expected, ["expectedHead", "taskGeneration"])
-      if (currentV2({ ...v2, expected }, stateEventSchema)) return { kind: "current", bytes }
-    }
+    if (stateEventV2Schema.safeParse(value).success) return { kind: "current", bytes }
     if (!stateEventSchema.safeParse(value).success) return { kind: "invalid" }
     const expected = value.expected
     if (typeof expected !== "object" || expected === null || Array.isArray(expected))
       return { kind: "invalid" }
+    const taskScoped =
+      value.kind === "plan_reconciled" ||
+      value.kind === "goal_cycle_started" ||
+      value.kind === "criterion_failure_recorded"
+    if (taskScoped && identities.length !== 1) return { kind: "invalid" }
     return {
       kind: "migrated",
       bytes: JSON.stringify({
         ...value,
         schemaVersion: 2,
-        expected: { ...expected, expectedHead: null, taskGeneration: null },
-        legacyAuditOnly: true,
+        expected: {
+          ...expected,
+          expectedHead: null,
+          taskGeneration: taskScoped ? 1 : null,
+        },
+        legacyHeadUnbound: true,
       }),
     }
   }
@@ -257,6 +251,11 @@ export function identitiesFromTaskFacts(
 }
 
 export function isFutureLifecycleRecord(bytes: string): boolean {
-  const value = parseRecord(bytes)
-  return value !== null && typeof value.schemaVersion === "number" && value.schemaVersion > 2
+  return bytes
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .some((line) => {
+      const value = parseRecord(line)
+      return value !== null && typeof value.schemaVersion === "number" && value.schemaVersion > 2
+    })
 }

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { migrateLifecycleState, recoverLifecycleMigration } from "../../src/state/migration"
+import { migrateLifecycleRecord } from "../../src/state/migration-records"
 import { runSnapshotPath, statePaths } from "../../src/state/paths"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 import "./state-migration-durable.test"
@@ -112,7 +113,7 @@ describe("durable lifecycle migration", () => {
       expect(failed).toEqual({ ok: false, code: "migration_interrupted" })
       expect(recovered).toEqual(
         boundary === "prepared"
-          ? { ok: false, code: "migration_recovery_required" }
+          ? { ok: true, status: "restored" }
           : boundary === "commit_marker" || boundary === "committed"
             ? { ok: true, status: "finalized" }
             : { ok: true, status: "restored" },
@@ -121,6 +122,27 @@ describe("durable lifecycle migration", () => {
         schemaVersion: boundary === "commit_marker" || boundary === "committed" ? 2 : 1,
       })
     }
+  })
+
+  test("Given a prepared journal without backups When recovery runs Then it safely clears the unpublished migration", async () => {
+    // Given
+    const root = await migrationRoot("migration-prepared-without-backup")
+    await initializedStore(root)
+    await migrateLifecycleState({
+      root,
+      crash: (boundary) => {
+        if (boundary === "prepared") throw new Error("injected crash")
+      },
+    })
+
+    // When
+    const recovered = await recoverLifecycleMigration(root)
+
+    // Then
+    expect(recovered).toEqual({ ok: true, status: "restored" })
+    expect(JSON.parse(await readFile(statePaths(root).activeIndex, "utf8"))).toMatchObject({
+      schemaVersion: 1,
+    })
   })
 
   test("Given a future persisted version When preflight runs Then it rejects without mutation", async () => {
@@ -140,6 +162,27 @@ describe("durable lifecycle migration", () => {
     expect(result).toEqual({ ok: false, code: "unknown_schema_version" })
   })
 
+  test("Given a multiline WAL containing a future schema When migration preflight runs Then it rejects before mutation", async () => {
+    // Given
+    const root = await migrationRoot("migration-future-wal")
+    const state = await initializedStore(root)
+    const wal = join(statePaths(root).root, "worker-acceptance", `${state.run.runId}.wal.jsonl`)
+    await mkdir(dirname(wal), { recursive: true })
+    await writeFile(
+      wal,
+      `${JSON.stringify({ schemaVersion: 1 })}\n${JSON.stringify({ schemaVersion: 3 })}\n`,
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "unknown_schema_version" })
+    expect(JSON.parse(await readFile(statePaths(root).activeIndex, "utf8"))).toMatchObject({
+      schemaVersion: 1,
+    })
+  })
+
   test("Given a damaged v1 backup When recovery runs Then it refuses partial restoration", async () => {
     // Given
     const root = await migrationRoot("migration-damaged-backup")
@@ -157,5 +200,86 @@ describe("durable lifecycle migration", () => {
 
     // Then
     expect(result).toEqual({ ok: false, code: "migration_recovery_required" })
+  })
+
+  test("Given a production state reader sees legacy bytes When it opens state Then locked preflight migrates before exposing it", async () => {
+    // Given
+    const root = await migrationRoot("migration-production-preflight")
+    const { store } = await initializedStore(root)
+
+    // When
+    const index = await store.readIndex()
+
+    // Then
+    expect(index.revision).toBe(1)
+    expect(JSON.parse(await readFile(statePaths(root).activeIndex, "utf8"))).toMatchObject({
+      schemaVersion: 2,
+    })
+  })
+
+  test("Given a uniquely mapped legacy task event When migrated Then it binds generation one without a head", () => {
+    // Given
+    const bytes = JSON.stringify({
+      schemaVersion: 1,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "ulw_loop",
+      kind: "criterion_failure_recorded",
+      expected: { indexRevision: 1, runRevision: 1, ownerSessionId: "session-a", ownerEpoch: 1 },
+      mutation: {
+        kind: "criterion_failure_recorded",
+        goalId: "goal-a",
+        criterionId: "criterion-a",
+        fingerprint: "failure-a",
+      },
+      at: "2026-07-13T00:02:00.000Z",
+    })
+
+    // When
+    const result = migrateLifecycleRecord(
+      "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
+      bytes,
+      [{ taskId: "TASK-ALPHA", role: "omp-lazy-worker-medium", agentId: "worker-a" }],
+    )
+
+    // Then
+    expect(result).toMatchObject({ kind: "migrated" })
+    if (result.kind === "migrated") {
+      expect(JSON.parse(result.bytes)).toMatchObject({
+        legacyHeadUnbound: true,
+        expected: { expectedHead: null, taskGeneration: 1 },
+      })
+    }
+  })
+
+  test("Given an ambiguously mapped legacy task event When migrated Then conversion blocks", () => {
+    // Given
+    const bytes = JSON.stringify({
+      schemaVersion: 1,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "ulw_loop",
+      kind: "criterion_failure_recorded",
+      expected: { indexRevision: 1, runRevision: 1, ownerSessionId: "session-a", ownerEpoch: 1 },
+      mutation: {
+        kind: "criterion_failure_recorded",
+        goalId: "goal-a",
+        criterionId: "criterion-a",
+        fingerprint: "failure-a",
+      },
+      at: "2026-07-13T00:02:00.000Z",
+    })
+
+    // When
+    const result = migrateLifecycleRecord(
+      "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
+      bytes,
+      [],
+    )
+
+    // Then
+    expect(result).toEqual({ kind: "invalid" })
   })
 })

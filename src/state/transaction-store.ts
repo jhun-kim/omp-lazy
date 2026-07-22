@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises"
 import { atomicReplace } from "./atomic-file"
-import { decodeActiveIndex, decodeRun } from "./codec"
+import { decodeActiveIndex, decodeRun, StateDecodeError } from "./codec"
 import type { ActiveIndex, AnyRun, CanonicalRoot, StateEvent } from "./domain"
 import { UuidSchema } from "./domain"
 import { EventStore } from "./event-store"
+import { migrateLifecycleState, recoverLifecycleMigration } from "./migration"
 import {
   ensureStatePathContained,
   runSnapshotPath,
@@ -72,11 +73,11 @@ export class TransactionStore {
         : { ok: false, code: "deadline_expired" }
     }
     try {
-      const index = await this.readIndex()
+      const index = await this.readIndex(false)
       const events = await this.events.readAll()
       const highest = events.at(-1)?.sequence ?? 0
       if (highest !== index.revision) return { ok: false, code: "state_diverged" }
-      const current = await this.readRun(event.runId)
+      const current = await this.readRun(event.runId, false)
       const prepared = prepareTransition(index, current, event)
       if ("code" in prepared) return { ok: false, code: prepared.code }
       options.crash?.("before_event")
@@ -105,7 +106,40 @@ export class TransactionStore {
     }
   }
 
-  async readIndex(): Promise<ActiveIndex> {
+  async preflightLifecycle(): Promise<void> {
+    let bytes: string
+    try {
+      bytes = await readFile(this.paths.activeIndex, "utf8")
+    } catch (error) {
+      if (isMissing(error)) return
+      throw error
+    }
+    let value: unknown
+    try {
+      value = JSON.parse(bytes)
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new StateDecodeError("malformed_index")
+      throw error
+    }
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      "schemaVersion" in value &&
+      value.schemaVersion === 2
+    ) {
+      return
+    }
+    const migrated = await migrateLifecycleState({ root: this.root })
+    if (migrated.ok) return
+    const recovered = await recoverLifecycleMigration(this.root)
+    if (!recovered.ok) throw new StateDecodeError(recovered.code)
+    const retried = await migrateLifecycleState({ root: this.root })
+    if (!retried.ok) throw new StateDecodeError(retried.code)
+  }
+
+  async readIndex(preflight = true): Promise<ActiveIndex> {
+    if (preflight) await this.preflightLifecycle()
     await ensureStatePathContained(this.root, this.paths.activeIndex)
     let bytes: string
     try {
@@ -119,7 +153,8 @@ export class TransactionStore {
     return decoded.value
   }
 
-  async readRun(runId: string): Promise<AnyRun | null> {
+  async readRun(runId: string, preflight = true): Promise<AnyRun | null> {
+    if (preflight) await this.preflightLifecycle()
     const parsedId = UuidSchema.safeParse(runId)
     if (!parsedId.success) return null
     await ensureStatePathContained(this.root, runSnapshotPath(this.root, parsedId.data))

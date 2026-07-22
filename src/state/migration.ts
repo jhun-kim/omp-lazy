@@ -269,7 +269,9 @@ export async function recoverLifecycleMigration(root: CanonicalRoot): Promise<Re
     const journal = await readJournal(root)
     if (journal === "absent") return { ok: true, status: "not_needed" }
     if (journal === "invalid") return { ok: false, code: "migration_recovery_required" }
-    if (journal.phase === "backing_up") return discardUnpublishedJournal(root, journal)
+    if (journal.phase === "prepared" || journal.phase === "backing_up") {
+      return discardUnpublishedJournal(root, journal)
+    }
     if (journal.phase === "committed") return finalize(root, journal, deadline)
     return await finalize(root, journal, deadline)
   } finally {
@@ -372,7 +374,11 @@ export async function migrateLifecycleState(request: {
     await writeJournal(request.root, publishing, deadline)
     crash(request.crash, "publishing")
     for (const item of ordered(targets)) {
-      await atomicReplace(join(state.root, item.path), item.bytes, {
+      const staged = join(paths.staged, item.path)
+      if (!(await verified(staged, hash(item.bytes)))) {
+        return { ok: false, code: "migration_recovery_required" }
+      }
+      await atomicReplace(join(state.root, item.path), await readFile(staged, "utf8"), {
         deadline,
         guard: (path) => ensureStatePathContained(request.root, path),
       })

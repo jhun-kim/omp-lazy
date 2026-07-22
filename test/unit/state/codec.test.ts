@@ -163,7 +163,7 @@ describe("strict state codec", () => {
     expect(result).toMatchObject({ ok: false, error: { code: "malformed_event" } })
   })
 
-  test("Given strict migrated v2 envelopes When decoded Then state readers retain their v1 internal view", () => {
+  test("Given strict migrated v2 envelopes When decoded Then state readers preserve the v2 event envelope", () => {
     // Given
     const run = JSON.parse(validStartWorkJson())
     run.schemaVersion = 2
@@ -191,7 +191,7 @@ describe("strict state codec", () => {
         taskGeneration: null,
       },
       mutation: { kind: "workflow_controlled", control: "pause" },
-      legacyAuditOnly: true,
+      legacyHeadUnbound: true,
       at: "2026-07-13T00:02:00.000Z",
     }
 
@@ -203,6 +203,66 @@ describe("strict state codec", () => {
     // Then
     expect(decodedRun).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
     expect(decodedIndex).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
-    expect(decodedEvent).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
+    expect(decodedEvent).toMatchObject({ ok: true, value: { schemaVersion: 2 } })
+  })
+
+  test("Given a v2 event envelope When decoded Then its exact v2 schema and concurrency fields are preserved", () => {
+    // Given
+    const event = {
+      schemaVersion: 2,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "start_work",
+      kind: "workflow_controlled",
+      expected: {
+        indexRevision: 1,
+        runRevision: 1,
+        ownerSessionId: "session-a",
+        ownerEpoch: 2,
+        expectedHead: null,
+        taskGeneration: null,
+      },
+      mutation: { kind: "workflow_controlled", control: "pause" },
+      legacyHeadUnbound: true,
+      at: "2026-07-13T00:02:00.000Z",
+    }
+
+    // When
+    const result = decodeStateEvent(JSON.stringify(event))
+
+    // Then
+    expect(result).toMatchObject({
+      ok: true,
+      value: { schemaVersion: 2, expected: { ownerEpoch: 2, taskGeneration: null } },
+    })
+  })
+
+  test("Given a v2 event omits its required head constraint When decoded Then strict parsing rejects it", () => {
+    // Given
+    const event = {
+      schemaVersion: 2,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "start_work",
+      kind: "workflow_controlled",
+      expected: {
+        indexRevision: 1,
+        runRevision: 1,
+        ownerSessionId: "session-a",
+        ownerEpoch: 2,
+        taskGeneration: null,
+      },
+      mutation: { kind: "workflow_controlled", control: "pause" },
+      legacyHeadUnbound: true,
+      at: "2026-07-13T00:02:00.000Z",
+    }
+
+    // When
+    const result = decodeStateEvent(JSON.stringify(event))
+
+    // Then
+    expect(result).toMatchObject({ ok: false, error: { code: "malformed_event" } })
   })
 })
