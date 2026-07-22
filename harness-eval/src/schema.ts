@@ -210,9 +210,12 @@ const scenarioRowSchema = z
 export const manifestSchema = z
   .object({
     actorMappings: z.array(actorRouteMappingSchema).length(ACTOR_IDS.length).readonly(),
+    baselineTargetCommit: commitSchema,
+    baselineTargetTree: commitSchema,
     hostExecutableSha256: sha256Schema,
     hostVersion: z.literal("17.0.5"),
     manifestId: z.literal("harness-eval-v1"),
+    liveProfileInputSchemaSha256: sha256Schema,
     modelConfigHash: sha256Schema,
     priceCatalog: z.array(priceRecordSchema).length(PROFILE_IDS.length).readonly(),
     scenarios: z.array(scenarioRowSchema).length(SCENARIO_IDS.length).readonly(),

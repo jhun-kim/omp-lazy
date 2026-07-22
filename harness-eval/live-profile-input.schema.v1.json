@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "profiles": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "effectiveDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "inputNanos": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "modelId": {
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+            "type": "string"
+          },
+          "modelRevision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "outputNanos": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "profileId": {
+            "enum": [
+              "legacy-low",
+              "candidate-high",
+              "candidate-low"
+            ],
+            "type": "string"
+          },
+          "retrievalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "sourceSha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "format": "uri",
+            "pattern": "^https://",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profileId",
+          "modelId",
+          "modelRevision",
+          "inputNanos",
+          "outputNanos",
+          "sourceUrl",
+          "sourceSha256",
+          "retrievalDate",
+          "effectiveDate"
+        ],
+        "type": "object"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "profiles"
+  ],
+  "type": "object"
+}

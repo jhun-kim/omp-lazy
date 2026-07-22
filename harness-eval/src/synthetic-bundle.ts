@@ -119,9 +119,12 @@ function buildBundle(): HarnessBundle {
       candidateLowRoute: `/actor/${actorId}`,
       legacyLowRoute: `/actor/${actorId}`,
     })),
+    baselineTargetCommit: commit,
+    baselineTargetTree: targetSourceHash,
     hostExecutableSha256: hash("4"),
     hostVersion: "17.0.5",
     manifestId: "harness-eval-v1",
+    liveProfileInputSchemaSha256: hash("7"),
     modelConfigHash,
     priceCatalog: PROFILE_IDS.map((profileId, index) => ({
       currency: "USD",

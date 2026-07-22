@@ -104,3 +104,4 @@ test/contract/evidence-manifest-review.test.ts text eol=lf
 test/contract/readme-contract.test.ts text eol=lf
 test/contract/release-gates.test.ts text eol=lf
 test/contract/release-workflow.test.ts text eol=lf
+harness-eval/** text eol=lf

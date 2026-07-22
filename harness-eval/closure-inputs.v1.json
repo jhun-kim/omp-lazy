@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "path": "package.json",
+      "sha256": "ea76750efde3333b2b14b8a478e8ed22f80919bb30f00f46dd86c4984a3c41bc"
+    },
+    {
+      "path": "bun.lock",
+      "sha256": "6c61a9b7fa4ee7818a1ed40960a99a97b3356f738c16307a3b8bd4dff880f361"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "14382186aa5f575918d4ff1f2b78ca1bcad065bb9db287b5f627b307e1f356b1"
+    },
+    {
+      "path": "biome.json",
+      "sha256": "ef60bb65558415c84540e10f77ea628dea932ff0b620932f75da41cf7fe9229c"
+    }
+  ]
+}

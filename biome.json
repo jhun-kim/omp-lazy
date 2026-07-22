@@ -7,7 +7,7 @@
     "defaultBranch": "main"
   },
   "files": {
-    "includes": ["**", "!node_modules", "!.git"]
+    "includes": ["**", "!node_modules", "!.git", "!harness-eval/fixtures"]
   },
   "formatter": {
     "enabled": true,

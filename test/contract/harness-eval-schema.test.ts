@@ -346,7 +346,7 @@ describe("harness evaluator CLI", () => {
     expect(JSON.parse(stdout)).toEqual({ code: "malformed_cli", status: "FAIL" })
   })
 
-  it("accepts frozen run grammar before reporting an unavailable T02 corpus", async () => {
+  it("accepts frozen run grammar before reporting a corpus without an execution target", async () => {
     // Given
     const child = Bun.spawn(
       [
@@ -370,7 +370,7 @@ describe("harness evaluator CLI", () => {
 
     // Then
     expect(exitCode).toBe(2)
-    expect(JSON.parse(stdout)).toEqual({ code: "manifest_unavailable", status: "BLOCKED" })
+    expect(JSON.parse(stdout)).toEqual({ code: "corpus_unavailable", status: "BLOCKED" })
   })
 
   it("rejects invalid comma selectors and verify target commits before manifest lookup", async () => {

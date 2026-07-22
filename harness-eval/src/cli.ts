@@ -1,5 +1,7 @@
 import { access, readFile } from "node:fs/promises"
 import { SCENARIO_IDS } from "./constants"
+import { validateDeterministicCorpus } from "./corpus"
+import { readLiveProfileInput } from "./live-profile"
 import { writeSyntheticHarnessBundle } from "./synthetic-bundle"
 import { verifyHarnessBundle } from "./verifier"
 
@@ -18,7 +20,7 @@ function parseFlags(argv: readonly string[]): Flags | undefined {
     const flag = argv[index]
     if (flag === undefined || !flag.startsWith("--") || flag.includes("=")) return undefined
     if (flags.has(flag)) return undefined
-    if (flag === "--all") {
+    if (flag === "--all" || flag === "--validate-corpus") {
       flags.set(flag, true)
       continue
     }
@@ -75,7 +77,17 @@ async function verifyBundle(path: string): Promise<CliReceipt> {
 async function run(flags: Flags): Promise<CliReceipt> {
   const mode = value(flags, "--mode")
   const manifest = value(flags, "--manifest")
+  const syntheticTarget = value(flags, "--synthetic-target")
   const targetCommit = value(flags, "--target-commit")
+  if (
+    flags.has("--validate-corpus") &&
+    mode === "deterministic" &&
+    manifest !== undefined &&
+    syntheticTarget !== undefined &&
+    hasExactKeys(flags, ["--mode", "--manifest", "--validate-corpus", "--synthetic-target"])
+  ) {
+    return validateDeterministicCorpus(manifest, syntheticTarget)
+  }
   if (
     !hasExactKeys(flags, [
       "--mode",
@@ -87,6 +99,8 @@ async function run(flags: Flags): Promise<CliReceipt> {
       "--profiles",
       "--credential-ref",
       "--target-root",
+      "--validate-corpus",
+      "--synthetic-target",
     ]) ||
     mode === undefined ||
     !modes.has(mode) ||
@@ -105,6 +119,10 @@ async function run(flags: Flags): Promise<CliReceipt> {
   }
   if (mode !== "live" && (flags.has("--profiles") || flags.has("--credential-ref")))
     return { code: "malformed_cli", status: "FAIL" }
+  if (mode === "live") {
+    const liveProfile = await readLiveProfileInput(".omo/inputs/harness-live-profile.v1.json")
+    if (liveProfile.status === "BLOCKED") return liveProfile
+  }
   return unavailableManifest(manifest)
 }
 

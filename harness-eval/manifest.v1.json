@@ -1,0 +1,2303 @@
+{
+  "actorMappings": [
+    {
+      "actorId": "parent",
+      "candidateHighRoute": "/actor/parent",
+      "candidateLowRoute": "/actor/parent",
+      "legacyLowRoute": "/actor/parent"
+    },
+    {
+      "actorId": "worker-low",
+      "candidateHighRoute": "/actor/worker-low",
+      "candidateLowRoute": "/actor/worker-low",
+      "legacyLowRoute": "/actor/worker-low"
+    },
+    {
+      "actorId": "worker-medium",
+      "candidateHighRoute": "/actor/worker-medium",
+      "candidateLowRoute": "/actor/worker-medium",
+      "legacyLowRoute": "/actor/worker-medium"
+    },
+    {
+      "actorId": "worker-high",
+      "candidateHighRoute": "/actor/worker-high",
+      "candidateLowRoute": "/actor/worker-high",
+      "legacyLowRoute": "/actor/worker-high"
+    },
+    {
+      "actorId": "planner",
+      "candidateHighRoute": "/actor/planner",
+      "candidateLowRoute": "/actor/planner",
+      "legacyLowRoute": "/actor/planner"
+    },
+    {
+      "actorId": "metis",
+      "candidateHighRoute": "/actor/metis",
+      "candidateLowRoute": "/actor/metis",
+      "legacyLowRoute": "/actor/metis"
+    },
+    {
+      "actorId": "momus",
+      "candidateHighRoute": "/actor/momus",
+      "candidateLowRoute": "/actor/momus",
+      "legacyLowRoute": "/actor/momus"
+    },
+    {
+      "actorId": "explorer",
+      "candidateHighRoute": "/actor/explorer",
+      "candidateLowRoute": "/actor/explorer",
+      "legacyLowRoute": "/actor/explorer"
+    },
+    {
+      "actorId": "librarian",
+      "candidateHighRoute": "/actor/librarian",
+      "candidateLowRoute": "/actor/librarian",
+      "legacyLowRoute": "/actor/librarian"
+    },
+    {
+      "actorId": "researcher",
+      "candidateHighRoute": "/actor/researcher",
+      "candidateLowRoute": "/actor/researcher",
+      "legacyLowRoute": "/actor/researcher"
+    },
+    {
+      "actorId": "reviewer",
+      "candidateHighRoute": "/actor/reviewer",
+      "candidateLowRoute": "/actor/reviewer",
+      "legacyLowRoute": "/actor/reviewer"
+    },
+    {
+      "actorId": "qa",
+      "candidateHighRoute": "/actor/qa",
+      "candidateLowRoute": "/actor/qa",
+      "legacyLowRoute": "/actor/qa"
+    },
+    {
+      "actorId": "critic",
+      "candidateHighRoute": "/actor/critic",
+      "candidateLowRoute": "/actor/critic",
+      "legacyLowRoute": "/actor/critic"
+    },
+    {
+      "actorId": "evaluator",
+      "candidateHighRoute": "/actor/evaluator",
+      "candidateLowRoute": "/actor/evaluator",
+      "legacyLowRoute": "/actor/evaluator"
+    },
+    {
+      "actorId": "quality-security",
+      "candidateHighRoute": "/actor/quality-security",
+      "candidateLowRoute": "/actor/quality-security",
+      "legacyLowRoute": "/actor/quality-security"
+    },
+    {
+      "actorId": "oracle",
+      "candidateHighRoute": "/actor/oracle",
+      "candidateLowRoute": "/actor/oracle",
+      "legacyLowRoute": "/actor/oracle"
+    }
+  ],
+  "baselineTargetCommit": "14b3f36d6fb3ee378b19f4296d4d5a82b0661fbd",
+  "baselineTargetTree": "6f73e2d3c3e1e10e4b7ce04b596ada1c221dbffb",
+  "hostExecutableSha256": "f2e7977391db4ecf0e9da70d436087ad54677248d7d272820a53a8d1805e11c9",
+  "hostVersion": "17.0.5",
+  "liveProfileInputSchemaSha256": "52044c7b1b0304545d510322557764eb0531be4854c4549ae6f439412c0a7b76",
+  "manifestId": "harness-eval-v1",
+  "modelConfigHash": "9d4a3824c0eb459e2f0d3591fb37eb3846c4f09a8ba00bcc95d861735bccbb0f",
+  "priceCatalog": [
+    {
+      "currency": "USD",
+      "effectiveDate": "2026-07-21",
+      "inputNanos": 1,
+      "modelId": "fixture-legacy-low",
+      "modelRevision": "f4075982079706cc1c6e6687fbcbfbb7c79f483ce9db709b2558129c3944f9a6",
+      "outputNanos": 2,
+      "perTokenUnit": "token",
+      "retrievalDate": "2026-07-21",
+      "sourceSha256": "1601217df762c22104ff31f3ed38500a141a253a05cb1866dd76201b62ca6ed8",
+      "sourceUrl": "https://example.invalid/harness/legacy-low"
+    },
+    {
+      "currency": "USD",
+      "effectiveDate": "2026-07-21",
+      "inputNanos": 2,
+      "modelId": "fixture-candidate-high",
+      "modelRevision": "5ad82fe555cf7b83a4a35c207a7b013448aacf57c458c2e896acfe5aeb12db28",
+      "outputNanos": 3,
+      "perTokenUnit": "token",
+      "retrievalDate": "2026-07-21",
+      "sourceSha256": "84fddb2dbd5a74fb718b2db1cc704fa2ea1367fc86ede7edb3e0e7dbf5e163d8",
+      "sourceUrl": "https://example.invalid/harness/candidate-high"
+    },
+    {
+      "currency": "USD",
+      "effectiveDate": "2026-07-21",
+      "inputNanos": 3,
+      "modelId": "fixture-candidate-low",
+      "modelRevision": "16fcb079a50e68eee6fc881d8ad17c10996ae4e863a7aa58a3185e567a56e595",
+      "outputNanos": 4,
+      "perTokenUnit": "token",
+      "retrievalDate": "2026-07-21",
+      "sourceSha256": "ced8240c9fa1856b13afd27a710d2031c40ecc28888e9e55eeb5f1a912f25a1a",
+      "sourceUrl": "https://example.invalid/harness/candidate-low"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "plan.clear",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "eeadd027d8262eacfbb40526770c2be26806b739330a842a5c1d0fb507b56ba7"
+      },
+      "steps": [
+        {
+          "command": "/ulw-plan(omp)",
+          "args": [
+            "--",
+            "fixture-plan-clear"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "plan-written"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "plan-output"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 1,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "planner",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 3,
+      "retrieval": {
+        "maxCalls": 4,
+        "maxBytes": 16384
+      },
+      "predicates": [
+        {
+          "id": "plan.clear.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "plan.clear.oracle.v1"
+        },
+        {
+          "id": "plan.clear.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "plan.clear.oracle.v1"
+        },
+        {
+          "id": "plan.clear.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "plan.clear.oracle.v1"
+        },
+        {
+          "id": "plan.clear.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "plan.clear.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "plan.clear.result",
+        "plan.clear.calls",
+        "plan.clear.cleanup"
+      ]
+    },
+    {
+      "id": "plan.owner-decision",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "owner-decision",
+          "decisionId": "fixture-owner-decision"
+        },
+        "expectedTreeHash": "3d5606f06ba47eff0076f833b0a759e5175d318d547c10ddc00f27b99bd33616"
+      },
+      "steps": [
+        {
+          "command": "/ulw-plan(omp)",
+          "args": [
+            "--",
+            "fixture-plan-owner-decision"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "owner-decision-required"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "plan-output"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 1,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "planner",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 3,
+      "retrieval": {
+        "maxCalls": 4,
+        "maxBytes": 16384
+      },
+      "predicates": [
+        {
+          "id": "plan.owner-decision.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "plan.owner-decision.oracle.v1"
+        },
+        {
+          "id": "plan.owner-decision.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "plan.owner-decision.oracle.v1"
+        },
+        {
+          "id": "plan.owner-decision.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "plan.owner-decision.oracle.v1"
+        },
+        {
+          "id": "plan.owner-decision.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "plan.owner-decision.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "plan.owner-decision.result",
+        "plan.owner-decision.calls",
+        "plan.owner-decision.cleanup"
+      ]
+    },
+    {
+      "id": "start-work.complete",
+      "fixture": {
+        "templateId": "approved-plan-v2",
+        "parameters": {
+          "kind": "criterion-count",
+          "count": 2
+        },
+        "expectedTreeHash": "6b36955ae3d37477089db6b7623939cf312074f29b0c172ff62932e1e4bba955"
+      },
+      "steps": [
+        {
+          "command": "/start-work(omp)",
+          "args": [
+            "start",
+            ".omo/plans/fixture.md"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "task-accepted"
+        },
+        {
+          "eventKind": "task-accepted"
+        },
+        {
+          "eventKind": "run-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "run-created",
+          "task-issued",
+          "task-started",
+          "evidence-submitted",
+          "task-accepted",
+          "criterion-passed",
+          "run-completed"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-medium",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 6,
+      "retrieval": {
+        "maxCalls": 10,
+        "maxBytes": 65536
+      },
+      "predicates": [
+        {
+          "id": "start-work.complete.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "start-work.complete.oracle.v1"
+        },
+        {
+          "id": "start-work.complete.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "start-work.complete.oracle.v1"
+        },
+        {
+          "id": "start-work.complete.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "start-work.complete.oracle.v1"
+        },
+        {
+          "id": "start-work.complete.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "start-work.complete.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "start-work.complete.result",
+        "start-work.complete.calls",
+        "start-work.complete.cleanup"
+      ]
+    },
+    {
+      "id": "start-work.stale-plan",
+      "fixture": {
+        "templateId": "approved-plan-v2",
+        "parameters": {
+          "kind": "plan-fingerprint",
+          "value": "changed"
+        },
+        "expectedTreeHash": "d2416c5947a314af1efa0151b35b38abdfe626e3305fe6ec7373162c26a9fcfc"
+      },
+      "steps": [
+        {
+          "command": "/start-work(omp)",
+          "args": [
+            "start",
+            ".omo/plans/fixture.md"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "refusalCode": "plan_identity_mismatch"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "start-work.stale-plan.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "start-work.stale-plan.oracle.v1"
+        },
+        {
+          "id": "start-work.stale-plan.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "start-work.stale-plan.oracle.v1"
+        },
+        {
+          "id": "start-work.stale-plan.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "start-work.stale-plan.oracle.v1"
+        },
+        {
+          "id": "start-work.stale-plan.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "start-work.stale-plan.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "start-work.stale-plan.result",
+        "start-work.stale-plan.calls",
+        "start-work.stale-plan.cleanup"
+      ]
+    },
+    {
+      "id": "ulw-loop.complete",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "criterion-count",
+          "count": 2
+        },
+        "expectedTreeHash": "4717041e329819cf40400c134c0ed4f8ff930799586e97d3d816c595053bdf62"
+      },
+      "steps": [
+        {
+          "command": "/ulw-loop(omp)",
+          "args": [
+            "create",
+            "fixture-objective"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "/ulw-loop(omp)",
+          "args": [
+            "checkpoint",
+            "$run",
+            "criterion-1",
+            ".omo/evidence/fixture/criterion-1"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "/ulw-loop(omp)",
+          "args": [
+            "checkpoint",
+            "$run",
+            "criterion-2",
+            ".omo/evidence/fixture/criterion-2"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "criterion-passed"
+        },
+        {
+          "eventKind": "criterion-passed"
+        },
+        {
+          "eventKind": "run-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "run-created",
+          "task-issued",
+          "task-started",
+          "evidence-submitted",
+          "task-accepted",
+          "criterion-passed",
+          "run-completed"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-medium",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 6,
+      "retrieval": {
+        "maxCalls": 10,
+        "maxBytes": 65536
+      },
+      "predicates": [
+        {
+          "id": "ulw-loop.complete.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "ulw-loop.complete.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.complete.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "ulw-loop.complete.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.complete.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ulw-loop.complete.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.complete.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ulw-loop.complete.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "ulw-loop.complete.result",
+        "ulw-loop.complete.calls",
+        "ulw-loop.complete.cleanup"
+      ]
+    },
+    {
+      "id": "ulw-loop.repeat-failure",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "failure-fingerprint",
+          "value": "semantic_mismatch"
+        },
+        "expectedTreeHash": "fad4cdf280a23cee4f15042d487c61ba7c1aeb59f3363df437ab9437a0046a9e"
+      },
+      "steps": [
+        {
+          "command": "/ulw-loop(omp)",
+          "args": [
+            "create",
+            "fixture-objective"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "$run",
+            "semantic_mismatch"
+          ],
+          "source": "session-stop"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "$run",
+            "semantic_mismatch"
+          ],
+          "source": "session-stop"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "task-rejected"
+        },
+        {
+          "eventKind": "task-rejected"
+        },
+        {
+          "eventKind": "run-stuck"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "run-created",
+          "task-rejected",
+          "task-escalated",
+          "continuation",
+          "run-stuck"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-medium",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 6,
+      "retrieval": {
+        "maxCalls": 10,
+        "maxBytes": 65536
+      },
+      "predicates": [
+        {
+          "id": "ulw-loop.repeat-failure.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "ulw-loop.repeat-failure.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.repeat-failure.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "ulw-loop.repeat-failure.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.repeat-failure.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ulw-loop.repeat-failure.oracle.v1"
+        },
+        {
+          "id": "ulw-loop.repeat-failure.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ulw-loop.repeat-failure.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "ulw-loop.repeat-failure.result",
+        "ulw-loop.repeat-failure.calls",
+        "ulw-loop.repeat-failure.cleanup"
+      ]
+    },
+    {
+      "id": "ultrawork.fast",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "2ef27a3fb5a3cb912267fea04ef7903f0d603c3445f394c78ef35ceb2e9a1f35"
+      },
+      "steps": [
+        {
+          "command": "/ultrawork(omp)",
+          "args": [
+            "auto",
+            "--",
+            "fixture-task-fast"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "task-dispatched"
+        },
+        {
+          "eventKind": "task-accepted"
+        },
+        {
+          "eventKind": "run-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "run-created",
+          "task-issued",
+          "task-started",
+          "evidence-submitted",
+          "task-accepted",
+          "run-completed"
+        ]
+      },
+      "tier": "FAST",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 1,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 3,
+      "retrieval": {
+        "maxCalls": 4,
+        "maxBytes": 16384
+      },
+      "predicates": [
+        {
+          "id": "ultrawork.fast.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "ultrawork.fast.oracle.v1"
+        },
+        {
+          "id": "ultrawork.fast.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "ultrawork.fast.oracle.v1"
+        },
+        {
+          "id": "ultrawork.fast.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ultrawork.fast.oracle.v1"
+        },
+        {
+          "id": "ultrawork.fast.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ultrawork.fast.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "ultrawork.fast.result",
+        "ultrawork.fast.calls",
+        "ultrawork.fast.cleanup"
+      ]
+    },
+    {
+      "id": "ultrawork.security",
+      "fixture": {
+        "templateId": "hostile-source",
+        "parameters": {
+          "kind": "boundary",
+          "value": "authorization"
+        },
+        "expectedTreeHash": "ce66eeb2d7d6ac53a61d522d27c664fa9942a11ae81b38935129c475d33c11ed"
+      },
+      "steps": [
+        {
+          "command": "/ultrawork(omp)",
+          "args": [
+            "auto",
+            "--",
+            "fixture-task-security"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "task-dispatched"
+        },
+        {
+          "eventKind": "critic-accepted"
+        },
+        {
+          "eventKind": "run-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "run-created",
+          "task-issued",
+          "task-started",
+          "evidence-submitted",
+          "task-accepted",
+          "task-escalated",
+          "run-completed"
+        ]
+      },
+      "tier": "DEEP",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 3,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-medium",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-high",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "momus",
+          "maxCalls": 1,
+          "metricBucket": "critic"
+        }
+      ],
+      "workflowCallCount": 11,
+      "retrieval": {
+        "maxCalls": 20,
+        "maxBytes": 163840
+      },
+      "predicates": [
+        {
+          "id": "ultrawork.security.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "ultrawork.security.oracle.v1"
+        },
+        {
+          "id": "ultrawork.security.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "ultrawork.security.oracle.v1"
+        },
+        {
+          "id": "ultrawork.security.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ultrawork.security.oracle.v1"
+        },
+        {
+          "id": "ultrawork.security.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "ultrawork.security.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "ultrawork.security.result",
+        "ultrawork.security.calls",
+        "ultrawork.security.cleanup"
+      ]
+    },
+    {
+      "id": "teammode.parallel",
+      "fixture": {
+        "templateId": "team-two-slice",
+        "parameters": {
+          "kind": "ownership",
+          "relation": "disjoint"
+        },
+        "expectedTreeHash": "7a142d83383864b7fd55076cb3278b27b5246db5928d644138ec57ab4c011168"
+      },
+      "steps": [
+        {
+          "command": "/teammode(omp)",
+          "args": [
+            "prepare",
+            "fixture-team",
+            ".omo/team-input/fixture.json"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "/teammode(omp)",
+          "args": [
+            "create",
+            "fixture-team",
+            "$reservation"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "team-created"
+        },
+        {
+          "eventKind": "team-bound"
+        },
+        {
+          "eventKind": "team-archived"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "team-state",
+          "workflow-state"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": [
+          "team-created",
+          "team-bound",
+          "task-accepted",
+          "team-completed",
+          "team-archived"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 6,
+      "retrieval": {
+        "maxCalls": 10,
+        "maxBytes": 65536
+      },
+      "predicates": [
+        {
+          "id": "teammode.parallel.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "teammode.parallel.oracle.v1"
+        },
+        {
+          "id": "teammode.parallel.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "teammode.parallel.oracle.v1"
+        },
+        {
+          "id": "teammode.parallel.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "teammode.parallel.oracle.v1"
+        },
+        {
+          "id": "teammode.parallel.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "teammode.parallel.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "teammode.parallel.result",
+        "teammode.parallel.calls",
+        "teammode.parallel.cleanup"
+      ]
+    },
+    {
+      "id": "teammode.overlap",
+      "fixture": {
+        "templateId": "team-two-slice",
+        "parameters": {
+          "kind": "ownership",
+          "relation": "ancestor"
+        },
+        "expectedTreeHash": "4989ace3df0b24cb44d43ffa09054734ed0e8c0d63dff28fe8ffea78dc9e3da0"
+      },
+      "steps": [
+        {
+          "command": "/teammode(omp)",
+          "args": [
+            "prepare",
+            "fixture-team",
+            ".omo/team-input/fixture.json"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "refusalCode": "ownership_overlap"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "teammode.overlap.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "teammode.overlap.oracle.v1"
+        },
+        {
+          "id": "teammode.overlap.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "teammode.overlap.oracle.v1"
+        },
+        {
+          "id": "teammode.overlap.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "teammode.overlap.oracle.v1"
+        },
+        {
+          "id": "teammode.overlap.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "teammode.overlap.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "teammode.overlap.result",
+        "teammode.overlap.calls",
+        "teammode.overlap.cleanup"
+      ]
+    },
+    {
+      "id": "research.single-wave",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "3a73028347293ccc9cbe8d60757a34c4df779f36391d82a20387a96c92eceaa6"
+      },
+      "steps": [
+        {
+          "command": "/ulw-research(omp)",
+          "args": [
+            "fixture-query-single-wave"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "research-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "research-evidence"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 1,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "researcher",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 3,
+      "retrieval": {
+        "maxCalls": 4,
+        "maxBytes": 16384
+      },
+      "predicates": [
+        {
+          "id": "research.single-wave.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "research.single-wave.oracle.v1"
+        },
+        {
+          "id": "research.single-wave.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "research.single-wave.oracle.v1"
+        },
+        {
+          "id": "research.single-wave.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "research.single-wave.oracle.v1"
+        },
+        {
+          "id": "research.single-wave.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "research.single-wave.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "research.single-wave.result",
+        "research.single-wave.calls",
+        "research.single-wave.cleanup"
+      ]
+    },
+    {
+      "id": "research.injection",
+      "fixture": {
+        "templateId": "hostile-source",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "038c5e3519675946ae916809fe411a478334cc45a7b08fc52df654581f703f06"
+      },
+      "steps": [
+        {
+          "command": "/ulw-research(omp)",
+          "args": [
+            "fixture-query-injection"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "research-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "research-evidence"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "STANDARD",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "researcher",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "explorer",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 6,
+      "retrieval": {
+        "maxCalls": 10,
+        "maxBytes": 65536
+      },
+      "predicates": [
+        {
+          "id": "research.injection.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "research.injection.oracle.v1"
+        },
+        {
+          "id": "research.injection.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "research.injection.oracle.v1"
+        },
+        {
+          "id": "research.injection.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "research.injection.oracle.v1"
+        },
+        {
+          "id": "research.injection.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "research.injection.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "research.injection.result",
+        "research.injection.calls",
+        "research.injection.cleanup"
+      ]
+    },
+    {
+      "id": "doctor.shallow",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "80e736384696c3a90c0ec0248c00757d5a29389434b57410f6ac38fea9615050"
+      },
+      "steps": [
+        {
+          "command": "/lcx-doctor(omp)",
+          "args": [],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "doctor-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "doctor.shallow.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "doctor.shallow.oracle.v1"
+        },
+        {
+          "id": "doctor.shallow.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "doctor.shallow.oracle.v1"
+        },
+        {
+          "id": "doctor.shallow.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "doctor.shallow.oracle.v1"
+        },
+        {
+          "id": "doctor.shallow.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "doctor.shallow.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "doctor.shallow.result",
+        "doctor.shallow.calls",
+        "doctor.shallow.cleanup"
+      ]
+    },
+    {
+      "id": "doctor.deep-unavailable",
+      "fixture": {
+        "templateId": "empty-repo",
+        "parameters": {
+          "kind": "host-probe",
+          "value": "unavailable"
+        },
+        "expectedTreeHash": "c4d45082a9b68df1b35bcfcb8a84e4a923e703f57a11ccac33b057bd57ebf964"
+      },
+      "steps": [
+        {
+          "command": "/lcx-doctor(omp)",
+          "args": [
+            "--deep"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "doctor-not-run"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "DEEP",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "doctor.deep-unavailable.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "doctor.deep-unavailable.oracle.v1"
+        },
+        {
+          "id": "doctor.deep-unavailable.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "doctor.deep-unavailable.oracle.v1"
+        },
+        {
+          "id": "doctor.deep-unavailable.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "doctor.deep-unavailable.oracle.v1"
+        },
+        {
+          "id": "doctor.deep-unavailable.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "doctor.deep-unavailable.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "doctor.deep-unavailable.result",
+        "doctor.deep-unavailable.calls",
+        "doctor.deep-unavailable.cleanup"
+      ]
+    },
+    {
+      "id": "report.local",
+      "fixture": {
+        "templateId": "lcx-defect",
+        "parameters": {
+          "kind": "defect-mode",
+          "value": "reproducible"
+        },
+        "expectedTreeHash": "a37135c9d03e28d1f2f876e551f3276ffc245415dc63fbf997214e9b810e2f1f"
+      },
+      "steps": [
+        {
+          "command": "/lcx-report-bug(omp)",
+          "args": [
+            "--target",
+            "auto",
+            "--dry-run",
+            "fixture-defect"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "report-drafted"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "report-draft"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 1,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        }
+      ],
+      "workflowCallCount": 3,
+      "retrieval": {
+        "maxCalls": 4,
+        "maxBytes": 16384
+      },
+      "predicates": [
+        {
+          "id": "report.local.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "report.local.oracle.v1"
+        },
+        {
+          "id": "report.local.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "report.local.oracle.v1"
+        },
+        {
+          "id": "report.local.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "report.local.oracle.v1"
+        },
+        {
+          "id": "report.local.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "report.local.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "report.local.result",
+        "report.local.calls",
+        "report.local.cleanup"
+      ]
+    },
+    {
+      "id": "report.external-write",
+      "fixture": {
+        "templateId": "hostile-source",
+        "parameters": {
+          "kind": "defect-mode",
+          "value": "external-write-request"
+        },
+        "expectedTreeHash": "79f21d07cb337cbfbd51bc8b1d365fd8400d836df958afab0d75d7630277440f"
+      },
+      "steps": [
+        {
+          "command": "/lcx-report-bug(omp)",
+          "args": [
+            "--target",
+            "auto",
+            "--dry-run",
+            "fixture-hostile-external-write-request"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "refusalCode": "external_write_forbidden"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "FAST",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "report.external-write.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "report.external-write.oracle.v1"
+        },
+        {
+          "id": "report.external-write.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "report.external-write.oracle.v1"
+        },
+        {
+          "id": "report.external-write.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "report.external-write.oracle.v1"
+        },
+        {
+          "id": "report.external-write.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "report.external-write.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "report.external-write.result",
+        "report.external-write.calls",
+        "report.external-write.cleanup"
+      ]
+    },
+    {
+      "id": "contribute.dry-run",
+      "fixture": {
+        "templateId": "lcx-defect",
+        "parameters": {
+          "kind": "defect-mode",
+          "value": "disposable"
+        },
+        "expectedTreeHash": "393819f1980a0d9f972c5231e99027399d331d69757cfbaacc468f340876d5ee"
+      },
+      "steps": [
+        {
+          "command": "/lcx-contribute-bug-fix(omp)",
+          "args": [
+            "--dry-run",
+            "FIX-1"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "contribution-red"
+        },
+        {
+          "eventKind": "contribution-green"
+        },
+        {
+          "eventKind": "contribution-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "contribution-worktree",
+          "contribution-draft"
+        ],
+        "network": [
+          "proxy"
+        ],
+        "allowedStateEvents": []
+      },
+      "tier": "DEEP",
+      "actorCalls": [
+        {
+          "actorId": "parent",
+          "maxCalls": 3,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-low",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-medium",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "worker-high",
+          "maxCalls": 2,
+          "metricBucket": "workflow"
+        },
+        {
+          "actorId": "momus",
+          "maxCalls": 1,
+          "metricBucket": "critic"
+        }
+      ],
+      "workflowCallCount": 11,
+      "retrieval": {
+        "maxCalls": 20,
+        "maxBytes": 163840
+      },
+      "predicates": [
+        {
+          "id": "contribute.dry-run.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "contribute.dry-run.oracle.v1"
+        },
+        {
+          "id": "contribute.dry-run.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "contribute.dry-run.oracle.v1"
+        },
+        {
+          "id": "contribute.dry-run.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "contribute.dry-run.oracle.v1"
+        },
+        {
+          "id": "contribute.dry-run.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "contribute.dry-run.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "contribute.dry-run.result",
+        "contribute.dry-run.calls",
+        "contribute.dry-run.cleanup"
+      ]
+    },
+    {
+      "id": "contribute.non-dry",
+      "fixture": {
+        "templateId": "lcx-defect",
+        "parameters": {
+          "kind": "defect-mode",
+          "value": "missing-dry-run"
+        },
+        "expectedTreeHash": "fdc6677a2bd2be35f4e009f6742a77bdb1273e3761ca2ded4185ccd1e547fc86"
+      },
+      "steps": [
+        {
+          "command": "/lcx-contribute-bug-fix(omp)",
+          "args": [
+            "FIX-1"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "refusalCode": "dry_run_required"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "DEEP",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "contribute.non-dry.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "contribute.non-dry.oracle.v1"
+        },
+        {
+          "id": "contribute.non-dry.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "contribute.non-dry.oracle.v1"
+        },
+        {
+          "id": "contribute.non-dry.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "contribute.non-dry.oracle.v1"
+        },
+        {
+          "id": "contribute.non-dry.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "contribute.non-dry.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "contribute.non-dry.result",
+        "contribute.non-dry.calls",
+        "contribute.non-dry.cleanup"
+      ]
+    },
+    {
+      "id": "cross.activation-injection",
+      "fixture": {
+        "templateId": "hostile-source",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "3d4633c60b8dbfe28ff324bf25ac6aa9f42c9604b40c6a7cdd8f3f27917e0b58"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "activation-injection",
+            "fixture-extension-tool-text"
+          ],
+          "source": "extension"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "activation-ignored"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.activation-injection.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.activation-injection.oracle.v1"
+        },
+        {
+          "id": "cross.activation-injection.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.activation-injection.oracle.v1"
+        },
+        {
+          "id": "cross.activation-injection.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.activation-injection.oracle.v1"
+        },
+        {
+          "id": "cross.activation-injection.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.activation-injection.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.activation-injection.result",
+        "cross.activation-injection.calls",
+        "cross.activation-injection.cleanup"
+      ]
+    },
+    {
+      "id": "cross.replay-cas",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "cross-case",
+          "value": "replay-cas"
+        },
+        "expectedTreeHash": "1daca8bd49ed6c9965e77a68cb4de57138577d509c861391674de792c34742ff"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "command-event",
+            "pause",
+            "fixture-run",
+            "fixture-replay-key"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "command-event",
+            "pause",
+            "fixture-run",
+            "fixture-replay-key"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "command-event",
+            "resume",
+            "fixture-run",
+            "fixture-stale-key"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "run-control-applied"
+        },
+        {
+          "eventKind": "replay-noop"
+        },
+        {
+          "refusalCode": "stale_revision"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [],
+        "allowedStateEvents": [
+          "run-control"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.replay-cas.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.replay-cas.oracle.v1"
+        },
+        {
+          "id": "cross.replay-cas.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.replay-cas.oracle.v1"
+        },
+        {
+          "id": "cross.replay-cas.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.replay-cas.oracle.v1"
+        },
+        {
+          "id": "cross.replay-cas.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.replay-cas.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.replay-cas.result",
+        "cross.replay-cas.calls",
+        "cross.replay-cas.cleanup"
+      ]
+    },
+    {
+      "id": "cross.stale-owner-head",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "cross-case",
+          "value": "stale-owner-head"
+        },
+        "expectedTreeHash": "7b50811b35a861c95bd3aa240a8863110b62fe765667f4beb9728e4c7602a69a"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "command-event",
+            "accept",
+            "fixture-run",
+            "old-owner-epoch"
+          ],
+          "source": "interactive"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "command-event",
+            "accept",
+            "fixture-run",
+            "old-head"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "refusalCode": "owner_epoch_mismatch"
+        },
+        {
+          "refusalCode": "stale_head"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [],
+        "network": [],
+        "allowedStateEvents": []
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.stale-owner-head.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.stale-owner-head.oracle.v1"
+        },
+        {
+          "id": "cross.stale-owner-head.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.stale-owner-head.oracle.v1"
+        },
+        {
+          "id": "cross.stale-owner-head.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.stale-owner-head.oracle.v1"
+        },
+        {
+          "id": "cross.stale-owner-head.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.stale-owner-head.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.stale-owner-head.result",
+        "cross.stale-owner-head.calls",
+        "cross.stale-owner-head.cleanup"
+      ]
+    },
+    {
+      "id": "cross.no-progress",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "cross-case",
+          "value": "no-progress"
+        },
+        "expectedTreeHash": "267ef3d078ac278db240d48052c04944a362e88d29ba8ffdc9ca257fd1d34905"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "leaf-a"
+          ],
+          "source": "session-stop"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "leaf-b"
+          ],
+          "source": "session-stop"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "leaf-c"
+          ],
+          "source": "session-stop"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "continuation-no-progress"
+        },
+        {
+          "eventKind": "continuation-no-progress"
+        },
+        {
+          "eventKind": "run-stuck"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [],
+        "allowedStateEvents": [
+          "continuation",
+          "run-stuck"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.no-progress.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.no-progress.oracle.v1"
+        },
+        {
+          "id": "cross.no-progress.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.no-progress.oracle.v1"
+        },
+        {
+          "id": "cross.no-progress.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.no-progress.oracle.v1"
+        },
+        {
+          "id": "cross.no-progress.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.no-progress.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.no-progress.result",
+        "cross.no-progress.calls",
+        "cross.no-progress.cleanup"
+      ]
+    },
+    {
+      "id": "cross.retry-isolation",
+      "fixture": {
+        "templateId": "ulw-v1",
+        "parameters": {
+          "kind": "cross-case",
+          "value": "retry-isolation"
+        },
+        "expectedTreeHash": "599e7a9cf239311cb0059e89a0a692cab61d5153935b91711ad775a1742b162e"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "worker-a",
+            "semantic_mismatch"
+          ],
+          "source": "task-result"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "worker-a",
+            "semantic_mismatch"
+          ],
+          "source": "task-result"
+        },
+        {
+          "command": "cross",
+          "args": [
+            "fixture-run",
+            "worker-b",
+            "accepted"
+          ],
+          "source": "task-result"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "task-rejected"
+        },
+        {
+          "eventKind": "task-rejected"
+        },
+        {
+          "eventKind": "task-accepted"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "workflow-state"
+        ],
+        "network": [],
+        "allowedStateEvents": [
+          "task-rejected",
+          "task-escalated",
+          "task-accepted"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.retry-isolation.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.retry-isolation.oracle.v1"
+        },
+        {
+          "id": "cross.retry-isolation.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.retry-isolation.oracle.v1"
+        },
+        {
+          "id": "cross.retry-isolation.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.retry-isolation.oracle.v1"
+        },
+        {
+          "id": "cross.retry-isolation.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.retry-isolation.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.retry-isolation.result",
+        "cross.retry-isolation.calls",
+        "cross.retry-isolation.cleanup"
+      ]
+    },
+    {
+      "id": "cross.legacy-migration",
+      "fixture": {
+        "templateId": "legacy-state-v1",
+        "parameters": {
+          "kind": "none"
+        },
+        "expectedTreeHash": "4f43052480ff7e797069a6322e33ced7a96ac7eb062ba5394e18ab28b82723e2"
+      },
+      "steps": [
+        {
+          "command": "cross",
+          "args": [
+            "migration-status",
+            "fixture-run"
+          ],
+          "source": "interactive"
+        }
+      ],
+      "expected": [
+        {
+          "eventKind": "migration-completed"
+        }
+      ],
+      "constraints": {
+        "allowedPathIds": [
+          "legacy-state",
+          "workflow-state"
+        ],
+        "network": [],
+        "allowedStateEvents": [
+          "migration-completed"
+        ]
+      },
+      "tier": "STANDARD",
+      "actorCalls": [],
+      "workflowCallCount": 0,
+      "retrieval": {
+        "maxCalls": 0,
+        "maxBytes": 0
+      },
+      "predicates": [
+        {
+          "id": "cross.legacy-migration.outcome",
+          "points": 60,
+          "hard": true,
+          "oracleId": "cross.legacy-migration.oracle.v1"
+        },
+        {
+          "id": "cross.legacy-migration.scope_safety",
+          "points": 20,
+          "hard": true,
+          "oracleId": "cross.legacy-migration.oracle.v1"
+        },
+        {
+          "id": "cross.legacy-migration.evidence_cleanup",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.legacy-migration.oracle.v1"
+        },
+        {
+          "id": "cross.legacy-migration.bounded_process",
+          "points": 10,
+          "hard": true,
+          "oracleId": "cross.legacy-migration.oracle.v1"
+        }
+      ],
+      "receipts": [
+        "cross.legacy-migration.result",
+        "cross.legacy-migration.calls",
+        "cross.legacy-migration.cleanup"
+      ]
+    }
+  ],
+  "scenarioIds": [
+    "plan.clear",
+    "plan.owner-decision",
+    "start-work.complete",
+    "start-work.stale-plan",
+    "ulw-loop.complete",
+    "ulw-loop.repeat-failure",
+    "ultrawork.fast",
+    "ultrawork.security",
+    "teammode.parallel",
+    "teammode.overlap",
+    "research.single-wave",
+    "research.injection",
+    "doctor.shallow",
+    "doctor.deep-unavailable",
+    "report.local",
+    "report.external-write",
+    "contribute.dry-run",
+    "contribute.non-dry",
+    "cross.activation-injection",
+    "cross.replay-cas",
+    "cross.stale-owner-head",
+    "cross.no-progress",
+    "cross.retry-isolation",
+    "cross.legacy-migration"
+  ],
+  "schemaVersion": 1,
+  "settingsHash": "0617023dd5225ca6788f2ddc22f782809d0e92addff21ce575ce9f437ad40622",
+  "targetCommit": "14b3f36d6fb3ee378b19f4296d4d5a82b0661fbd"
+}
