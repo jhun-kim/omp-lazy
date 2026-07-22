@@ -7,6 +7,13 @@ import type {
   Uuid,
   WorkflowKind,
 } from "../state/domain"
+import {
+  currentAcceptance,
+  EMPTY_RECEIPT_AUTHORITY,
+  exhaustedTaskId,
+  type ReceiptAuthority,
+  startCompletionAcceptanceIds,
+} from "../state/receipt-authority"
 import { evaluateStartWorkContinuation } from "../workflows/start-work-contract"
 import type { PlanSnapshot } from "../workflows/start-work-plan"
 import { evaluateUlwContinuation } from "../workflows/ulw-loop-contract"
@@ -30,11 +37,35 @@ export type ContinuationDecision =
       readonly run: AnyRun
       readonly mutation: StateEvent["mutation"]
     }
+  | {
+      readonly kind: "settled"
+      readonly run: AnyRun
+      readonly mutation: StateEvent["mutation"]
+      readonly taskGeneration: number
+    }
 
 export type ContinuationSnapshot = {
   readonly index: ActiveIndex
   readonly runs: readonly AnyRun[]
   readonly plans: readonly PlanObservation[]
+  readonly authorities?: readonly {
+    readonly runId: Uuid
+    readonly authority: ReceiptAuthority
+  }[]
+}
+
+function authorityFor(snapshot: ContinuationSnapshot, run: AnyRun): ReceiptAuthority {
+  return (
+    snapshot.authorities?.find((candidate) => candidate.runId === run.runId)?.authority ??
+    EMPTY_RECEIPT_AUTHORITY
+  )
+}
+
+function hasReachedNoProgressBound(run: AnyRun): boolean {
+  return (
+    run.continuation.progressRevisionSeen === run.progressRevision &&
+    run.continuation.noProgressAttempts >= 2
+  )
 }
 
 export function decideContinuation(_request: {
@@ -52,7 +83,48 @@ export function decideContinuation(_request: {
     const observed = _request.snapshot.plans.find((plan) => plan.runId === start.run.runId)
     if (observed !== undefined) {
       const eligibility = evaluateStartWorkContinuation(start.run, observed.snapshot)
+      const authority = authorityFor(_request.snapshot, start.run)
+      if (!eligibility.ok && eligibility.code === "complete") {
+        const acceptanceIds = startCompletionAcceptanceIds(start.run, authority)
+        if (acceptanceIds !== null) {
+          return {
+            kind: "settled",
+            run: start.run,
+            taskGeneration: authority.taskGeneration,
+            mutation: { kind: "workflow_terminal", status: "completed", acceptanceIds },
+          }
+        }
+      }
+      const exhausted = exhaustedTaskId(start.run, authority)
+      if (exhausted !== null) {
+        return {
+          kind: "settled",
+          run: start.run,
+          taskGeneration: authority.taskGeneration,
+          mutation: { kind: "workflow_terminal", status: "failed", taskId: exhausted },
+        }
+      }
       if (eligibility.ok) {
+        const accepted = currentAcceptance(start.run, authority, eligibility.nextTaskId)
+        if (accepted !== null) {
+          return {
+            kind: "settled",
+            run: start.run,
+            taskGeneration: authority.taskGeneration,
+            mutation: {
+              kind: "task_evidence_accepted",
+              taskId: eligibility.nextTaskId,
+              acceptanceId: accepted.idempotencyKey,
+            },
+          }
+        }
+        if (hasReachedNoProgressBound(start.run)) {
+          return {
+            kind: "stuck",
+            run: start.run,
+            mutation: { kind: "continuation_stuck", leafId: _request.leafId },
+          }
+        }
         return {
           kind: "continue",
           run: start.run,
@@ -69,16 +141,43 @@ export function decideContinuation(_request: {
   }
   if (loop.kind !== "found" || loop.run.workflow !== "ulw_loop") return { kind: "quiet" }
   if (loop.run.continuation.lastProcessedLeafId === _request.leafId) return { kind: "quiet" }
+  const authority = authorityFor(_request.snapshot, loop.run)
+  const exhausted = exhaustedTaskId(loop.run, authority)
+  if (exhausted !== null) {
+    return {
+      kind: "settled",
+      run: loop.run,
+      taskGeneration: authority.taskGeneration,
+      mutation: { kind: "workflow_terminal", status: "failed", taskId: exhausted },
+    }
+  }
   const eligibility = evaluateUlwContinuation(loop.run)
   if (!eligibility.ok) return { kind: "quiet" }
   const activeGoal = loop.run.payload.goals.find((goal) => goal.id === eligibility.goalId)
   if (activeGoal?.status !== "pending" && activeGoal?.status !== "in_progress") {
     return { kind: "quiet" }
   }
-  const unchanged =
-    loop.run.continuation.progressRevisionSeen === loop.run.progressRevision &&
-    loop.run.continuation.noProgressAttempts >= 2
-  return unchanged
+  const pendingCriterion = activeGoal.criteria.find((criterion) => criterion.status !== "pass")
+  if (pendingCriterion !== undefined) {
+    const accepted = currentAcceptance(loop.run, authority, pendingCriterion.id)
+    if (accepted !== null) {
+      return {
+        kind: "settled",
+        run: loop.run,
+        taskGeneration: authority.taskGeneration,
+        mutation: {
+          kind: "criterion_settled",
+          goalId: activeGoal.id,
+          criterionId: pendingCriterion.id,
+          acceptanceId: accepted.idempotencyKey,
+          evidenceRef: accepted.receiptPath,
+          captureRevision: accepted.runRevision,
+          captureCommit: accepted.captureCommit,
+        },
+      }
+    }
+  }
+  return hasReachedNoProgressBound(loop.run)
     ? {
         kind: "stuck",
         run: loop.run,

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
-import type { ActiveIndex, AnyRun, CanonicalRoot, StateEvent, Uuid } from "../state/domain"
+import type { ActiveIndex, AnyRun, CanonicalRoot, PersistedStateEvent, Uuid } from "../state/domain"
 import { UuidSchema } from "../state/domain"
+import type { ReceiptAuthority } from "../state/receipt-authority"
 import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
 import { parseStartWorkPlan } from "../workflows/start-work-plan"
@@ -16,8 +17,9 @@ import type { DeadlineFence } from "./deadline-fence"
 export interface ContinuationStorePort {
   readIndex(): Promise<ActiveIndex>
   readRun(runId: string): Promise<AnyRun | null>
+  readReceiptAuthority?(run: AnyRun): Promise<ReceiptAuthority>
   commit(
-    event: StateEvent,
+    event: PersistedStateEvent,
     options: { readonly deadline: DeadlineFence },
   ): Promise<
     | { readonly ok: true; readonly run: AnyRun; readonly index: ActiveIndex }
@@ -47,6 +49,17 @@ export class DurableContinuationCoordinator implements ContinuationCoordinatorPo
     const loaded = await Promise.all(entries.map((entry) => store.readRun(entry.runId)))
     if (!request.fence.isValid()) return { kind: "quiet" }
     const runs = loaded.filter((run): run is AnyRun => run !== null)
+    const authorities = await Promise.all(
+      runs.map(async (run) => ({
+        runId: run.runId,
+        authority: (await store.readReceiptAuthority?.(run)) ?? {
+          taskGeneration: 0,
+          accepted: [],
+          rejected: [],
+        },
+      })),
+    )
+    if (!request.fence.isValid()) return { kind: "quiet" }
     const plans: PlanObservation[] = []
     for (const run of runs) {
       if (run.workflow !== "start_work") continue
@@ -57,25 +70,43 @@ export class DurableContinuationCoordinator implements ContinuationCoordinatorPo
     const decision = decideContinuation({
       sessionId: request.sessionId,
       leafId: request.leafId,
-      snapshot: { index, runs, plans },
+      snapshot: { index, runs, plans, authorities },
     })
     if (decision.kind === "quiet" || !request.fence.isValid()) return { kind: "quiet" }
-    const event: StateEvent = {
-      schemaVersion: 1,
+    const common = {
       eventId: this.dependencies.eventId(),
       sequence: index.revision + 1,
       runId: decision.run.runId,
       workflow: decision.run.workflow,
       kind: decision.mutation.kind,
-      expected: {
-        indexRevision: index.revision,
-        runRevision: decision.run.revision,
-        ownerSessionId: decision.run.owner.sessionId,
-        ownerEpoch: decision.run.owner.epoch,
-      },
       mutation: decision.mutation,
       at: this.dependencies.nowIso(),
     }
+    const event: PersistedStateEvent =
+      decision.run.schemaVersion === 2
+        ? {
+            ...common,
+            schemaVersion: 2,
+            expected: {
+              indexRevision: index.revision,
+              runRevision: decision.run.revision,
+              ownerSessionId: decision.run.owner.sessionId,
+              ownerEpoch: decision.run.owner.epoch,
+              expectedHead: decision.kind === "settled" ? decision.run.expectedHead : null,
+              taskGeneration: decision.kind === "settled" ? decision.taskGeneration : null,
+            },
+            legacyHeadUnbound: false,
+          }
+        : {
+            ...common,
+            schemaVersion: 1,
+            expected: {
+              indexRevision: index.revision,
+              runRevision: decision.run.revision,
+              ownerSessionId: decision.run.owner.sessionId,
+              ownerEpoch: decision.run.owner.epoch,
+            },
+          }
     if (!request.fence.isValid()) return { kind: "quiet" }
     const committed = await store.commit(event, { deadline: request.fence })
     if (!committed.ok || !request.fence.isValid()) return { kind: "quiet" }

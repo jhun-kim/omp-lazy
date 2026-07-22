@@ -256,11 +256,36 @@ const mutationSchema = z.discriminatedUnion("kind", [
       kind: z.literal("criterion_settled"),
       goalId: nonempty,
       criterionId: nonempty,
+      acceptanceId: nonempty.optional(),
       evidenceRef: nonempty,
       captureRevision: counter,
       captureCommit: nonempty,
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("task_evidence_accepted"),
+      taskId: nonempty,
+      acceptanceId: nonempty,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("workflow_terminal"),
+      status: z.enum(["completed", "failed"]),
+      acceptanceIds: uniqueStrings.optional(),
+      taskId: nonempty.optional(),
+    })
+    .strict()
+    .superRefine((mutation, context) => {
+      const completed = mutation.status === "completed"
+      if (
+        completed !== (mutation.acceptanceIds !== undefined) ||
+        completed === (mutation.taskId !== undefined)
+      ) {
+        context.addIssue({ code: "custom", message: "terminal authority mismatch" })
+      }
+    }),
   z
     .object({
       kind: z.literal("continuation_attempted"),
@@ -293,6 +318,8 @@ export const stateEventSchema = z
       "plan_reconciled",
       "workflow_steered",
       "criterion_settled",
+      "task_evidence_accepted",
+      "workflow_terminal",
       "continuation_attempted",
       "continuation_stuck",
       "goal_cycle_started",
@@ -330,6 +357,8 @@ export const stateEventV2Schema = z
       "plan_reconciled",
       "workflow_steered",
       "criterion_settled",
+      "task_evidence_accepted",
+      "workflow_terminal",
       "continuation_attempted",
       "continuation_stuck",
       "goal_cycle_started",

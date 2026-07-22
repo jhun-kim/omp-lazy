@@ -194,6 +194,7 @@ async function checkpointUlwRun(context: CommandContext): Promise<WorkflowComman
     kind: "criterion_settled",
     goalId: goal.id,
     criterionId: criterionId ?? "",
+    acceptanceId: accepted.idempotencyKey,
     evidenceRef: evidencePath,
     captureRevision: accepted.runRevision,
     captureCommit: accepted.captureCommit,

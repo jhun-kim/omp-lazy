@@ -29,6 +29,17 @@ describe("ULW loop contract", () => {
     expect(result).toEqual({ ok: false, code: "cycle_limit" })
   })
 
+  test("Given a cycle starts without accepted evidence When persisted Then progress does not advance", () => {
+    // Given
+    const run = ulwLoopRun()
+
+    // When
+    const result = startGoalCycle(run, "goal-1")
+
+    // Then
+    expect(result).toMatchObject({ ok: true, run: { progressRevision: run.progressRevision } })
+  })
+
   test("Given three identical failures When recording a fourth Then the persisted bound rejects it", () => {
     // Given
     const run = ulwLoopRun()
@@ -59,6 +70,21 @@ describe("ULW loop contract", () => {
 
     // Then
     expect(result).toEqual({ ok: false, code: "identical_failure_limit" })
+  })
+
+  test("Given a criterion failure without accepted evidence When persisted Then progress does not advance", () => {
+    // Given
+    const run = ulwLoopRun()
+
+    // When
+    const result = recordCriterionFailure(run, {
+      goalId: "goal-1",
+      criterionId: "criterion-1",
+      fingerprint: "failure",
+    })
+
+    // Then
+    expect(result).toMatchObject({ ok: true, run: { progressRevision: run.progressRevision } })
   })
 
   test("Given unmet criteria When completion is evaluated Then it cannot complete", () => {

@@ -1,10 +1,11 @@
 import type { UlwLoopRun } from "../state/domain"
 
-export function evaluateUlwContinuation(
-  _run: UlwLoopRun,
-):
+export function evaluateUlwContinuation(_run: UlwLoopRun):
   | { readonly ok: true; readonly goalId: string }
-  | { readonly ok: false; readonly code: "not_active" | "unmet_criteria" | "no_active_goal" } {
+  | {
+      readonly ok: false
+      readonly code: "not_active" | "unmet_criteria" | "no_active_goal" | "budget_exhausted"
+    } {
   const allCriteriaPass = _run.payload.goals.every((goal) =>
     goal.criteria.every((criterion) => criterion.status === "pass"),
   )
@@ -13,7 +14,14 @@ export function evaluateUlwContinuation(
   }
   if (_run.payload.status !== "active") return { ok: false, code: "not_active" }
   const goal = _run.payload.goals.find((candidate) => candidate.id === _run.payload.activeGoalId)
-  return goal === undefined ? { ok: false, code: "no_active_goal" } : { ok: true, goalId: goal.id }
+  if (goal === undefined) return { ok: false, code: "no_active_goal" }
+  if (
+    goal.cycleCount >= 5 ||
+    goal.criteria.some((criterion) => criterion.identicalFailureCount >= 3)
+  ) {
+    return { ok: false, code: "budget_exhausted" }
+  }
+  return { ok: true, goalId: goal.id }
 }
 
 export function startGoalCycle(
@@ -33,7 +41,6 @@ export function startGoalCycle(
     run: {
       ..._run,
       revision: _run.revision + 1,
-      progressRevision: _run.progressRevision + 1,
       payload: { ..._run.payload, goals },
     },
   }
@@ -74,7 +81,6 @@ export function recordCriterionFailure(
     run: {
       ..._run,
       revision: _run.revision + 1,
-      progressRevision: _run.progressRevision + 1,
       payload: { ..._run.payload, goals },
     },
   }

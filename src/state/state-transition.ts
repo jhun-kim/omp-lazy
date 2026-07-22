@@ -1,6 +1,8 @@
 import { recordCriterionFailure, startGoalCycle } from "../workflows/ulw-loop-contract"
 import { reduceWorkflowControl } from "../workflows/workflow-control"
 import type { ActiveIndex, ActiveIndexEntry, AnyRun, PersistedStateEvent } from "./domain"
+import type { ReceiptAuthority } from "./receipt-authority"
+import { reduceRuntimeProgress } from "./runtime-progress-transition"
 
 export type TransitionErrorCode =
   | "index_revision_conflict"
@@ -19,8 +21,19 @@ export type PreparedTransition = {
   readonly index: ActiveIndex
 }
 
-function controlRun(run: AnyRun, event: PersistedStateEvent): AnyRun | null {
+function controlRun(
+  run: AnyRun,
+  event: PersistedStateEvent,
+  authority: ReceiptAuthority | null,
+): AnyRun | null {
   const mutation = event.mutation
+  if (
+    event.schemaVersion === 2 &&
+    event.legacyHeadUnbound &&
+    (mutation.kind === "goal_cycle_started" || mutation.kind === "criterion_failure_recorded")
+  ) {
+    return run
+  }
   switch (mutation.kind) {
     case "run_created":
       return null
@@ -92,7 +105,6 @@ function controlRun(run: AnyRun, event: PersistedStateEvent): AnyRun | null {
         return {
           ...run,
           revision: run.revision + 1,
-          progressRevision: run.progressRevision + 1,
           payload: {
             ...run.payload,
             ...(mutation.annotation === undefined ? {} : { annotation: mutation.annotation }),
@@ -101,85 +113,11 @@ function controlRun(run: AnyRun, event: PersistedStateEvent): AnyRun | null {
         }
       }
     case "criterion_settled":
-      if (run.workflow !== "ulw_loop") return null
-      {
-        const goal = run.payload.goals.find(({ id }) => id === mutation.goalId)
-        const criterion = goal?.criteria.find(({ id }) => id === mutation.criterionId)
-        if (goal === undefined || criterion === undefined || criterion.status === "pass")
-          return null
-        const goals = run.payload.goals.map((candidate) => {
-          if (candidate.id !== mutation.goalId) return candidate
-          const criteria = candidate.criteria.map((item) =>
-            item.id === mutation.criterionId
-              ? {
-                  ...item,
-                  status: "pass" as const,
-                  evidenceRef: mutation.evidenceRef,
-                  captureRevision: mutation.captureRevision,
-                  captureCommit: mutation.captureCommit,
-                }
-              : item,
-          )
-          return {
-            ...candidate,
-            status: criteria.every(({ status }) => status === "pass")
-              ? ("complete" as const)
-              : candidate.status,
-            criteria,
-          }
-        })
-        const completed = goals.every((candidate) =>
-          candidate.criteria.every(({ status }) => status === "pass"),
-        )
-        return {
-          ...run,
-          revision: run.revision + 1,
-          progressRevision: run.progressRevision + 1,
-          payload: {
-            ...run.payload,
-            activeGoalId: completed ? null : run.payload.activeGoalId,
-            status: completed ? "completed" : run.payload.status,
-            goals,
-          },
-        }
-      }
+    case "task_evidence_accepted":
+    case "workflow_terminal":
     case "continuation_attempted":
-      if (run.continuation.lastProcessedLeafId === mutation.leafId) return null
-      {
-        const progressChanged = run.continuation.progressRevisionSeen !== mutation.progressRevision
-        return {
-          ...run,
-          revision: run.revision + 1,
-          continuation: {
-            lastProcessedLeafId: mutation.leafId,
-            progressRevisionSeen: mutation.progressRevision,
-            noProgressAttempts: progressChanged ? 1 : run.continuation.noProgressAttempts + 1,
-            stuck: false,
-          },
-        }
-      }
     case "continuation_stuck":
-      return run.workflow === "start_work"
-        ? {
-            ...run,
-            revision: run.revision + 1,
-            continuation: {
-              ...run.continuation,
-              lastProcessedLeafId: mutation.leafId,
-              stuck: true,
-            },
-            payload: { ...run.payload, status: "stuck" },
-          }
-        : {
-            ...run,
-            revision: run.revision + 1,
-            continuation: {
-              ...run.continuation,
-              lastProcessedLeafId: mutation.leafId,
-              stuck: true,
-            },
-            payload: { ...run.payload, status: "stuck" },
-          }
+      return reduceRuntimeProgress(run, event, authority)
     case "goal_cycle_started":
       if (run.workflow !== "ulw_loop") return null
       {
@@ -249,6 +187,7 @@ export function prepareTransition(
   index: ActiveIndex,
   current: AnyRun | null,
   event: PersistedStateEvent,
+  authority: ReceiptAuthority | null = null,
 ): PreparedTransition | { readonly code: TransitionErrorCode } {
   if (event.expected.indexRevision !== index.revision) {
     return { code: event.schemaVersion === 2 ? "stale_revision" : "index_revision_conflict" }
@@ -284,13 +223,15 @@ export function prepareTransition(
         event.kind === "plan_reconciled" ||
         event.kind === "workflow_steered" ||
         event.kind === "criterion_settled" ||
+        event.kind === "task_evidence_accepted" ||
+        event.kind === "workflow_terminal" ||
         event.kind === "goal_cycle_started" ||
         event.kind === "criterion_failure_recorded"
       if (taskScoped !== (event.expected.taskGeneration !== null)) {
         return { code: "task_scope_mismatch" }
       }
     }
-    next = controlRun(current, event)
+    next = controlRun(current, event, authority)
   }
   if (next === null || next.runId !== event.runId || next.workflow !== event.workflow) {
     return { code: "invalid_mutation" }

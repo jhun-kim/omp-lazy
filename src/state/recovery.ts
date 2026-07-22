@@ -84,7 +84,13 @@ export async function repairState(
       run = current
       runPublished = true
     } else {
-      const prepared = prepareTransition(index, current, event)
+      const receiptBound =
+        event.mutation.kind === "criterion_settled" ||
+        event.mutation.kind === "task_evidence_accepted" ||
+        event.mutation.kind === "workflow_terminal"
+      const authority =
+        receiptBound && current !== null ? await store.readReceiptAuthority(current) : null
+      const prepared = prepareTransition(index, current, event, authority)
       if ("code" in prepared) return { ok: false, code: prepared.code }
       run = prepared.run
     }

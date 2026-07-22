@@ -47,6 +47,11 @@ export class TaskSidecarStore {
     return this.#resolveUnlocked(sessionId)
   }
 
+  async scopeForRun(run: AnyRun): Promise<TaskRunScope> {
+    const index = await this.store.readIndex(false)
+    return { indexRevision: index.revision, run, ledger: await this.#readLedger(run) }
+  }
+
   async transact<T>(
     sessionId: string,
     decide: (scope: TaskRunScope) => TaskLedgerDecision<T>,

@@ -141,4 +141,66 @@ describe("session stop timeout fence", () => {
     expect(messages).toEqual([])
     expect(await Bun.file(store.paths.lock).exists()).toBeFalse()
   })
+
+  test("Given blocked receipt authority I/O When released after expiry Then no late state or continuation escapes", async () => {
+    const { root, run, store } = await initializedContinuationStore("continuation-late-authority")
+    let now = 0
+    let releaseAuthority: (() => void) | undefined
+    let markEntered: (() => void) | undefined
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    const blockedAuthority = new Promise<void>((resolve) => {
+      releaseAuthority = resolve
+    })
+    if (releaseAuthority === undefined || markEntered === undefined)
+      throw new Error("I/O gate missing")
+    const base = durableDependencies(root, store)
+    const coordinator = new DurableContinuationCoordinator({
+      ...base,
+      openStore: () => ({
+        readIndex: () => store.readIndex(),
+        readRun: (runId) => store.readRun(runId),
+        readReceiptAuthority: async () => {
+          markEntered?.()
+          await blockedAuthority
+          return { taskGeneration: 0, accepted: [], rejected: [] }
+        },
+        commit: (event, options) => store.commit(event, options),
+      }),
+    })
+    const before = await store.readRun(run.runId)
+    const messages: string[] = []
+    const pending = handleSessionStop(
+      {
+        contextPercent: 20,
+        contextSessionId: "session-a",
+        cwd: root.displayPath,
+        diagnosticTurnId: 0,
+        leafId: "leaf-authority",
+        sessionId: "session-a",
+        stopHookActive: false,
+      },
+      {
+        coordinator,
+        suppression: {
+          suppressNext: async (request) => {
+            messages.push(request.text)
+          },
+          runCommand: async (_sessionId, operation) => operation(),
+        },
+        createFence: () => createDeadlineFence(250, { nowMs: () => now }),
+      },
+    )
+    await entered
+
+    now = 251
+    releaseAuthority()
+    const result = await pending
+
+    expect(result).toBeUndefined()
+    expect(await store.readRun(run.runId)).toEqual(before)
+    expect(messages).toEqual([])
+    expect(await Bun.file(store.paths.lock).exists()).toBeFalse()
+  })
 })

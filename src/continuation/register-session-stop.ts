@@ -96,7 +96,7 @@ export function registerSessionStop(
       {
         coordinator,
         suppression,
-        createFence: () => createDeadlineFence(250, clock),
+        createFence: () => createDeadlineFence(2_000, clock),
       },
     )
   })

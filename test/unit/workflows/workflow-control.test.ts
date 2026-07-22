@@ -126,6 +126,28 @@ describe("pure workflow control", () => {
     })
   })
 
+  test("Given a fully checked plan When reconciled Then audit-only Markdown cannot advance or complete work", () => {
+    // Given
+    const run = startWorkRun()
+    const plan = parseStartWorkPlan(
+      "<!-- omp-lazy-ulw-plan:plan:v1 -->\n## TODOs\n- [x] **BUILD. Build state**\n\n## Final Verification Wave\n- [x] **VERIFY. Verify state**\n",
+    )
+
+    // When
+    const result = reduceWorkflowControl(run, {
+      kind: "reconcile_plan",
+      sessionId: "session-a",
+      expectedEpoch: 1,
+      plan,
+    })
+
+    // Then
+    expect(result).toMatchObject({
+      ok: true,
+      run: { progressRevision: run.progressRevision, payload: { status: "active" } },
+    })
+  })
+
   test("Given ULW blocked work When adopted Then it activates without a Goal runtime", () => {
     // Given
     const run = ulwLoopRun()

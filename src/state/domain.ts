@@ -162,9 +162,21 @@ export type StateMutation =
       readonly kind: "criterion_settled"
       readonly goalId: string
       readonly criterionId: string
+      readonly acceptanceId?: string | undefined
       readonly evidenceRef: string
       readonly captureRevision: number
       readonly captureCommit: string
+    }
+  | {
+      readonly kind: "task_evidence_accepted"
+      readonly taskId: string
+      readonly acceptanceId: string
+    }
+  | {
+      readonly kind: "workflow_terminal"
+      readonly status: "completed" | "failed"
+      readonly acceptanceIds?: readonly string[] | undefined
+      readonly taskId?: string | undefined
     }
   | {
       readonly kind: "continuation_attempted"

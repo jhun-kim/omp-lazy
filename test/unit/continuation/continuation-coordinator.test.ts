@@ -82,6 +82,32 @@ describe("pure continuation coordinator", () => {
     expect(result).toMatchObject({ kind: "continue", run: { workflow: "ulw_loop" } })
   })
 
+  test.each([
+    "blocked",
+    "needs_user_decision",
+    "review_blocked",
+  ] as const)("Given %s start-work and active ULW When selected Then explicit ULW is not starved", (status) => {
+    const fixture = dualSnapshot()
+    const blocked = {
+      ...fixture.start,
+      payload: { ...fixture.start.payload, status },
+    }
+    const first = fixture.index.entries[0]
+    if (first === undefined) throw new Error("fixture entry missing")
+    const index = {
+      ...fixture.index,
+      entries: [{ ...first, statusHint: "blocked" as const }, fixture.index.entries[1] ?? first],
+    }
+
+    const result = decideContinuation({
+      sessionId: "session-a",
+      leafId: `leaf-${status}`,
+      snapshot: { index, runs: [blocked, fixture.loop], plans: [] },
+    })
+
+    expect(result).toMatchObject({ kind: "continue", run: { workflow: "ulw_loop" } })
+  })
+
   test("Given a replayed leaf or missing indexed target When selected Then it stays quiet", () => {
     const fixture = dualSnapshot()
     const replay = {
@@ -127,6 +153,61 @@ describe("pure continuation coordinator", () => {
       run: { workflow: "ulw_loop" },
       mutation: { kind: "continuation_stuck", leafId: "leaf-3" },
     })
+  })
+
+  test("Given two unchanged start-work attempts When a distinct leaf stops Then it persists stuck without continuing", () => {
+    // Given
+    const fixture = dualSnapshot()
+    const start = {
+      ...fixture.start,
+      continuation: {
+        ...fixture.start.continuation,
+        progressRevisionSeen: fixture.start.progressRevision,
+        noProgressAttempts: 2,
+      },
+    }
+
+    // When
+    const result = decideContinuation({
+      sessionId: "session-a",
+      leafId: "leaf-3",
+      snapshot: {
+        index: fixture.index,
+        runs: [start, fixture.loop],
+        plans: [{ runId: start.runId, snapshot: fixture.plan }],
+      },
+    })
+
+    // Then
+    expect(result).toMatchObject({
+      kind: "stuck",
+      run: { workflow: "start_work" },
+      mutation: { kind: "continuation_stuck", leafId: "leaf-3" },
+    })
+  })
+
+  test("Given exhausted ULW cycle budget When a distinct leaf stops Then continuation stays quiet", () => {
+    // Given
+    const fixture = dualSnapshot()
+    const activeGoal = fixture.loop.payload.goals[0]
+    if (activeGoal === undefined) throw new Error("fixture goal missing")
+    const exhausted = {
+      ...fixture.loop,
+      payload: {
+        ...fixture.loop.payload,
+        goals: [{ ...activeGoal, cycleCount: 5 }],
+      },
+    }
+
+    // When
+    const result = decideContinuation({
+      sessionId: "session-a",
+      leafId: "leaf-budget",
+      snapshot: { index: fixture.index, runs: [fixture.start, exhausted], plans: [] },
+    })
+
+    // Then
+    expect(result).toEqual({ kind: "quiet" })
   })
 
   test("Given malformed, foreign, or terminal ownership When selected Then it stays quiet", () => {

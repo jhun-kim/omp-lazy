@@ -105,10 +105,9 @@ function reduceStart(run: StartWorkRun, command: ControlCommand): ControlResult<
         run: {
           ...run,
           revision: run.revision + 1,
-          progressRevision: run.progressRevision + 1,
           payload: {
             ...run.payload,
-            status: command.plan.remainingTaskIds.length === 0 ? "completed" : "active",
+            status: "active",
             plan: {
               ...run.payload.plan,
               taskIds: command.plan.taskIds,

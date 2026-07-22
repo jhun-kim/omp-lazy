@@ -16,6 +16,8 @@ import {
   StateRootContainmentError,
   statePaths,
 } from "./paths"
+import { persistedEventForIndex } from "./persisted-event"
+import { type ReceiptAuthority, readReceiptAuthority } from "./receipt-authority"
 import { type Deadline, deadlineAfter, RepoLock } from "./repo-lock"
 import { prepareTransition, type TransitionErrorCode } from "./state-transition"
 
@@ -103,8 +105,14 @@ export class TransactionStore {
       const highest = events.at(-1)?.sequence ?? 0
       if (highest !== index.revision) return { ok: false, code: "state_diverged" }
       const current = await this.readRun(event.runId, false)
-      const persistedEvent = this.#persistedEvent(index, event)
-      const prepared = prepareTransition(index, current, persistedEvent)
+      const persistedEvent = persistedEventForIndex(index, event)
+      const receiptBound =
+        persistedEvent.mutation.kind === "criterion_settled" ||
+        persistedEvent.mutation.kind === "task_evidence_accepted" ||
+        persistedEvent.mutation.kind === "workflow_terminal"
+      const authority =
+        receiptBound && current !== null ? await readReceiptAuthority(this, current) : null
+      const prepared = prepareTransition(index, current, persistedEvent, authority)
       if ("code" in prepared) return { ok: false, code: prepared.code }
       options.crash?.("before_event")
       if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
@@ -240,32 +248,7 @@ export class TransactionStore {
     return (await this.events.readAll()).find((event) => event.eventId === parsedId.data) ?? null
   }
 
-  #persistedEvent(index: ActiveIndex, event: PersistedStateEvent): PersistedStateEvent {
-    if (index.schemaVersion === 1 || event.schemaVersion === 2) return event
-    const mutation =
-      event.mutation.kind === "run_created" && event.mutation.run.schemaVersion === 1
-        ? {
-            ...event.mutation,
-            run: {
-              ...event.mutation.run,
-              schemaVersion: 2 as const,
-              packetHash: null,
-              expectedHead: null,
-            },
-          }
-        : event.mutation
-    const taskGeneration =
-      event.kind === "plan_reconciled" ||
-      event.kind === "goal_cycle_started" ||
-      event.kind === "criterion_failure_recorded"
-        ? 1
-        : null
-    return {
-      ...event,
-      schemaVersion: 2,
-      expected: { ...event.expected, expectedHead: null, taskGeneration },
-      mutation,
-      legacyHeadUnbound: false,
-    }
+  async readReceiptAuthority(run: AnyRun): Promise<ReceiptAuthority> {
+    return readReceiptAuthority(this, run)
   }
 }

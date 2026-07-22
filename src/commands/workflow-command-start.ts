@@ -121,7 +121,7 @@ async function createStartWork(context: CommandContext): Promise<WorkflowCommand
     updatedAt: at,
     payload: {
       kind: "start_work",
-      status: plan.value.normalized.remainingTaskIds.length === 0 ? "completed" : "active",
+      status: "active",
       plan: {
         planId: newRunId(),
         canonicalPath: plan.value.canonicalPath,

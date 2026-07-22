@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
-import { AgentIdSchema, JobIdSchema } from "../../src/contracts/agent-ids"
+import { AgentIdSchema, JobIdSchema, ToolCallIdSchema } from "../../src/contracts/agent-ids"
 import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
 import { ToolResultObserver } from "../../src/observers/tool-result-observer"
 import {
   type AcceptanceRuntime,
   acceptanceBytes,
   acceptanceRuntime,
+  bindWorker,
   controlRun,
   removeRuntime,
   writeEvidence,
@@ -106,18 +107,22 @@ test("Given a capped semantic role When only run progress advances Then its budg
     taskIds: ["next-result-target"],
     taskFingerprint: "b".repeat(64),
   })
-  const next = await writeEvidence(value)
+  const agentId = AgentIdSchema.parse("next-attempt-worker")
+  const jobId = JobIdSchema.parse("next-attempt-worker")
+  await bindWorker(value.ledger, value.run.owner.sessionId, {
+    toolCallId: ToolCallIdSchema.parse("next-attempt-dispatch"),
+    agentId,
+    jobId,
+    role: value.role,
+  })
+  const next = await writeEvidence(value, { actualAgentId: agentId, actualJobId: jobId })
 
   const accepted = await value.acceptance.accept(caller, {
-    agentId: value.agentId,
+    agentId,
     receiptPath: next.receiptPath,
   })
 
-  expect(advanced.progressRevision).toBe(value.run.progressRevision + 1)
-  expect(accepted).toMatchObject({
-    kind: "needs_parent_decision",
-    code: "retry_cap_reached",
-    rejectionCount: 3,
-  })
-  expect(await value.acceptance.acceptanceLedger.entries(value.run.runId)).toHaveLength(0)
+  expect(advanced.progressRevision).toBe(value.run.progressRevision)
+  expect(accepted.kind).toBe("accepted")
+  expect(await value.acceptance.acceptanceLedger.entries(value.run.runId)).toHaveLength(1)
 })
