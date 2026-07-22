@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseStartWorkPlan } from "../../../src/workflows/start-work-plan"
+import { normalizeStartWorkPlan, parseStartWorkPlan } from "../../../src/workflows/start-work-plan"
 
 const BASE_PLAN = `# Plan
 
@@ -64,5 +64,67 @@ describe("start-work plan identity", () => {
 
     // Then
     expect(after.fingerprint).not.toBe(before.fingerprint)
+  })
+
+  test("Given a v1 plan without explicit task ids When normalized Then stable legacy ids are assigned", () => {
+    // Given
+    const plan = `<!-- omp-lazy-ulw-plan:plan:v1 -->
+## TODOs
+- [ ] Build state
+## Final Verification Wave
+- [x] Verify state
+`
+
+    // When
+    const result = normalizeStartWorkPlan(plan)
+
+    // Then
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        version: 1,
+      },
+    })
+    if (result.ok) {
+      expect(result.value.taskIds[0]).toMatch(/^LEGACY-[0-9a-f]{12}$/)
+      expect(result.value.taskIds[1]).toMatch(/^LEGACY-[0-9a-f]{12}$/)
+    }
+  })
+
+  test("Given duplicate v1 normalized task identities When normalized Then migration-safe rejection is returned", () => {
+    // Given
+    const plan = `<!-- omp-lazy-ulw-plan:plan:v1 -->
+## TODOs
+- [ ] **T05. State migration**
+## Final Verification Wave
+- [ ] **T05. State migration**
+`
+
+    // When
+    const result = normalizeStartWorkPlan(plan)
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "duplicate_normalized_task_identity" })
+  })
+
+  test("Given v2 headings out of order When normalized Then the plan identity is rejected", () => {
+    // Given
+    const plan = `<!-- omp-lazy-ulw-plan:plan:v2 -->
+## Scope
+## TL;DR (For humans)
+## Verification strategy
+## Execution strategy
+## Todos
+- [ ] **T05. State migration**
+## Final verification wave
+## Commit strategy
+## Success criteria
+`
+
+    // When
+    const result = normalizeStartWorkPlan(plan)
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "plan_identity_mismatch" })
   })
 })
