@@ -1,10 +1,14 @@
 import { readFile } from "node:fs/promises"
 import { atomicReplace } from "./atomic-file"
 import { decodeActiveIndex, decodeRun, StateDecodeError } from "./codec"
-import type { ActiveIndex, AnyRun, CanonicalRoot, StateEvent } from "./domain"
+import type { ActiveIndex, AnyRun, CanonicalRoot, PersistedStateEvent } from "./domain"
 import { UuidSchema } from "./domain"
 import { EventStore } from "./event-store"
-import { migrateLifecycleState, recoverLifecycleMigration } from "./migration"
+import {
+  lifecycleMigrationRequiresRecovery,
+  migrateLifecycleState,
+  recoverLifecycleMigration,
+} from "./migration"
 import {
   ensureStatePathContained,
   runSnapshotPath,
@@ -46,7 +50,7 @@ export class TransactionStore {
   }
 
   async commit(
-    event: StateEvent,
+    event: PersistedStateEvent,
     options: { readonly deadline: Deadline; readonly crash?: (point: CrashPoint) => void },
   ): Promise<TransactionResult> {
     if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
@@ -78,11 +82,12 @@ export class TransactionStore {
       const highest = events.at(-1)?.sequence ?? 0
       if (highest !== index.revision) return { ok: false, code: "state_diverged" }
       const current = await this.readRun(event.runId, false)
-      const prepared = prepareTransition(index, current, event)
+      const persistedEvent = this.#persistedEvent(index, event)
+      const prepared = prepareTransition(index, current, persistedEvent)
       if ("code" in prepared) return { ok: false, code: prepared.code }
       options.crash?.("before_event")
       if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
-      await this.events.append(event, options.deadline)
+      await this.events.append(persistedEvent, options.deadline)
       options.crash?.("after_event")
       if (!options.deadline.isValid()) return { ok: false, code: "deadline_expired" }
       await atomicReplace(
@@ -121,14 +126,18 @@ export class TransactionStore {
       if (error instanceof SyntaxError) throw new StateDecodeError("malformed_index")
       throw error
     }
-    if (
+    const current =
       typeof value === "object" &&
       value !== null &&
       !Array.isArray(value) &&
       "schemaVersion" in value &&
       value.schemaVersion === 2
-    ) {
+    if (current && !(await lifecycleMigrationRequiresRecovery(this.root))) {
       return
+    }
+    if (current) {
+      const recovered = await recoverLifecycleMigration(this.root)
+      if (!recovered.ok) throw new StateDecodeError(recovered.code)
     }
     const migrated = await migrateLifecycleState({ root: this.root })
     if (migrated.ok) return
@@ -168,5 +177,34 @@ export class TransactionStore {
     const decoded = decodeRun(bytes, this.root)
     if (!decoded.ok) throw decoded.error
     return decoded.value
+  }
+
+  #persistedEvent(index: ActiveIndex, event: PersistedStateEvent): PersistedStateEvent {
+    if (index.schemaVersion === 1 || event.schemaVersion === 2) return event
+    const mutation =
+      event.mutation.kind === "run_created" && event.mutation.run.schemaVersion === 1
+        ? {
+            ...event.mutation,
+            run: {
+              ...event.mutation.run,
+              schemaVersion: 2 as const,
+              packetHash: null,
+              expectedHead: null,
+            },
+          }
+        : event.mutation
+    const taskGeneration =
+      event.kind === "plan_reconciled" ||
+      event.kind === "goal_cycle_started" ||
+      event.kind === "criterion_failure_recorded"
+        ? 1
+        : null
+    return {
+      ...event,
+      schemaVersion: 2,
+      expected: { ...event.expected, expectedHead: null, taskGeneration },
+      mutation,
+      legacyHeadUnbound: false,
+    }
   }
 }

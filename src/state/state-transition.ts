@@ -1,6 +1,6 @@
 import { recordCriterionFailure, startGoalCycle } from "../workflows/ulw-loop-contract"
 import { reduceWorkflowControl } from "../workflows/workflow-control"
-import type { ActiveIndex, ActiveIndexEntry, AnyRun, StateEvent } from "./domain"
+import type { ActiveIndex, ActiveIndexEntry, AnyRun, PersistedStateEvent } from "./domain"
 
 export type TransitionErrorCode =
   | "index_revision_conflict"
@@ -14,7 +14,7 @@ export type PreparedTransition = {
   readonly index: ActiveIndex
 }
 
-function controlRun(run: AnyRun, event: StateEvent): AnyRun | null {
+function controlRun(run: AnyRun, event: PersistedStateEvent): AnyRun | null {
   const mutation = event.mutation
   switch (mutation.kind) {
     case "run_created":
@@ -155,13 +155,15 @@ export function deriveIndex(index: ActiveIndex, run: AnyRun, sequence: number): 
             statusHint: hint,
           },
         ]
-  return { schemaVersion: 1, revision: sequence, entries }
+  return index.schemaVersion === 2
+    ? { schemaVersion: 2, migrationRevision: index.migrationRevision, revision: sequence, entries }
+    : { schemaVersion: 1, revision: sequence, entries }
 }
 
 export function prepareTransition(
   index: ActiveIndex,
   current: AnyRun | null,
-  event: StateEvent,
+  event: PersistedStateEvent,
 ): PreparedTransition | { readonly code: TransitionErrorCode } {
   if (event.expected.indexRevision !== index.revision) return { code: "index_revision_conflict" }
   if (event.sequence !== index.revision + 1) return { code: "invalid_mutation" }

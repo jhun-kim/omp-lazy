@@ -21,7 +21,6 @@ const continuationSchema = z
   })
   .strict()
 const envelopeFields = {
-  schemaVersion: z.literal(1),
   runId: UuidSchema,
   revision: counter,
   transactionRevision: counter,
@@ -30,6 +29,13 @@ const envelopeFields = {
   continuation: continuationSchema,
   createdAt: timestamp,
   updatedAt: timestamp,
+} as const
+const v2EnvelopeFields = {
+  packetHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
+  expectedHead: nonempty.nullable(),
 } as const
 const planSchema = z
   .object({
@@ -42,26 +48,33 @@ const planSchema = z
     taskIds: uniqueStrings,
   })
   .strict()
+const startWorkFields = {
+  ...envelopeFields,
+  workflow: z.literal("start_work"),
+  payload: z
+    .object({
+      kind: z.literal("start_work"),
+      status: z.enum([
+        "active",
+        "paused",
+        "stuck",
+        "completed",
+        "cancelled",
+        "failed",
+        "abandoned",
+      ]),
+      plan: planSchema,
+    })
+    .strict(),
+} as const
 const startWorkRunSchema = z
   .object({
-    ...envelopeFields,
-    workflow: z.literal("start_work"),
-    payload: z
-      .object({
-        kind: z.literal("start_work"),
-        status: z.enum([
-          "active",
-          "paused",
-          "stuck",
-          "completed",
-          "cancelled",
-          "failed",
-          "abandoned",
-        ]),
-        plan: planSchema,
-      })
-      .strict(),
+    schemaVersion: z.literal(1),
+    ...startWorkFields,
   })
+  .strict()
+const startWorkRunV2Schema = z
+  .object({ schemaVersion: z.literal(2), ...startWorkFields, ...v2EnvelopeFields })
   .strict()
 const criterionSchema = z
   .object({
@@ -96,73 +109,104 @@ const goalSchema = z
       context.addIssue({ code: "custom", message: "duplicate criterion" })
     }
   })
+const ulwLoopFields = {
+  ...envelopeFields,
+  workflow: z.literal("ulw_loop"),
+  payload: z
+    .object({
+      kind: z.literal("ulw_loop"),
+      status: z.enum([
+        "active",
+        "paused",
+        "stuck",
+        "completed",
+        "cancelled",
+        "failed",
+        "blocked",
+        "needs_user_decision",
+        "review_blocked",
+      ]),
+      activeGoalId: nonempty.nullable(),
+      goals: z.array(goalSchema).readonly(),
+    })
+    .strict(),
+} as const
+
+function refineUlwLoop(
+  run: { readonly payload: z.infer<typeof ulwLoopFields.payload> },
+  context: z.core.$RefinementCtx,
+): void {
+  const goalIds = run.payload.goals.map((goal) => goal.id)
+  const criterionIds = run.payload.goals.flatMap((goal) =>
+    goal.criteria.map((criterion) => criterion.id),
+  )
+  if (new Set(goalIds).size !== goalIds.length) {
+    context.addIssue({ code: "custom", message: "duplicate goal", input: run })
+  }
+  if (new Set(criterionIds).size !== criterionIds.length) {
+    context.addIssue({ code: "custom", message: "duplicate criterion", input: run })
+  }
+  const inProgress = run.payload.goals.filter((goal) => goal.status === "in_progress")
+  const activeMatches = inProgress.length === 1 && inProgress[0]?.id === run.payload.activeGoalId
+  if (
+    (run.payload.activeGoalId === null && inProgress.length !== 0) ||
+    (run.payload.activeGoalId !== null && !activeMatches)
+  ) {
+    context.addIssue({ code: "custom", message: "active goal mismatch", input: run })
+  }
+}
+
 const ulwLoopRunSchema = z
   .object({
-    ...envelopeFields,
-    workflow: z.literal("ulw_loop"),
-    payload: z
-      .object({
-        kind: z.literal("ulw_loop"),
-        status: z.enum([
-          "active",
-          "paused",
-          "stuck",
-          "completed",
-          "cancelled",
-          "failed",
-          "blocked",
-          "needs_user_decision",
-          "review_blocked",
-        ]),
-        activeGoalId: nonempty.nullable(),
-        goals: z.array(goalSchema).readonly(),
-      })
-      .strict(),
-  })
-  .strict()
-  .superRefine((run, context) => {
-    const goalIds = run.payload.goals.map((goal) => goal.id)
-    const criterionIds = run.payload.goals.flatMap((goal) =>
-      goal.criteria.map((criterion) => criterion.id),
-    )
-    if (new Set(goalIds).size !== goalIds.length) {
-      context.addIssue({ code: "custom", message: "duplicate goal" })
-    }
-    if (new Set(criterionIds).size !== criterionIds.length) {
-      context.addIssue({ code: "custom", message: "duplicate criterion" })
-    }
-    const inProgress = run.payload.goals.filter((goal) => goal.status === "in_progress")
-    const activeMatches = inProgress.length === 1 && inProgress[0]?.id === run.payload.activeGoalId
-    if (
-      (run.payload.activeGoalId === null && inProgress.length !== 0) ||
-      (run.payload.activeGoalId !== null && !activeMatches)
-    ) {
-      context.addIssue({ code: "custom", message: "active goal mismatch" })
-    }
-  })
-
-export const runSchema = z.union([startWorkRunSchema, ulwLoopRunSchema])
-export const activeIndexSchema = z
-  .object({
     schemaVersion: z.literal(1),
-    revision: counter,
-    entries: z
-      .array(
-        z
-          .object({
-            workflow: z.enum(["start_work", "ulw_loop"]),
-            sessionId: nonempty,
-            runId: UuidSchema,
-            ownerEpoch: counter,
-            runRevision: counter,
-            transactionRevision: counter,
-            statusHint: z.enum(["active", "paused", "stuck", "blocked"]),
-          })
-          .strict(),
-      )
-      .readonly(),
+    ...ulwLoopFields,
   })
   .strict()
+  .superRefine(refineUlwLoop)
+const ulwLoopRunV2Schema = z
+  .object({ schemaVersion: z.literal(2), ...ulwLoopFields, ...v2EnvelopeFields })
+  .strict()
+  .superRefine(refineUlwLoop)
+
+export const runSchema = z.union([
+  startWorkRunSchema,
+  startWorkRunV2Schema,
+  ulwLoopRunSchema,
+  ulwLoopRunV2Schema,
+])
+const activeIndexFields = {
+  revision: counter,
+  entries: z
+    .array(
+      z
+        .object({
+          workflow: z.enum(["start_work", "ulw_loop"]),
+          sessionId: nonempty,
+          runId: UuidSchema,
+          ownerEpoch: counter,
+          runRevision: counter,
+          transactionRevision: counter,
+          statusHint: z.enum(["active", "paused", "stuck", "blocked"]),
+        })
+        .strict(),
+    )
+    .readonly(),
+} as const
+export const activeIndexSchema = z.union([
+  z
+    .object({
+      schemaVersion: z.literal(1),
+      ...activeIndexFields,
+    })
+    .strict(),
+  z
+    .object({
+      schemaVersion: z.literal(2),
+      migrationRevision: counter.positive(),
+      ...activeIndexFields,
+    })
+    .strict(),
+])
 const mutationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("run_created"), run: runSchema }).strict(),
   z

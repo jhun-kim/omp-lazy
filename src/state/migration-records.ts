@@ -57,11 +57,15 @@ function currentV2(value: JsonRecord, parser: z.ZodType): boolean {
 
 function identityFor(
   identities: readonly TaskIdentity[],
+  runId: string,
   agentId: string,
   role?: string,
 ): TaskIdentity | null {
   const matches = identities.filter(
-    (identity) => identity.agentId === agentId && (role === undefined || identity.role === role),
+    (identity) =>
+      identity.runId === runId &&
+      identity.agentId === agentId &&
+      (role === undefined || identity.role === role),
   )
   return matches.length === 1 ? (matches[0] ?? null) : null
 }
@@ -76,7 +80,7 @@ function migrateAcceptance(
   const parsed = acceptanceLedgerSchema.safeParse(value)
   if (!parsed.success) return { kind: "invalid" }
   const entries = parsed.data.entries.map((entry) => {
-    const identity = identityFor(identities, entry.actualAgentId, entry.workerRole)
+    const identity = identityFor(identities, entry.runId, entry.actualAgentId, entry.workerRole)
     return identity === null
       ? null
       : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: entry.attempt }
@@ -95,7 +99,7 @@ function migrateRejections(
   const parsed = rejectionLedgerSchema.safeParse(value)
   if (!parsed.success) return { kind: "invalid" }
   const entries = parsed.data.entries.map((entry) => {
-    const identity = identityFor(identities, entry.actualAgentId)
+    const identity = identityFor(identities, entry.runId, entry.actualAgentId)
     return identity === null
       ? null
       : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: entry.attempt }
@@ -115,7 +119,12 @@ function migrateWal(bytes: string, identities: readonly TaskIdentity[]): Migrati
     }
     const parsed = acceptanceEventSchema.safeParse(entry)
     if (!parsed.success) return null
-    const identity = identityFor(identities, parsed.data.actualAgentId, parsed.data.workerRole)
+    const identity = identityFor(
+      identities,
+      parsed.data.runId,
+      parsed.data.actualAgentId,
+      parsed.data.workerRole,
+    )
     return identity === null
       ? null
       : {
@@ -162,22 +171,32 @@ export function migrateLifecycleRecord(
   }
   if (path.startsWith("events/")) {
     if (stateEventV2Schema.safeParse(value).success) return { kind: "current", bytes }
-    if (!stateEventSchema.safeParse(value).success) return { kind: "invalid" }
-    const expected = value.expected
-    if (typeof expected !== "object" || expected === null || Array.isArray(expected))
-      return { kind: "invalid" }
+    const parsedEvent = stateEventSchema.safeParse(value)
+    if (!parsedEvent.success) return { kind: "invalid" }
+    const event = parsedEvent.data
     const taskScoped =
-      value.kind === "plan_reconciled" ||
-      value.kind === "goal_cycle_started" ||
-      value.kind === "criterion_failure_recorded"
-    if (taskScoped && identities.length !== 1) return { kind: "invalid" }
+      event.kind === "plan_reconciled" ||
+      event.kind === "goal_cycle_started" ||
+      event.kind === "criterion_failure_recorded"
+    const orderedTaskId =
+      event.mutation.kind === "plan_reconciled"
+        ? (event.mutation.taskIds[0] ?? null)
+        : event.mutation.kind === "goal_cycle_started"
+          ? event.mutation.goalId
+          : event.mutation.kind === "criterion_failure_recorded"
+            ? event.mutation.criterionId
+            : null
+    const eventIdentities = identities.filter(
+      (identity) => identity.runId === event.runId && identity.taskId === orderedTaskId,
+    )
+    if (taskScoped && eventIdentities.length !== 1) return { kind: "invalid" }
     return {
       kind: "migrated",
       bytes: JSON.stringify({
         ...value,
         schemaVersion: 2,
         expected: {
-          ...expected,
+          ...event.expected,
           expectedHead: null,
           taskGeneration: taskScoped ? 1 : null,
         },

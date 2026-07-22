@@ -130,9 +130,12 @@ export const rejectionLedgerV2Schema = z
   })
 
 type AcceptanceLedger = z.infer<typeof acceptanceLedgerSchema>
-type RejectionScope = Omit<z.infer<typeof rejectionEntrySchema>, "count" | "status">
+type AcceptanceLedgerV2 = z.infer<typeof acceptanceLedgerV2Schema>
+type RuntimeAcceptanceLedger = AcceptanceLedger | AcceptanceLedgerV2
+type LegacyRejectionScope = Omit<z.infer<typeof rejectionEntrySchema>, "count" | "status">
+type V2RejectionScope = Omit<z.infer<typeof rejectionEntryV2Schema>, "count" | "status">
+type RejectionScope = LegacyRejectionScope | V2RejectionScope
 type V2RejectionEntry = z.infer<typeof rejectionEntryV2Schema>
-type V2RejectionScope = Omit<V2RejectionEntry, "count" | "status">
 type RuntimeRejectionEntry = z.infer<typeof rejectionEntrySchema> &
   Partial<Pick<V2RejectionEntry, "taskId" | "role" | "semanticAttempt">>
 type RuntimeRejectionLedger = {
@@ -157,8 +160,8 @@ export class WorkerAcceptanceLedgerError extends Error {
   }
 }
 
-function rejectionKey(scope: RejectionScope | V2RejectionScope | RuntimeRejectionEntry): string {
-  return "taskId" in scope && "role" in scope && "semanticAttempt" in scope
+function rejectionKey(scope: RejectionScope | RuntimeRejectionEntry, schemaVersion: 1 | 2): string {
+  return schemaVersion === 2 && "taskId" in scope && "role" in scope && "semanticAttempt" in scope
     ? [scope.runId, scope.taskId, scope.taskGeneration, scope.role, scope.semanticAttempt].join(
         "\u0000",
       )
@@ -182,35 +185,58 @@ export class WorkerAcceptanceLedger {
 
   async rejectionCount(scope: RejectionScope): Promise<number> {
     const ledger = await this.#readRejections(scope.runId)
-    return ledger.entries.find((entry) => rejectionKey(entry) === rejectionKey(scope))?.count ?? 0
+    return (
+      ledger.entries.find(
+        (entry) =>
+          rejectionKey(entry, ledger.schemaVersion) === rejectionKey(scope, ledger.schemaVersion),
+      )?.count ?? 0
+    )
   }
 
   async reject(scope: RejectionScope, deadline: Deadline): Promise<number> {
     const ledger = await this.#readRejections(scope.runId)
-    const existing = ledger.entries.find((entry) => rejectionKey(entry) === rejectionKey(scope))
+    const existing = ledger.entries.find(
+      (entry) =>
+        rejectionKey(entry, ledger.schemaVersion) === rejectionKey(scope, ledger.schemaVersion),
+    )
     if (existing?.count === 3) return 3
     const count = (existing?.count ?? 0) + 1
-    const replacement = {
-      ...scope,
-      count,
-      status: count === 3 ? "needs_parent_decision" : "retry_allowed",
-    } as const
+    const status = count === 3 ? "needs_parent_decision" : "retry_allowed"
+    const replacement =
+      ledger.schemaVersion === 2
+        ? rejectionEntryV2Schema.parse({ ...scope, count, status })
+        : rejectionEntrySchema.parse({
+            runId: scope.runId,
+            attempt: scope.attempt,
+            runRevision: scope.runRevision,
+            ownerEpoch: scope.ownerEpoch,
+            taskGeneration: scope.taskGeneration,
+            actualAgentId: scope.actualAgentId,
+            count,
+            status,
+          })
     const entries =
       existing === undefined
         ? [...ledger.entries, replacement]
         : ledger.entries.map((entry) =>
-            rejectionKey(entry) === rejectionKey(scope) ? replacement : entry,
+            rejectionKey(entry, ledger.schemaVersion) === rejectionKey(scope, ledger.schemaVersion)
+              ? replacement
+              : entry,
           )
-    await atomicReplace(
-      this.rejectionPath(scope.runId),
-      JSON.stringify(rejectionLedgerSchema.parse({ ...ledger, entries })),
-      { deadline, guard: this.store.guard },
-    )
+    const updated =
+      ledger.schemaVersion === 2
+        ? rejectionLedgerV2Schema.parse({ ...ledger, entries })
+        : rejectionLedgerSchema.parse({ ...ledger, entries })
+    await atomicReplace(this.rejectionPath(scope.runId), JSON.stringify(updated), {
+      deadline,
+      guard: this.store.guard,
+    })
     return count
   }
 
   async accept(
-    event: Omit<WorkerAcceptanceEvent, "sequence" | "idempotencyKey" | "receiptHash">,
+    event: Omit<WorkerAcceptanceEvent, "sequence" | "idempotencyKey" | "receiptHash"> &
+      Pick<V2RejectionEntry, "taskId" | "role" | "semanticAttempt">,
     evidence: EvidenceBundle,
     deadline: Deadline,
   ): Promise<"accepted" | "replayed" | "duplicate_receipt"> {
@@ -221,24 +247,40 @@ export class WorkerAcceptanceLedger {
       event.actualAgentId,
       event.artifactHash,
     ].join("\u0000")
-    const candidate = acceptanceEventSchema.parse({
-      ...event,
+    const commonCandidate = {
+      ...(({ taskId: _taskId, role: _role, semanticAttempt: _semanticAttempt, ...common }) =>
+        common)(event),
       sequence: ledger.ledgerRevision + 1,
       idempotencyKey,
       receiptHash: evidence.receiptFile.sha256,
-    })
+    }
+    const candidate =
+      ledger.schemaVersion === 2
+        ? acceptanceLedgerEntryV2Schema.parse({ ...commonCandidate, ...event })
+        : acceptanceEventSchema.parse(commonCandidate)
     const existing = ledger.entries.find((entry) => entry.idempotencyKey === idempotencyKey)
     if (existing !== undefined) {
       return same(existing, { ...candidate, sequence: existing.sequence })
         ? "replayed"
         : "duplicate_receipt"
     }
-    const updated = acceptanceLedgerSchema.parse({
-      ...ledger,
-      ledgerRevision: ledger.ledgerRevision + 1,
-      entries: [...ledger.entries, candidate],
-    })
-    await appendAcceptanceWal(this.acceptanceWalPath(event.runId), candidate, {
+    const updated =
+      ledger.schemaVersion === 2
+        ? acceptanceLedgerV2Schema.parse({
+            ...ledger,
+            ledgerRevision: ledger.ledgerRevision + 1,
+            entries: [...ledger.entries, candidate],
+          })
+        : acceptanceLedgerSchema.parse({
+            ...ledger,
+            ledgerRevision: ledger.ledgerRevision + 1,
+            entries: [...ledger.entries, candidate],
+          })
+    const walEvent =
+      ledger.schemaVersion === 2
+        ? acceptanceEventV2Schema.parse({ ...candidate, schemaVersion: 2 })
+        : candidate
+    await appendAcceptanceWal(this.acceptanceWalPath(event.runId), walEvent, {
       deadline,
       guard: this.store.guard,
     })
@@ -250,53 +292,54 @@ export class WorkerAcceptanceLedger {
   }
 
   async entries(runId: string): Promise<readonly WorkerAcceptanceEvent[]> {
-    return (await this.#readAcceptance(runId)).entries
+    const entries = (await this.#readAcceptance(runId)).entries
+    return entries.map((entry) =>
+      "taskId" in entry
+        ? (({ taskId: _taskId, role: _role, semanticAttempt: _semanticAttempt, ...common }) =>
+            common)(entry)
+        : entry,
+    )
   }
 
-  async #readAcceptance(runId: string): Promise<AcceptanceLedger> {
-    let snapshot: AcceptanceLedger
+  async #readAcceptance(runId: string): Promise<RuntimeAcceptanceLedger> {
+    let snapshot: RuntimeAcceptanceLedger
     const path = this.acceptancePath(runId)
     await this.store.guard(path)
     try {
       const raw: unknown = JSON.parse(await readFile(path, "utf8"))
       const v2 = acceptanceLedgerV2Schema.safeParse(raw)
-      snapshot = v2.success
-        ? acceptanceLedgerSchema.parse({
-            schemaVersion: 1,
-            runId: v2.data.runId,
-            ledgerRevision: v2.data.ledgerRevision,
-            entries: v2.data.entries.map(
-              ({ taskId: _taskId, role: _role, semanticAttempt: _semanticAttempt, ...entry }) =>
-                entry,
-            ),
-          })
-        : acceptanceLedgerSchema.parse(raw)
+      snapshot = v2.success ? v2.data : acceptanceLedgerSchema.parse(raw)
     } catch (error) {
       if (isMissing(error)) {
-        snapshot = acceptanceLedgerSchema.parse({
-          schemaVersion: 1,
-          runId,
-          ledgerRevision: 0,
-          entries: [],
-        })
+        const run = await this.store.readRun(runId, false)
+        snapshot =
+          run?.schemaVersion === 2
+            ? acceptanceLedgerV2Schema.parse({
+                schemaVersion: 2,
+                runId,
+                ledgerRevision: 0,
+                entries: [],
+              })
+            : acceptanceLedgerSchema.parse({
+                schemaVersion: 1,
+                runId,
+                ledgerRevision: 0,
+                entries: [],
+              })
       } else {
         throw error
       }
     }
-    const entries = [...snapshot.entries]
+    const entries: (WorkerAcceptanceEvent | z.infer<typeof acceptanceLedgerEntryV2Schema>)[] = [
+      ...snapshot.entries,
+    ]
     for (const raw of await readAcceptanceWal(this.acceptanceWalPath(runId), this.store.guard)) {
-      const v2 = acceptanceEventV2Schema.safeParse(raw)
-      const event = v2.success
-        ? acceptanceEventSchema.parse(
-            (({
-              schemaVersion: _schemaVersion,
-              taskId: _taskId,
-              role: _role,
-              semanticAttempt: _semanticAttempt,
-              ...entry
-            }) => entry)(v2.data),
-          )
-        : acceptanceEventSchema.parse(raw)
+      const event =
+        snapshot.schemaVersion === 2
+          ? (({ schemaVersion: _schemaVersion, ...entry }) => entry)(
+              acceptanceEventV2Schema.parse(raw),
+            )
+          : acceptanceEventSchema.parse(raw)
       const existing = entries[event.sequence - 1]
       if (existing !== undefined) {
         if (!same(existing, event)) throw new WorkerAcceptanceLedgerError("wal_diverged")
@@ -304,11 +347,9 @@ export class WorkerAcceptanceLedger {
       }
       entries.push(event)
     }
-    return acceptanceLedgerSchema.parse({
-      ...snapshot,
-      ledgerRevision: entries.length,
-      entries,
-    })
+    return snapshot.schemaVersion === 2
+      ? acceptanceLedgerV2Schema.parse({ ...snapshot, ledgerRevision: entries.length, entries })
+      : acceptanceLedgerSchema.parse({ ...snapshot, ledgerRevision: entries.length, entries })
   }
 
   async #readRejections(runId: string): Promise<RuntimeRejectionLedger> {
@@ -320,7 +361,10 @@ export class WorkerAcceptanceLedger {
       return v2.success ? v2.data : rejectionLedgerSchema.parse(raw)
     } catch (error) {
       if (isMissing(error)) {
-        return rejectionLedgerSchema.parse({ schemaVersion: 1, runId, entries: [] })
+        const run = await this.store.readRun(runId, false)
+        return run?.schemaVersion === 2
+          ? rejectionLedgerV2Schema.parse({ schemaVersion: 2, runId, entries: [] })
+          : rejectionLedgerSchema.parse({ schemaVersion: 1, runId, entries: [] })
       }
       throw error
     }

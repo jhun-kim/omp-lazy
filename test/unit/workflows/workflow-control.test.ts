@@ -104,7 +104,7 @@ describe("pure workflow control", () => {
     // Given
     const run = startWorkRun()
     const plan = parseStartWorkPlan(
-      "## TODOs\n- [ ] Replacement task\n\n## Final Verification Wave\n- [ ] Review\n",
+      "<!-- omp-lazy-ulw-plan:plan:v1 -->\n## TODOs\n- [ ] **REPLACEMENT. Replacement task**\n\n## Final Verification Wave\n- [ ] **REVIEW. Review**\n",
     )
 
     // When
@@ -120,7 +120,7 @@ describe("pure workflow control", () => {
       ok: true,
       run: {
         payload: {
-          plan: { taskIds: ["Replacement task", "Review"], taskFingerprint: plan.fingerprint },
+          plan: { taskIds: ["REPLACEMENT", "REVIEW"], taskFingerprint: plan.fingerprint },
         },
       },
     })

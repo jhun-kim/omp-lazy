@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFile, mkdir, rename, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { basename, dirname, join, relative } from "node:path"
+import { migrateLifecycleState } from "../../src/state/migration"
 import {
   ARTIFACT_FILE_CASES,
   OUTPUT_BINDING_CASES,
@@ -259,4 +260,76 @@ test("Given exact and conflicting receipt replays When submitted Then acceptance
   expect(duplicate).toMatchObject({ kind: "rejected", code: "duplicate_receipt" })
   expect(await acceptanceBytes(value)).toBe(firstBytes)
   expect(JSON.parse(firstBytes ?? "").entries).toHaveLength(1)
+})
+
+test("Given migrated state When runtime rejects a worker Then the full semantic identity is persisted", async () => {
+  // Given
+  const value = await runtime("migrated-rejection-identity")
+  expect(await migrateLifecycleState({ root: value.store.root })).toEqual({
+    ok: true,
+    status: "migrated",
+  })
+  const files = await writeEvidence(value)
+  await writeFile(files.artifactPath, "")
+
+  // When
+  const result = await value.acceptance.accept(
+    { sessionId: value.run.owner.sessionId, cwd: value.displayPath },
+    { agentId: value.agentId, receiptPath: files.receiptPath },
+  )
+  const ledger = JSON.parse(
+    await readFile(value.acceptance.acceptanceLedger.rejectionPath(value.run.runId), "utf8"),
+  )
+
+  // Then
+  expect(result).toMatchObject({ kind: "rejected", rejectionCount: 1 })
+  expect(ledger).toMatchObject({
+    schemaVersion: 2,
+    entries: [
+      {
+        runId: value.run.runId,
+        taskId: "worker",
+        taskGeneration: 2,
+        role: value.role,
+        semanticAttempt: value.run.progressRevision,
+      },
+    ],
+  })
+})
+
+test("Given migrated state When runtime accepts a worker Then snapshot and WAL remain v2", async () => {
+  // Given
+  const value = await runtime("migrated-acceptance-envelope")
+  expect(await migrateLifecycleState({ root: value.store.root })).toEqual({
+    ok: true,
+    status: "migrated",
+  })
+  const files = await writeEvidence(value)
+
+  // When
+  const result = await value.acceptance.accept(
+    { sessionId: value.run.owner.sessionId, cwd: value.displayPath },
+    { agentId: value.agentId, receiptPath: files.receiptPath },
+  )
+  const snapshot = JSON.parse(
+    await readFile(value.acceptance.acceptanceLedger.acceptancePath(value.run.runId), "utf8"),
+  )
+  const wal = JSON.parse(
+    (
+      await readFile(value.acceptance.acceptanceLedger.acceptanceWalPath(value.run.runId), "utf8")
+    ).trim(),
+  )
+
+  // Then
+  expect(result.kind).toBe("accepted")
+  expect(snapshot).toMatchObject({
+    schemaVersion: 2,
+    entries: [{ taskId: "worker", role: value.role, semanticAttempt: value.run.progressRevision }],
+  })
+  expect(wal).toMatchObject({
+    schemaVersion: 2,
+    taskId: "worker",
+    role: value.role,
+    semanticAttempt: value.run.progressRevision,
+  })
 })

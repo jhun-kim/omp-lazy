@@ -21,11 +21,24 @@ export type ActiveIndexEntry = {
   readonly statusHint: IndexStatusHint
 }
 
-export type ActiveIndex = {
-  readonly schemaVersion: 1
+type ActiveIndexFields = {
   readonly revision: number
   readonly entries: readonly ActiveIndexEntry[]
 }
+
+export type ActiveIndex = ActiveIndexFields &
+  (
+    | { readonly schemaVersion: 1 }
+    | { readonly schemaVersion: 2; readonly migrationRevision: number }
+  )
+
+type RunVersion =
+  | { readonly schemaVersion: 1 }
+  | {
+      readonly schemaVersion: 2
+      readonly packetHash: string | null
+      readonly expectedHead: string | null
+    }
 
 export type StartWorkStatus =
   | "active"
@@ -92,8 +105,7 @@ export type UlwLoopPayload = {
 
 export type RunEnvelope<
   P extends StartWorkPayload | UlwLoopPayload = StartWorkPayload | UlwLoopPayload,
-> = {
-  readonly schemaVersion: 1
+> = RunVersion & {
   readonly runId: Uuid
   readonly workflow: P["kind"]
   readonly revision: number

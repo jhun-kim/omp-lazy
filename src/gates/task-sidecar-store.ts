@@ -4,12 +4,18 @@ import { atomicReplace } from "../state/atomic-file"
 import type { AnyRun } from "../state/domain"
 import { deadlineAfter } from "../state/repo-lock"
 import type { TransactionStore } from "../state/transaction-store"
-import { type TaskFact, type TaskLedger, taskFactKey, taskLedgerSchema } from "./task-ledger-codec"
+import {
+  type PersistedTaskLedger,
+  type TaskFact,
+  taskFactKey,
+  taskLedgerSchema,
+  taskLedgerV2Schema,
+} from "./task-ledger-codec"
 
 export type TaskRunScope = {
   readonly indexRevision: number
   readonly run: AnyRun
-  readonly ledger: TaskLedger
+  readonly ledger: PersistedTaskLedger
 }
 
 export type TaskScopeResult =
@@ -28,14 +34,6 @@ export type TaskLedgerTransaction<T> =
 
 function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
-}
-
-function record(
-  value: unknown,
-): (Record<string, unknown> & { readonly schemaVersion?: unknown }) | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? Object.fromEntries(Object.entries(value))
-    : null
 }
 
 function sameFact(left: TaskFact, right: TaskFact): boolean {
@@ -90,12 +88,12 @@ export class TaskSidecarStore {
   }
 
   #merge(
-    ledger: TaskLedger,
+    ledger: PersistedTaskLedger,
     facts: readonly TaskFact[],
     ownerSessionId: string,
     ownerEpoch: number,
   ):
-    | { readonly kind: "merged"; readonly ledger: TaskLedger; readonly changed: boolean }
+    | { readonly kind: "merged"; readonly ledger: PersistedTaskLedger; readonly changed: boolean }
     | { readonly kind: "conflict" } {
     const byKey = new Map(
       ledger.entries
@@ -127,12 +125,10 @@ export class TaskSidecarStore {
     ]
     return {
       kind: "merged",
-      ledger: taskLedgerSchema.parse({
-        schemaVersion: 1,
-        runId: ledger.runId,
-        ledgerRevision: entries.length,
-        entries,
-      }),
+      ledger:
+        ledger.schemaVersion === 2
+          ? taskLedgerV2Schema.parse({ ...ledger, ledgerRevision: entries.length, entries })
+          : taskLedgerSchema.parse({ ...ledger, ledgerRevision: entries.length, entries }),
       changed: true,
     }
   }
@@ -159,7 +155,7 @@ export class TaskSidecarStore {
     return { kind: "scope", value: { indexRevision: index.revision, run, ledger } }
   }
 
-  async #readLedger(run: AnyRun): Promise<TaskLedger> {
+  async #readLedger(run: AnyRun): Promise<PersistedTaskLedger> {
     let bytes: string
     const path = this.#ledgerPath(run.runId)
     await this.store.guard(path)
@@ -167,22 +163,28 @@ export class TaskSidecarStore {
       bytes = await readFile(path, "utf8")
     } catch (error) {
       if (isMissing(error)) {
-        return taskLedgerSchema.parse({
-          schemaVersion: 1,
-          runId: run.runId,
-          ledgerRevision: 0,
-          entries: [],
-        })
+        return run.schemaVersion === 2
+          ? taskLedgerV2Schema.parse({
+              schemaVersion: 2,
+              runId: run.runId,
+              ledgerRevision: 0,
+              entries: [],
+              packetHash: null,
+              tier: null,
+              reservationId: null,
+            })
+          : taskLedgerSchema.parse({
+              schemaVersion: 1,
+              runId: run.runId,
+              ledgerRevision: 0,
+              entries: [],
+            })
       }
       throw error
     }
     const raw: unknown = JSON.parse(bytes)
-    const current = taskLedgerSchema.safeParse(raw)
-    if (current.success) return current.data
-    const migrated = record(raw)
-    if (migrated?.schemaVersion !== 2) return taskLedgerSchema.parse(raw)
-    const { packetHash: _packetHash, reservationId: _reservationId, tier: _tier, ...v1 } = migrated
-    return taskLedgerSchema.parse({ ...v1, schemaVersion: 1 })
+    const migrated = taskLedgerV2Schema.safeParse(raw)
+    return migrated.success ? migrated.data : taskLedgerSchema.parse(raw)
   }
 
   #ledgerPath(runId: string): string {

@@ -279,6 +279,11 @@ export async function recoverLifecycleMigration(root: CanonicalRoot): Promise<Re
   }
 }
 
+export async function lifecycleMigrationRequiresRecovery(root: CanonicalRoot): Promise<boolean> {
+  const journal = await readJournal(root)
+  return journal === "invalid" || (journal !== "absent" && journal.phase !== "committed")
+}
+
 export async function migrateLifecycleState(request: {
   readonly root: CanonicalRoot
   readonly deadline?: Deadline

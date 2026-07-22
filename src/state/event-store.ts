@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { atomicCreate } from "./atomic-file"
 import { decodeStateEvent } from "./codec"
-import type { PersistedStateEvent, StateEvent } from "./domain"
+import type { PersistedStateEvent } from "./domain"
 import type { StatePathGuard } from "./paths"
 import type { Deadline } from "./repo-lock"
 
@@ -10,17 +10,6 @@ const EVENT_FILE = /^(\d{16})-([0-9a-f-]{36})\.json$/
 
 function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
-}
-
-function runtimeEvent(event: PersistedStateEvent): StateEvent {
-  if (event.schemaVersion === 1) return event
-  const {
-    expectedHead: _expectedHead,
-    taskGeneration: _taskGeneration,
-    ...expected
-  } = event.expected
-  const { legacyHeadUnbound: _legacyHeadUnbound, ...base } = event
-  return { ...base, schemaVersion: 1, expected }
 }
 
 export class EventStoreError extends Error {
@@ -46,12 +35,12 @@ export class EventStore {
     this.eventsPath = join(stateRoot, "events")
   }
 
-  eventPath(event: StateEvent): string {
+  eventPath(event: PersistedStateEvent): string {
     const sequence = event.sequence.toString().padStart(16, "0")
     return join(this.eventsPath, `${sequence}-${event.eventId}.json`)
   }
 
-  async append(event: StateEvent, deadline: Deadline): Promise<void> {
+  async append(event: PersistedStateEvent, deadline: Deadline): Promise<void> {
     if (event.sequence < 1) throw new EventStoreError("event_sequence_gap")
     const path = this.eventPath(event)
     await this.guard?.(path)
@@ -62,7 +51,7 @@ export class EventStore {
     })
   }
 
-  async readAll(): Promise<readonly StateEvent[]> {
+  async readAll(): Promise<readonly PersistedStateEvent[]> {
     await this.guard?.(this.eventsPath)
     let names: readonly string[]
     try {
@@ -72,7 +61,7 @@ export class EventStore {
       throw error
     }
     const committed = names.filter((name) => !name.includes(".tmp-"))
-    const events: StateEvent[] = []
+    const events: PersistedStateEvent[] = []
     for (const name of committed) {
       const match = EVENT_FILE.exec(name)
       if (match === null) throw new EventStoreError("invalid_event_filename")
@@ -85,7 +74,7 @@ export class EventStore {
       await this.guard?.(path)
       const decoded = decodeStateEvent(await readFile(path, "utf8"))
       if (!decoded.ok) throw new EventStoreError("malformed_event")
-      const event = runtimeEvent(decoded.value)
+      const event = decoded.value
       if (event.sequence !== Number(sequenceText) || event.eventId !== eventId) {
         throw new EventStoreError("event_filename_mismatch")
       }

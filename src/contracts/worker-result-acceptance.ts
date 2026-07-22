@@ -13,6 +13,7 @@ import { type EvidenceBundle, validateEvidenceBundle } from "./artifact-containm
 import {
   type WorkerAcceptanceInput,
   WorkerAcceptanceInputSchema,
+  type WorkerRole,
   WorkerRoleSchema,
 } from "./evidence-receipt"
 import { readGitEvidenceBinding } from "./git-evidence-binding"
@@ -35,6 +36,8 @@ type DispatchScope = {
   readonly scope: TaskRunScope
   readonly identity: RuntimeIdentityRecord
   readonly generation: number
+  readonly role: WorkerRole
+  readonly taskId: string
   readonly input: WorkerAcceptanceInput
 }
 
@@ -124,10 +127,18 @@ export class WorkerResultAcceptance {
       if (generation === 0 || identity === undefined) {
         return { kind: "rejected", code: "unowned_worker", rejectionCount: 0 }
       }
-      if (!WorkerRoleSchema.safeParse(identity.agentType).success) {
+      const role = WorkerRoleSchema.safeParse(identity.agentType)
+      if (!role.success || identity.requestedName === null) {
         return { kind: "rejected", code: "unowned_worker_role", rejectionCount: 0 }
       }
-      const dispatch = { scope: resolved.value, identity, generation, input: parsed.data }
+      const dispatch = {
+        scope: resolved.value,
+        identity,
+        generation,
+        role: role.data,
+        taskId: identity.requestedName,
+        input: parsed.data,
+      }
       return await this.#acceptDispatch(dispatch, deadline, signal)
     } finally {
       await handle.release()
@@ -146,6 +157,9 @@ export class WorkerResultAcceptance {
       ownerEpoch: dispatch.scope.run.owner.epoch,
       taskGeneration: dispatch.generation,
       actualAgentId: dispatch.identity.actualAgentId,
+      taskId: dispatch.taskId,
+      role: dispatch.role,
+      semanticAttempt: dispatch.scope.run.progressRevision,
     }
     const priorRejections = await this.acceptanceLedger.rejectionCount(rejectionScope)
     if (
@@ -194,6 +208,9 @@ export class WorkerResultAcceptance {
         artifactHash: evidence.value.artifactHash,
         artifactPaths: evidence.value.artifacts.map((file) => file.relativePath),
         cleanupReceiptPaths: evidence.value.cleanupReceipts.map((file) => file.relativePath),
+        taskId: dispatch.taskId,
+        role: dispatch.role,
+        semanticAttempt: dispatch.scope.run.progressRevision,
         ...(dispatch.input.parentDecision === "accept_after_review"
           ? { parentDecision: dispatch.input.parentDecision }
           : {}),

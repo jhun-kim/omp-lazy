@@ -201,8 +201,14 @@ describe("strict state codec", () => {
     const decodedEvent = decodeStateEvent(JSON.stringify(event))
 
     // Then
-    expect(decodedRun).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
-    expect(decodedIndex).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
+    expect(decodedRun).toMatchObject({
+      ok: true,
+      value: { schemaVersion: 2, packetHash: null, expectedHead: null },
+    })
+    expect(decodedIndex).toMatchObject({
+      ok: true,
+      value: { schemaVersion: 2, migrationRevision: 1 },
+    })
     expect(decodedEvent).toMatchObject({ ok: true, value: { schemaVersion: 2 } })
   })
 

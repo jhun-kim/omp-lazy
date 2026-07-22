@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { migrateLifecycleState, recoverLifecycleMigration } from "../../src/state/migration"
+import { taskIdentities } from "../../src/state/migration-identities"
 import { migrateLifecycleRecord } from "../../src/state/migration-records"
 import { runSnapshotPath, statePaths } from "../../src/state/paths"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
@@ -162,6 +163,57 @@ describe("durable lifecycle migration", () => {
     expect(result).toEqual({ ok: false, code: "unknown_schema_version" })
   })
 
+  test("Given a task ledger identity When decoded for migration Then its runId remains part of identity", () => {
+    // Given
+    const runId = "11111111-1111-4111-8111-111111111111"
+
+    // When
+    const identities = taskIdentities({
+      schemaVersion: 1,
+      runId,
+      ledgerRevision: 2,
+      entries: [
+        {
+          sequence: 1,
+          ownerSessionId: "session-a",
+          ownerEpoch: 1,
+          fact: {
+            kind: "task_reserved",
+            toolCallId: "dispatch-a",
+            itemCount: 1,
+            requests: [
+              {
+                itemIndex: 0,
+                requestedName: "criterion-a",
+                agentType: "omp-lazy-worker-medium",
+              },
+            ],
+          },
+        },
+        {
+          sequence: 2,
+          ownerSessionId: "session-a",
+          ownerEpoch: 1,
+          fact: {
+            kind: "task_identities_bound",
+            toolCallId: "dispatch-a",
+            bindings: [{ itemIndex: 0, actualAgentId: "worker-a", actualJobId: null }],
+          },
+        },
+      ],
+    })
+
+    // Then
+    expect(identities).toEqual([
+      {
+        runId,
+        taskId: "criterion-a",
+        role: "omp-lazy-worker-medium",
+        agentId: "worker-a",
+      },
+    ])
+  })
+
   test("Given a multiline WAL containing a future schema When migration preflight runs Then it rejects before mutation", async () => {
     // Given
     const root = await migrationRoot("migration-future-wal")
@@ -240,7 +292,14 @@ describe("durable lifecycle migration", () => {
     const result = migrateLifecycleRecord(
       "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
       bytes,
-      [{ taskId: "TASK-ALPHA", role: "omp-lazy-worker-medium", agentId: "worker-a" }],
+      [
+        {
+          runId: "11111111-1111-4111-8111-111111111111",
+          taskId: "criterion-a",
+          role: "omp-lazy-worker-medium",
+          agentId: "worker-a",
+        },
+      ],
     )
 
     // Then
@@ -277,6 +336,85 @@ describe("durable lifecycle migration", () => {
       "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
       bytes,
       [],
+    )
+
+    // Then
+    expect(result).toEqual({ kind: "invalid" })
+  })
+
+  test("Given the same worker identity in two runs When a legacy event migrates Then run identity selects only its run", () => {
+    // Given
+    const bytes = JSON.stringify({
+      schemaVersion: 1,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "ulw_loop",
+      kind: "criterion_failure_recorded",
+      expected: { indexRevision: 1, runRevision: 1, ownerSessionId: "session-a", ownerEpoch: 1 },
+      mutation: {
+        kind: "criterion_failure_recorded",
+        goalId: "goal-a",
+        criterionId: "criterion-a",
+        fingerprint: "failure-a",
+      },
+      at: "2026-07-13T00:02:00.000Z",
+    })
+
+    // When
+    const result = migrateLifecycleRecord(
+      "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
+      bytes,
+      [
+        {
+          runId: "11111111-1111-4111-8111-111111111111",
+          taskId: "criterion-a",
+          role: "omp-lazy-worker-medium",
+          agentId: "worker-a",
+        },
+        {
+          runId: "22222222-2222-4222-8222-222222222222",
+          taskId: "criterion-a",
+          role: "omp-lazy-worker-medium",
+          agentId: "worker-a",
+        },
+      ],
+    )
+
+    // Then
+    expect(result).toMatchObject({ kind: "migrated" })
+  })
+
+  test("Given a legacy plan event maps a later task When migrated Then ordered-plan matching blocks it", () => {
+    // Given
+    const bytes = JSON.stringify({
+      schemaVersion: 1,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 2,
+      runId: "11111111-1111-4111-8111-111111111111",
+      workflow: "start_work",
+      kind: "plan_reconciled",
+      expected: { indexRevision: 1, runRevision: 1, ownerSessionId: "session-a", ownerEpoch: 1 },
+      mutation: {
+        kind: "plan_reconciled",
+        taskIds: ["TASK-ALPHA", "TASK-BETA"],
+        taskFingerprint: "a".repeat(64),
+      },
+      at: "2026-07-13T00:02:00.000Z",
+    })
+
+    // When
+    const result = migrateLifecycleRecord(
+      "events/0000000000000002-44444444-4444-4444-8444-444444444444.json",
+      bytes,
+      [
+        {
+          runId: "11111111-1111-4111-8111-111111111111",
+          taskId: "TASK-BETA",
+          role: "omp-lazy-worker-medium",
+          agentId: "worker-b",
+        },
+      ],
     )
 
     // Then

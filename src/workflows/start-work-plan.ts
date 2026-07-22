@@ -90,8 +90,13 @@ function parseChecklist(
 
 export function normalizeStartWorkPlan(markdown: string): NormalizePlanResult {
   const lines = markdown.replaceAll("\r\n", "\n").split("\n")
-  const hasV1Marker = lines.includes(V1_MARKER)
-  const version = lines.includes(V2_MARKER) ? 2 : 1
+  const v1MarkerCount = lines.filter((line) => line === V1_MARKER).length
+  const v2MarkerCount = lines.filter((line) => line === V2_MARKER).length
+  if (v1MarkerCount + v2MarkerCount !== 1) {
+    return { ok: false, code: "plan_identity_mismatch" }
+  }
+  const hasV1Marker = v1MarkerCount === 1
+  const version = v2MarkerCount === 1 ? 2 : 1
   if (version === 2 && !v2HeadingsAreOrdered(lines)) {
     return { ok: false, code: "plan_identity_mismatch" }
   }

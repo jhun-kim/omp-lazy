@@ -3,12 +3,13 @@ import { evaluateStartWorkContinuation } from "../../../src/workflows/start-work
 import { parseStartWorkPlan } from "../../../src/workflows/start-work-plan"
 import { startWorkRun } from "../../fixtures/state-fixtures"
 
-const PLAN = `## TODOs
-- [ ] Build state
-- [x] Verify state
+const PLAN = `<!-- omp-lazy-ulw-plan:plan:v1 -->
+## TODOs
+- [ ] **BUILD. Build state**
+- [x] **VERIFY. Verify state**
 
 ## Final Verification Wave
-- [ ] Review
+- [ ] **REVIEW. Review**
 `
 
 describe("start-work contract", () => {
@@ -32,13 +33,15 @@ describe("start-work contract", () => {
     const result = evaluateStartWorkContinuation(matching, observed)
 
     // Then
-    expect(result).toEqual({ ok: true, nextTaskId: "Build state" })
+    expect(result).toEqual({ ok: true, nextTaskId: "BUILD" })
   })
 
   test("Given checkbox-only progress When evaluated Then the next remaining task changes without conflict", () => {
     // Given
     const initial = parseStartWorkPlan(PLAN)
-    const checked = parseStartWorkPlan(PLAN.replace("- [ ] Build state", "- [x] Build state"))
+    const checked = parseStartWorkPlan(
+      PLAN.replace("- [ ] **BUILD. Build state**", "- [x] **BUILD. Build state**"),
+    )
     const run = startWorkRun()
     const matching = {
       ...run,
@@ -56,13 +59,13 @@ describe("start-work contract", () => {
     const result = evaluateStartWorkContinuation(matching, checked)
 
     // Then
-    expect(result).toEqual({ ok: true, nextTaskId: "Review" })
+    expect(result).toEqual({ ok: true, nextTaskId: "REVIEW" })
   })
 
   test("Given task identity replacement When evaluated Then reconcile is required", () => {
     // Given
     const initial = parseStartWorkPlan(PLAN)
-    const changed = parseStartWorkPlan(PLAN.replace("Build state", "Replace state"))
+    const changed = parseStartWorkPlan(PLAN.replace("BUILD. Build state", "REPLACE. Replace state"))
     const run = startWorkRun()
     const matching = {
       ...run,

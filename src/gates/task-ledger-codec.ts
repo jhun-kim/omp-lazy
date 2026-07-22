@@ -99,41 +99,77 @@ export type TaskIdentityFact = Extract<TaskFact, { readonly kind: "task_identiti
 export type TaskAuthorizationFact = Extract<TaskFact, { readonly kind: "task_control_authorized" }>
 export type TaskReceiptFact = Extract<TaskFact, { readonly kind: "task_receipt_observed" }>
 
+const taskLedgerFields = {
+  runId: UuidSchema,
+  ledgerRevision: counter,
+  entries: z
+    .array(
+      z
+        .object({
+          sequence: counter.positive(),
+          ownerSessionId: nonempty,
+          ownerEpoch: counter,
+          fact: factSchema,
+        })
+        .strict(),
+    )
+    .readonly(),
+} as const
+
+function ledgerIsOrdered(ledger: {
+  readonly ledgerRevision: number
+  readonly entries: readonly {
+    readonly sequence: number
+    readonly ownerSessionId: string
+    readonly ownerEpoch: number
+    readonly fact: TaskFact
+  }[]
+}): boolean {
+  if (
+    ledger.ledgerRevision !== ledger.entries.length ||
+    ledger.entries.some((entry, position) => entry.sequence !== position + 1)
+  ) {
+    return false
+  }
+  const keys = ledger.entries.map(
+    (entry) => `${entry.ownerSessionId}\u0000${entry.ownerEpoch}\u0000${taskFactKey(entry.fact)}`,
+  )
+  return new Set(keys).size === keys.length
+}
+
 export const taskLedgerSchema = z
   .object({
     schemaVersion: z.literal(1),
-    runId: UuidSchema,
-    ledgerRevision: counter,
-    entries: z
-      .array(
-        z
-          .object({
-            sequence: counter.positive(),
-            ownerSessionId: nonempty,
-            ownerEpoch: counter,
-            fact: factSchema,
-          })
-          .strict(),
-      )
-      .readonly(),
+    ...taskLedgerFields,
   })
   .strict()
   .superRefine((ledger, context) => {
-    if (
-      ledger.ledgerRevision !== ledger.entries.length ||
-      ledger.entries.some((entry, position) => entry.sequence !== position + 1)
-    ) {
-      context.addIssue({ code: "custom", message: "task ledger sequence mismatch" })
+    if (!ledgerIsOrdered(ledger)) {
+      context.addIssue({ code: "custom", message: "duplicate task fact key" })
     }
-    const keys = ledger.entries.map(
-      (entry) => `${entry.ownerSessionId}\u0000${entry.ownerEpoch}\u0000${taskFactKey(entry.fact)}`,
-    )
-    if (new Set(keys).size !== keys.length) {
+  })
+
+export const taskLedgerV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    ...taskLedgerFields,
+    packetHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .nullable(),
+    tier: z.enum(["FAST", "STANDARD", "DEEP"]).nullable(),
+    reservationId: nonempty.nullable(),
+  })
+  .strict()
+  .superRefine((ledger, context) => {
+    if (!ledgerIsOrdered(ledger)) {
       context.addIssue({ code: "custom", message: "duplicate task fact key" })
     }
   })
 
 export type TaskLedger = z.infer<typeof taskLedgerSchema>
+export type TaskLedgerV2 = z.infer<typeof taskLedgerV2Schema>
+export type PersistedTaskLedger = TaskLedger | TaskLedgerV2
 export type TaskLedgerEntry = TaskLedger["entries"][number]
 
 export function taskFactKey(fact: TaskFact): string {

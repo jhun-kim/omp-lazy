@@ -8,6 +8,7 @@ const WorkerRoleSchema = z.enum([
 ])
 
 export type TaskIdentity = {
+  readonly runId: string
   readonly taskId: string
   readonly role: z.infer<typeof WorkerRoleSchema>
   readonly agentId: string
@@ -56,7 +57,12 @@ export function taskIdentities(value: unknown): readonly TaskIdentity[] | null {
       const request = requests.get(binding.itemIndex)
       const role = WorkerRoleSchema.safeParse(request?.role)
       if (request === undefined || request.taskId.length === 0 || !role.success) return null
-      identities.push({ taskId: request.taskId, role: role.data, agentId: binding.actualAgentId })
+      identities.push({
+        runId: parsed.data.runId,
+        taskId: request.taskId,
+        role: role.data,
+        agentId: binding.actualAgentId,
+      })
     }
   }
   return identities
