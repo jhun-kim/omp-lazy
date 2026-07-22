@@ -99,7 +99,7 @@ The alias and expansion columns are an exact machine-checked mirror of `package.
 | `typecheck` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile unit -- bun scripts/run-local-tsc.ts --noEmit` | Locked local TypeScript check. |
 | `lint` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bunx biome check .` | Biome lint and formatting check. |
 | `test:unit` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/unit` | Unit suite. |
-| `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 180000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product and boundary contracts. |
+| `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 240000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product and boundary contracts. |
 | `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
 | `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
 | `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |

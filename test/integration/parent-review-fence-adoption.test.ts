@@ -89,7 +89,7 @@ test("Given a capped prior dispatch When its owner adopts and rebinds Then the n
   expect(await acceptanceBytes(value)).toBe(bytesAfterAcceptance)
 })
 
-test("Given a capped result target When the run advances attempts Then the new target is isolated", async () => {
+test("Given a capped semantic role When only run progress advances Then its budget remains exhausted", async () => {
   const value = await acceptanceRuntime("new-attempt-review-fence")
   runtimes.push(value)
   const initial = await writeEvidence(value)
@@ -114,6 +114,10 @@ test("Given a capped result target When the run advances attempts Then the new t
   })
 
   expect(advanced.progressRevision).toBe(value.run.progressRevision + 1)
-  expect(accepted.kind).toBe("accepted")
-  expect(await value.acceptance.acceptanceLedger.entries(value.run.runId)).toHaveLength(1)
+  expect(accepted).toMatchObject({
+    kind: "needs_parent_decision",
+    code: "retry_cap_reached",
+    rejectionCount: 3,
+  })
+  expect(await value.acceptance.acceptanceLedger.entries(value.run.runId)).toHaveLength(0)
 })

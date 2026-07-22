@@ -49,7 +49,7 @@ const acceptanceLedgerEntryV2Schema = acceptanceEventSchema
   .extend({
     taskId: nonempty,
     role: WorkerRoleSchema,
-    semanticAttempt: counter,
+    semanticAttempt: counter.positive(),
   })
   .strict()
 export const acceptanceEventV2Schema = acceptanceLedgerEntryV2Schema
@@ -82,16 +82,6 @@ export const acceptanceLedgerV2Schema = z
       context.addIssue({ code: "custom", message: "acceptance ledger sequence mismatch" })
     }
   })
-  .strict()
-  .superRefine((ledger, context) => {
-    if (
-      ledger.ledgerRevision !== ledger.entries.length ||
-      ledger.entries.some((entry, index) => entry.sequence !== index + 1) ||
-      new Set(ledger.entries.map((entry) => entry.idempotencyKey)).size !== ledger.entries.length
-    ) {
-      context.addIssue({ code: "custom", message: "acceptance ledger sequence mismatch" })
-    }
-  })
 
 export const rejectionEntrySchema = z
   .object({
@@ -118,7 +108,7 @@ export const rejectionEntryV2Schema = rejectionEntrySchema
   .extend({
     taskId: nonempty,
     role: WorkerRoleSchema,
-    semanticAttempt: counter,
+    semanticAttempt: counter.positive(),
   })
   .strict()
 export const rejectionLedgerV2Schema = z
@@ -129,8 +119,16 @@ export const rejectionLedgerV2Schema = z
   })
   .strict()
   .superRefine((ledger, context) => {
-    if (ledger.entries.some((entry) => entry.runId !== ledger.runId)) {
-      context.addIssue({ code: "custom", message: "rejection ledger run mismatch" })
+    const keys = ledger.entries.map((entry) =>
+      [entry.runId, entry.taskId, entry.taskGeneration, entry.role, entry.semanticAttempt].join(
+        "\u0000",
+      ),
+    )
+    if (
+      ledger.entries.some((entry) => entry.runId !== ledger.runId) ||
+      new Set(keys).size !== keys.length
+    ) {
+      context.addIssue({ code: "custom", message: "rejection ledger identity mismatch" })
     }
   })
 

@@ -291,7 +291,7 @@ test("Given migrated state When runtime rejects a worker Then the full semantic 
         taskId: "worker",
         taskGeneration: 2,
         role: value.role,
-        semanticAttempt: value.run.progressRevision,
+        semanticAttempt: 2,
       },
     ],
   })
@@ -324,12 +324,12 @@ test("Given migrated state When runtime accepts a worker Then snapshot and WAL r
   expect(result.kind).toBe("accepted")
   expect(snapshot).toMatchObject({
     schemaVersion: 2,
-    entries: [{ taskId: "worker", role: value.role, semanticAttempt: value.run.progressRevision }],
+    entries: [{ taskId: "worker", role: value.role, semanticAttempt: 2 }],
   })
   expect(wal).toMatchObject({
     schemaVersion: 2,
     taskId: "worker",
     role: value.role,
-    semanticAttempt: value.run.progressRevision,
+    semanticAttempt: 2,
   })
 })

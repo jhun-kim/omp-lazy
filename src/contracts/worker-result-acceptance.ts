@@ -54,6 +54,19 @@ function isTerminal(run: AnyRun): boolean {
   }
 }
 
+function semanticAttempt(role: WorkerRole): 1 | 2 | 3 {
+  switch (role) {
+    case "omp-lazy-worker-low":
+      return 1
+    case "omp-lazy-worker-medium":
+      return 2
+    case "omp-lazy-worker-high":
+      return 3
+    default:
+      return role satisfies never
+  }
+}
+
 function receiptBindingError(
   dispatch: DispatchScope,
   evidence: EvidenceBundle,
@@ -159,7 +172,7 @@ export class WorkerResultAcceptance {
       actualAgentId: dispatch.identity.actualAgentId,
       taskId: dispatch.taskId,
       role: dispatch.role,
-      semanticAttempt: dispatch.scope.run.progressRevision,
+      semanticAttempt: semanticAttempt(dispatch.role),
     }
     const priorRejections = await this.acceptanceLedger.rejectionCount(rejectionScope)
     if (
@@ -210,7 +223,7 @@ export class WorkerResultAcceptance {
         cleanupReceiptPaths: evidence.value.cleanupReceipts.map((file) => file.relativePath),
         taskId: dispatch.taskId,
         role: dispatch.role,
-        semanticAttempt: dispatch.scope.run.progressRevision,
+        semanticAttempt: semanticAttempt(dispatch.role),
         ...(dispatch.input.parentDecision === "accept_after_review"
           ? { parentDecision: dispatch.input.parentDecision }
           : {}),

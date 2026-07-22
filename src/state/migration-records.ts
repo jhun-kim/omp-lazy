@@ -83,7 +83,7 @@ function migrateAcceptance(
     const identity = identityFor(identities, entry.runId, entry.actualAgentId, entry.workerRole)
     return identity === null
       ? null
-      : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: entry.attempt }
+      : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: 1 }
   })
   if (entries.some((entry) => entry === null)) return { kind: "invalid" }
   return { kind: "migrated", bytes: JSON.stringify({ ...value, schemaVersion: 2, entries }) }
@@ -98,14 +98,28 @@ function migrateRejections(
   if (schemaVersion(value) !== 1) return { kind: "invalid" }
   const parsed = rejectionLedgerSchema.safeParse(value)
   if (!parsed.success) return { kind: "invalid" }
-  const entries = parsed.data.entries.map((entry) => {
+  const converted = parsed.data.entries.map((entry) => {
     const identity = identityFor(identities, entry.runId, entry.actualAgentId)
     return identity === null
       ? null
-      : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: entry.attempt }
+      : { ...entry, taskId: identity.taskId, role: identity.role, semanticAttempt: 1 }
   })
-  if (entries.some((entry) => entry === null)) return { kind: "invalid" }
-  return { kind: "migrated", bytes: JSON.stringify({ ...value, schemaVersion: 2, entries }) }
+  const entries = new Map<string, Exclude<(typeof converted)[number], null>>()
+  for (const entry of converted) {
+    if (entry === null) return { kind: "invalid" }
+    const key = [entry.runId, entry.taskId, entry.taskGeneration, entry.role, 1].join("\u0000")
+    const prior = entries.get(key)
+    const count = Math.min(3, (prior?.count ?? 0) + entry.count)
+    entries.set(key, {
+      ...entry,
+      count,
+      status: count === 3 ? "needs_parent_decision" : "retry_allowed",
+    })
+  }
+  return {
+    kind: "migrated",
+    bytes: JSON.stringify({ ...value, schemaVersion: 2, entries: [...entries.values()] }),
+  }
 }
 
 function migrateWal(bytes: string, identities: readonly TaskIdentity[]): MigrationRecordResult {
@@ -132,7 +146,7 @@ function migrateWal(bytes: string, identities: readonly TaskIdentity[]): Migrati
           schemaVersion: 2,
           taskId: identity.taskId,
           role: identity.role,
-          semanticAttempt: parsed.data.attempt,
+          semanticAttempt: 1,
         }
   })
   if (migrated.some((entry) => entry === null)) return { kind: "invalid" }

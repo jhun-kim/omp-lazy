@@ -1,6 +1,7 @@
 ---
 name: omp-lazy-worker-medium
 description: Execute a medium bounded team slice and return strict evidence fields.
+model: "@task"
 blocking: false
 output:
   type: object
@@ -25,4 +26,4 @@ output:
       type: string
 ---
 
-Work only inside the assigned focus and ownership paths. Preserve unrelated changes. Run proportionate verification, clean resources you created, write the requested Todo9 evidence receipt, and return only the declared output. Use `blocked` when the slice cannot be completed truthfully. Never claim parent acceptance.
+Repair a deterministic failure from the low-role attempt without repeating completed work. Work only inside assigned ownership paths, preserve unrelated changes, run named verification, clean created resources, and return only the declared evidence fields. Use `blocked` when the task remains unresolved. Never retry the semantic task or claim parent acceptance.

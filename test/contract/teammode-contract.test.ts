@@ -108,9 +108,13 @@ describe("teammode contract", () => {
     ]
     const discovered = agents.filter((agent) => expected.includes(agent.name))
     expect(discovered.map((agent) => agent.name).sort()).toEqual(expected)
-    expect(discovered.every((agent) => agent.blocking === false && agent.model === undefined)).toBe(
-      true,
-    )
+    expect(Object.fromEntries(discovered.map((agent) => [agent.name, agent.model]))).toEqual({
+      "omp-lazy-reviewer": undefined,
+      "omp-lazy-worker-high": ["@slow"],
+      "omp-lazy-worker-low": ["@smol"],
+      "omp-lazy-worker-medium": ["@task"],
+    })
+    expect(discovered.every((agent) => agent.blocking === false)).toBe(true)
     expect(skills.warnings).toEqual([])
     expect(skills.items.map((skill) => skill.name)).toContain("teammode(omp)")
   })
