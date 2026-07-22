@@ -100,7 +100,9 @@ The alias and expansion columns are an exact machine-checked mirror of `package.
 | `lint` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bunx biome check .` | Biome lint and formatting check. |
 | `test:unit` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/unit` | Unit suite. |
 | `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 180000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product and boundary contracts. |
-| `test:integration` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Integration suite. |
+| `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
+| `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
+| `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |
 | `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | Bounded hostile G01-G25 replay. |
 | `test:regression` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/contract/regression.test.ts` | Focused regression suite. |
 | `preflight:omp` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun scripts/preflight-real-omp.ts` | Pinned host and async preflight. |
@@ -194,6 +196,11 @@ directories, and worktree roots; they do not mutate a pre-existing operator prof
 These checks reject static redirected paths at each operation boundary; they do not claim protection
 against a separate hostile OS process concurrently changing filesystem topology because Bun does not
 expose a portable `openat`-style relative filesystem API.
+
+On Windows, a capability-probe receipt proves direct launcher exit plus its provider and sandbox
+cleanup. It does not prove containment of arbitrary descendants after their launcher exits; that
+requires pre-enrollment in a Windows Job Object, which the pinned host runtime does not expose.
+Cooperative child cleanup remains covered by its existing bounded tests.
 
 ## Evidence handoff
 

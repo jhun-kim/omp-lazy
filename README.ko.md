@@ -100,7 +100,9 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 | `lint` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bunx biome check .` | Biome lint 및 formatting check. |
 | `test:unit` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/unit` | Unit suite. |
 | `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 180000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product 및 boundary contract. |
-| `test:integration` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Integration suite. |
+| `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
+| `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
+| `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |
 | `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | 경계가 정해진 hostile G01-G25 replay. |
 | `test:regression` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/contract/regression.test.ts` | 집중 regression suite. |
 | `preflight:omp` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun scripts/preflight-real-omp.ts` | 고정된 host 및 async preflight. |
@@ -193,6 +195,11 @@ junction escape를 거부합니다. release 및 host gate는 disposable home, pr
 worktree root를 사용합니다. 기존 operator profile 또는 state root는 변경하지 않습니다. 이 check들은 각
 operation boundary에서 static redirected path를 거부합니다. 다만 Bun이 portable `openat` style relative filesystem API를
 노출하지 않으므로, 별도의 hostile OS process가 filesystem topology를 동시에 바꾸는 상황까지 보호한다고 주장하지는 않습니다.
+
+Windows에서 capability-probe receipt는 direct launcher exit와 해당 provider 및 sandbox cleanup을 증명합니다.
+launcher가 종료된 뒤 arbitrary descendant를 containment한다고 증명하지는 않습니다. 이를 위해서는 pinned host
+runtime이 노출하지 않는 Windows Job Object 사전 등록이 필요합니다. Cooperative child cleanup은 기존 bounded test로
+계속 검증됩니다.
 
 ## Evidence handoff
 

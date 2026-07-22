@@ -12,10 +12,12 @@ import {
   readClosureBinding,
 } from "./baseline-contract"
 
-const adapterScript = `import { COMMAND_REGISTRATIONS } from "./src/commands/command-definitions.ts"
+const adapterScript = `import { writeSync } from "node:fs"
+import { COMMAND_REGISTRATIONS } from "./src/commands/command-definitions.ts"
 import { CommandSyntaxError } from "./src/commands/command-parser.ts"
 import { CommandStateError, DurableWorkflowCommandExecutor } from "./src/commands/workflow-command-handler.ts"
 const scenarios = JSON.parse(process.env.OMP_HARNESS_BASELINE_SCENARIOS ?? "[]")
+const stderrBytes = Number.parseInt(process.env.OMP_HARNESS_BASELINE_STDERR_BYTES ?? "0", 10)
 const results = []
 for (const scenario of scenarios) {
   const registration = COMMAND_REGISTRATIONS.find((candidate) => candidate.command === scenario.command)
@@ -25,6 +27,7 @@ for (const scenario of scenarios) {
   try { await executor.execute({ registration, args: scenario.args.join(" "), cwd: ".", sessionId: "baseline" }); results.push({ kind: "activation", messageCount: messages.length }) }
   catch (error) { results.push({ kind: error instanceof CommandStateError || error instanceof CommandSyntaxError ? "grammar_rejected" : "unexpected" }) }
 }
+if (stderrBytes > 0) writeSync(2, "x".repeat(stderrBytes))
 process.stdout.write(JSON.stringify(results))`
 
 type AdapterResult = {
@@ -37,9 +40,10 @@ function git(arguments_: readonly string[], cwd: string): string | undefined {
   return result.exitCode === 0 ? new TextDecoder().decode(result.stdout).trim() : undefined
 }
 
-async function executeAdapters(
+export async function executeBaselineAdapters(
   worktree: string,
   manifest: BaselineManifest,
+  adapterStderrBytes?: number,
 ): Promise<readonly AdapterResult[]> {
   const selected = manifest.scenarios.filter((scenario) =>
     baselineRows.some(
@@ -59,11 +63,18 @@ async function executeAdapters(
             command: scenario.steps[0]?.command ?? "",
           })),
         ),
+        ...(adapterStderrBytes === undefined
+          ? {}
+          : { OMP_HARNESS_BASELINE_STDERR_BYTES: `${adapterStderrBytes}` }),
       },
       stderr: "pipe",
       stdout: "pipe",
     })
-    const [exitCode, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()])
+    const [exitCode, stdout] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
     if (exitCode !== 0) throw new TypeError("baseline adapter execution failed")
     return z
       .array(
@@ -113,6 +124,7 @@ async function publish(path: string, receipt: BaselineReceipt): Promise<void> {
 }
 
 export async function runBaselineEvaluation(options: {
+  readonly adapterStderrBytes?: number
   readonly abortAfterClone?: boolean
   readonly manifestPath: string
   readonly outputPath: string
@@ -149,7 +161,7 @@ export async function runBaselineEvaluation(options: {
       git(["status", "--porcelain"], target) !== ""
     )
       throw new TypeError("baseline checkout mismatch")
-    if (!observed(await executeAdapters(target, manifest)))
+    if (!observed(await executeBaselineAdapters(target, manifest, options.adapterStderrBytes)))
       throw new TypeError("baseline defect not observed")
     const receipt = baselineReceiptSchema.parse({
       baseline: {

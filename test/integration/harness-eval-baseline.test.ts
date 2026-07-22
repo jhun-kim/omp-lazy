@@ -18,7 +18,11 @@ describe("frozen legacy baseline evaluator integration", () => {
 
     try {
       // When the frozen baseline adapters execute against the manifest target
-      const receipt = await runBaselineEvaluation({ manifestPath, outputPath: output })
+      const receipt = await runBaselineEvaluation({
+        adapterStderrBytes: 128 * 1_048_576,
+        manifestPath,
+        outputPath: output,
+      })
 
       // Then all frozen rows are complete, redacted, and never candidate PASSes
       expect(receipt.rows.map((row) => row.scenarioId)).toEqual([...baselineScenarioIds])

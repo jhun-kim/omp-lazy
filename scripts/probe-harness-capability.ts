@@ -72,10 +72,23 @@ function models(url: string, scopes: ReadonlyMap<string, string>, fault: Fault):
   return [...scopes.entries()].map(([actor, scope]) => `  omp-harness-${actor}:\n    baseUrl: ${url}/actor/${actor}\n    apiKey: OMP_HARNESS_KEY\n    api: openai-completions\n    headers:${fault === "omit-payload-scope" ? " {}" : `\n      X-OMP-Harness-Scope: ${scope}`}\n    models:\n      - id: ${actor}\n        name: ${actor}\n        reasoning: false\n        input: [text]\n        contextWindow: 32000\n        maxTokens: 2048\n        compat:\n          extraBody:\n            seed: 0`).join("\n")
 }
 
-async function run(command: readonly string[], cwd: string, environment: Record<string, string>): Promise<{ readonly exitCode: number }> {
-  const child = Bun.spawn([...command], { cwd, env: { ...process.env, ...environment }, stderr: "pipe", stdout: "pipe" })
-  const result = await Promise.race([child.exited.then((exitCode) => ({ exitCode })), Bun.sleep(20_000).then(() => { child.kill(); return { exitCode: 1 } })])
-  return result
+export async function runProbeCommand(request: {
+  readonly command: readonly string[]
+  readonly cwd: string
+  readonly environment: Readonly<Record<string, string>>
+  readonly timeoutMs?: number
+}): Promise<{ readonly exitCode: number }> {
+  const child = Bun.spawn([...request.command], { cwd: request.cwd, env: { ...process.env, ...request.environment }, stderr: "ignore", stdout: "ignore" })
+  const exitCode = await Promise.race([
+    child.exited,
+    (async () => {
+      await Bun.sleep(request.timeoutMs ?? 20_000)
+      child.kill()
+      await child.exited
+      return 1
+    })(),
+  ])
+  return { exitCode }
 }
 
 async function probe(fault: Fault): Promise<{ readonly rows: readonly Row[]; readonly cleanup: { readonly provider: "complete"; readonly sandbox: "complete" } }> {
@@ -96,11 +109,11 @@ async function probe(fault: Fault): Promise<{ readonly rows: readonly Row[]; rea
     await writeFile(join(agentRoot, "config.yml"), `temperature: 0\ntopP: 1\nasync:\n  enabled: true\ntask:\n  batch: true\n  maxConcurrency: 4\n  agentModelOverrides:\n    harness-child-a: omp-harness-child-a/child-a\n    harness-child-b: omp-harness-child-b/child-b\n`)
     const base = ["-p", "--mode", "json", "--no-session", "--no-skills", "--no-rules", "--model", "omp-harness-parent/parent", "--max-time", "8", "--auto-approve", "--approval-mode", "yolo", "--cwd", sandbox, "-e", join(sandbox, "probe-extension.ts")] as const
     const environment = { OMP_HARNESS_KEY: "non-secret" }
-    const parent = await run(ompCommand(omp.path, [...base, "run harness"]), sandbox, environment)
+    const parent = await runProbeCommand({ command: ompCommand(omp.path, [...base, "run harness"]), cwd: sandbox, environment })
     if (parent.exitCode !== 0) throw new ProbeError("host_session_failed", "parent session failed")
     const tails = [["harness-start", "start .omo/plans/harness.md"], ["harness-approve", "approve .omo/plans/harness.md deadbeef"], ["harness-checkpoint", "checkpoint run-1 criterion-1 evidence.json"], ["harness-steer", "steer run-1 steering.json"], ["harness-team-prepare", "prepare team-a roster.json"], ["harness-team-create", "create team-a reservation-1"], ["harness-routes", ""]] as const
-    for (const [name, tail] of tails) await run(ompCommand(omp.path, [...base, `/${name}${tail ? ` ${tail}` : ""}`]), sandbox, environment)
-    const beforeInvalid = provider.requests.length; await run(ompCommand(omp.path, [...base, "/harness-start invalid"]), sandbox, environment)
+    for (const [name, tail] of tails) await runProbeCommand({ command: ompCommand(omp.path, [...base, `/${name}${tail ? ` ${tail}` : ""}`]), cwd: sandbox, environment })
+    const beforeInvalid = provider.requests.length; await runProbeCommand({ command: ompCommand(omp.path, [...base, "/harness-start invalid"]), cwd: sandbox, environment })
     const logs = (await readFile(log, "utf8")).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
     const child = provider.requests.filter((request) => request.route.startsWith("child-")); const overlap = child.some((left, index) => child.slice(index + 1).some((right) => left.started < right.ended && right.started < left.ended))
     const wire = provider.requests.filter((request) => request.body.includes('"temperature":0') && request.body.includes('"top_p":1') && request.body.includes('"seed":0'))
@@ -118,4 +131,6 @@ async function main(): Promise<void> {
   process.stdout.write(`${JSON.stringify(receipt)}\n`); if (status === "FAIL") process.exitCode = 2
 }
 
-try { await main() } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1 }
+if (import.meta.main) {
+  try { await main() } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1 }
+}
