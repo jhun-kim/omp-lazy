@@ -129,7 +129,7 @@ export async function runBaselineEvaluation(options: {
   )
     throw new TypeError("baseline commit mismatch")
   const root = join(
-    process.env["TEMP"] ?? process.env["TMP"] ?? repositoryRoot,
+    process.env.TEMP ?? process.env.TMP ?? repositoryRoot,
     `.baseline-${randomUUID()}`,
   )
   const target = join(root, "target")

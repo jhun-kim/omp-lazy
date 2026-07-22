@@ -76,5 +76,4 @@ describe("frozen legacy baseline evaluator", () => {
       await rm(root, { force: true, recursive: true })
     }
   })
-
 })
