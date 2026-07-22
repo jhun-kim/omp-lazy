@@ -55,11 +55,12 @@ export function taskIdentities(value: unknown): readonly TaskIdentity[] | null {
     if (requests === undefined) return null
     for (const binding of values) {
       const request = requests.get(binding.itemIndex)
+      if (request === undefined) return null
       const role = WorkerRoleSchema.safeParse(request?.role)
-      if (request === undefined || request.taskId.length === 0 || !role.success) return null
+      if (!role.success) continue
       identities.push({
         runId: parsed.data.runId,
-        taskId: request.taskId,
+        taskId: request.taskId || `${toolCallId}:${binding.itemIndex}`,
         role: role.data,
         agentId: binding.actualAgentId,
       })

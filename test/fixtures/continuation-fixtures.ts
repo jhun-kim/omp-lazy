@@ -7,7 +7,7 @@ import { parseStartWorkPlan } from "../../src/workflows/start-work-plan"
 import { createEvent, startRun, temporaryRoot } from "./store-fixtures"
 
 export const CONTINUATION_PLAN =
-  "## TODOs\n- [ ] Build durable state\n- [ ] Verify continuation\n\n## Final Verification Wave\n- [ ] Review evidence\n"
+  "<!-- omp-lazy-ulw-plan:plan:v1 -->\n## TODOs\n- [ ] Build durable state\n- [ ] Verify continuation\n\n## Final Verification Wave\n- [ ] Review evidence\n"
 
 export async function initializedContinuationStore(label: string): Promise<{
   readonly root: Awaited<ReturnType<typeof temporaryRoot>>

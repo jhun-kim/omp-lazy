@@ -128,7 +128,7 @@ export class WorkerResultAcceptance {
         return { kind: "rejected", code: "unowned_worker", rejectionCount: 0 }
       }
       const role = WorkerRoleSchema.safeParse(identity.agentType)
-      if (!role.success || identity.requestedName === null) {
+      if (!role.success) {
         return { kind: "rejected", code: "unowned_worker_role", rejectionCount: 0 }
       }
       const dispatch = {
@@ -136,7 +136,7 @@ export class WorkerResultAcceptance {
         identity,
         generation,
         role: role.data,
-        taskId: identity.requestedName,
+        taskId: identity.requestedName ?? `${identity.toolCallId}:${identity.itemIndex}`,
         input: parsed.data,
       }
       return await this.#acceptDispatch(dispatch, deadline, signal)

@@ -18,7 +18,7 @@ afterEach(async () => {
   await Promise.all(runtimes.splice(0).map(removeRuntime))
 })
 
-test("Given a capped result target When its owner adopts and rebinds Then explicit review remains mandatory", async () => {
+test("Given a capped prior dispatch When its owner adopts and rebinds Then the new identity is isolated", async () => {
   const value = await acceptanceRuntime("adopted-review-fence")
   runtimes.push(value)
   const initial = await writeEvidence(value)
@@ -70,13 +70,10 @@ test("Given a capped result target When its owner adopts and rebinds Then explic
   })
   const currentCaller = { sessionId: adopted.owner.sessionId, cwd: value.displayPath }
   const input = { agentId, receiptPath: current.receiptPath }
-  const capped = await value.acceptance.accept(currentCaller, input)
-  const entriesBeforeReview = await value.acceptance.acceptanceLedger.entries(value.run.runId)
-  const reviewInput = { ...input, parentDecision: "accept_after_review" as const }
-  const reviewed = await value.acceptance.accept(currentCaller, reviewInput)
-  const bytesAfterReview = await acceptanceBytes(value)
-  const replay = await value.acceptance.accept(currentCaller, reviewInput)
-  const entriesAfterReview = await value.acceptance.acceptanceLedger.entries(value.run.runId)
+  const accepted = await value.acceptance.accept(currentCaller, input)
+  const bytesAfterAcceptance = await acceptanceBytes(value)
+  const replay = await value.acceptance.accept(currentCaller, input)
+  const entries = await value.acceptance.acceptanceLedger.entries(value.run.runId)
 
   expect(strikes.map((result) => result.kind)).toEqual([
     "rejected",
@@ -85,13 +82,11 @@ test("Given a capped result target When its owner adopts and rebinds Then explic
   ])
   expect(current.receiptPath).toBe(initial.receiptPath)
   expect(oldOwner).toMatchObject({ kind: "rejected", code: "caller_not_current_parent" })
-  expect(capped).toMatchObject({ kind: "needs_parent_decision", rejectionCount: 3 })
-  expect(entriesBeforeReview).toEqual([])
-  expect(reviewed.kind).toBe("accepted")
+  expect(accepted.kind).toBe("accepted")
   expect(replay.kind).toBe("replayed")
-  expect(entriesAfterReview).toHaveLength(1)
-  expect(entriesAfterReview[0]?.parentDecision).toBe("accept_after_review")
-  expect(await acceptanceBytes(value)).toBe(bytesAfterReview)
+  expect(entries).toHaveLength(1)
+  expect(entries[0]?.parentDecision).toBeUndefined()
+  expect(await acceptanceBytes(value)).toBe(bytesAfterAcceptance)
 })
 
 test("Given a capped result target When the run advances attempts Then the new target is isolated", async () => {

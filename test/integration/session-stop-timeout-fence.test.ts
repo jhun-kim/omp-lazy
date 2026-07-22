@@ -100,6 +100,7 @@ describe("session stop timeout fence", () => {
       },
     })
     const messages: string[] = []
+    await store.readIndex()
     const indexBefore = await readFile(store.paths.activeIndex, "utf8")
     const runPath = runSnapshotPath(root, run.runId)
     const runBefore = await readFile(runPath, "utf8")

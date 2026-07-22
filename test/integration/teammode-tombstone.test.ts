@@ -34,7 +34,7 @@ describe("teammode tombstones", () => {
     expect(result).toEqual({ ok: true, status: "deleted" })
     expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
       deleted: true,
-      schemaVersion: 1,
+      schemaVersion: 2,
       teamName: teamDefinition.teamName,
     })
     expect(await runtime.contract.read(teamDefinition.teamName)).toBeNull()
