@@ -33,16 +33,38 @@ export const acceptanceEventSchema = z
     receiptHash: hash,
     artifactHash: hash,
     artifactPaths: z.array(nonempty).min(1).readonly(),
-    cleanupReceiptPaths: z.array(nonempty).min(1).readonly(),
+    cleanupReceiptPaths: z.array(nonempty).max(32).readonly(),
+    cleanupStatus: z.enum(["receipts", "not_applicable"]).optional(),
+    cleanupScenarioId: nonempty.optional(),
     parentDecision: z.literal("accept_after_review").optional(),
   })
   .strict()
+  .superRefine((event, context) => {
+    if (
+      (event.cleanupStatus === "not_applicable") !== (event.cleanupScenarioId !== undefined) ||
+      (event.cleanupStatus === "not_applicable" && event.cleanupReceiptPaths.length > 0) ||
+      (event.cleanupStatus === "receipts" && event.cleanupReceiptPaths.length === 0)
+    ) {
+      context.addIssue({ code: "custom", message: "cleanup acceptance binding mismatch" })
+    }
+  })
 
 export type WorkerAcceptanceEvent = z.infer<typeof acceptanceEventSchema>
 export type ScopedWorkerAcceptanceEvent = WorkerAcceptanceEvent & {
   readonly taskId: string | null
   readonly role: z.infer<typeof WorkerRoleSchema> | null
   readonly semanticAttempt: number | null
+}
+
+export type CompactAcceptanceSummary = {
+  readonly runId: string
+  readonly accepted: readonly {
+    readonly taskId: string | null
+    readonly role: z.infer<typeof WorkerRoleSchema> | null
+    readonly semanticAttempt: number | null
+    readonly receiptId: string
+    readonly artifactHash: string
+  }[]
 }
 
 const acceptanceLedgerEntryV2Schema = acceptanceEventSchema
@@ -311,6 +333,20 @@ export class WorkerAcceptanceLedger {
       role: "role" in entry ? entry.role : null,
       semanticAttempt: "semanticAttempt" in entry ? entry.semanticAttempt : null,
     }))
+  }
+
+  async compactSummary(runId: string): Promise<CompactAcceptanceSummary> {
+    const entries = await this.scopedEntries(runId)
+    return {
+      runId,
+      accepted: entries.map((entry) => ({
+        taskId: entry.taskId,
+        role: entry.role,
+        semanticAttempt: entry.semanticAttempt,
+        receiptId: entry.receiptHash,
+        artifactHash: entry.artifactHash,
+      })),
+    }
   }
 
   async #readAcceptance(runId: string): Promise<RuntimeAcceptanceLedger> {

@@ -80,6 +80,43 @@ describe("OMP 17.0.5 task input parsing", () => {
 })
 
 describe("durable fan-out reservation", () => {
+  test("Given a FAST packet When high and low agents spawn Then only the exact allowlist passes", async () => {
+    // Given
+    const root = await temporaryRoot("task-guard-fast-allowlist")
+    roots.push(root.displayPath)
+    const { store } = await initializedStore(root)
+    const ledger = new TaskEventLedger(store)
+    const guard = new TaskSpawnGuard(ledger, 1, {
+      packetHash: "a".repeat(64),
+      tier: "FAST",
+      allowedAgentTypes: ["omp-lazy-worker-low"],
+    })
+
+    // When
+    const hiddenHigh = await guard.handle({
+      toolName: "task",
+      toolCallId: "tool-hidden-high",
+      input: { agent: "omp-lazy-worker-high", task: "attempt forbidden escalation" },
+      sessionId: "session-a",
+    })
+    const allowedLow = await guard.handle({
+      toolName: "task",
+      toolCallId: "tool-allowed-low",
+      input: { agent: "omp-lazy-worker-low", task: "execute packet" },
+      sessionId: "session-a",
+    })
+
+    // Then
+    expect(hiddenHigh).toEqual({
+      block: true,
+      reason: "omp-lazy: agent not allowed by packet",
+    })
+    expect(allowedLow).toBeUndefined()
+    expect(
+      (await ledger.reservations("session-a")).map((reservation) => String(reservation.toolCallId)),
+    ).toEqual(["tool-allowed-low"])
+  })
+
   test("Given an active run When allowed and blocked calls arrive Then only allowed items persist", async () => {
     // Given
     const root = await temporaryRoot("task-guard-cap")

@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent"
+import { z } from "zod"
 import {
   authorizeImmutableToolCall,
   type ImmutableToolAuthorization,
@@ -22,10 +23,62 @@ export type AuthorizedTaskSpawnRequest = {
   readonly sessionId: string
 }
 
+const PublicTaskAgentSchema = z.enum([
+  "omp-lazy-explorer",
+  "omp-lazy-librarian",
+  "omp-lazy-metis",
+  "omp-lazy-momus",
+  "omp-lazy-planner",
+  "omp-lazy-qa",
+  "omp-lazy-researcher",
+  "omp-lazy-reviewer",
+  "omp-lazy-worker-high",
+  "omp-lazy-worker-low",
+  "omp-lazy-worker-medium",
+])
+
+const TaskSpawnPacketPolicySchema = z
+  .object({
+    packetHash: z.string().regex(/^[0-9a-f]{64}$/),
+    tier: z.enum(["FAST", "STANDARD", "DEEP"]),
+    allowedAgentTypes: z.array(PublicTaskAgentSchema).min(1).max(11).readonly(),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    if (new Set(policy.allowedAgentTypes).size !== policy.allowedAgentTypes.length) {
+      context.addIssue({ code: "custom", message: "duplicate packet spawn agent" })
+    }
+  })
+
+export type TaskSpawnPacketPolicy = z.infer<typeof TaskSpawnPacketPolicySchema>
+
+const TierAgentEligibility = {
+  FAST: [
+    "omp-lazy-explorer",
+    "omp-lazy-librarian",
+    "omp-lazy-planner",
+    "omp-lazy-researcher",
+    "omp-lazy-worker-low",
+  ],
+  STANDARD: [
+    "omp-lazy-explorer",
+    "omp-lazy-librarian",
+    "omp-lazy-metis",
+    "omp-lazy-planner",
+    "omp-lazy-qa",
+    "omp-lazy-researcher",
+    "omp-lazy-reviewer",
+    "omp-lazy-worker-low",
+    "omp-lazy-worker-medium",
+  ],
+  DEEP: PublicTaskAgentSchema.options,
+} as const satisfies Record<TaskSpawnPacketPolicy["tier"], readonly string[]>
+
 export class TaskSpawnGuard {
   constructor(
     readonly ledger: TaskEventLedger,
     readonly maxFanOut: number,
+    readonly packetPolicy?: TaskSpawnPacketPolicy,
   ) {}
 
   async handle(request: TaskSpawnRequest): Promise<TaskSpawnGuardResult> {
@@ -71,6 +124,28 @@ export class TaskSpawnGuard {
     try {
       if (!Number.isSafeInteger(this.maxFanOut) || this.maxFanOut < 1) {
         return { block: true, reason: "omp-lazy: invalid fan-out policy" }
+      }
+      const parsedPolicy =
+        this.packetPolicy === undefined
+          ? null
+          : TaskSpawnPacketPolicySchema.safeParse(this.packetPolicy)
+      if (parsedPolicy !== null && !parsedPolicy.success) {
+        return { block: true, reason: "omp-lazy: invalid packet spawn policy" }
+      }
+      if (parsedPolicy?.success) {
+        const eligible = new Set(TierAgentEligibility[parsedPolicy.data.tier])
+        if (parsedPolicy.data.allowedAgentTypes.some((agent) => !eligible.has(agent))) {
+          return { block: true, reason: "omp-lazy: tier-ineligible packet agent" }
+        }
+        const allowed = new Set(parsedPolicy.data.allowedAgentTypes)
+        if (
+          authorization.spawn.requests.some((spawnRequest) => {
+            const requested = PublicTaskAgentSchema.safeParse(spawnRequest.agentType)
+            return !requested.success || !allowed.has(requested.data)
+          })
+        ) {
+          return { block: true, reason: "omp-lazy: agent not allowed by packet" }
+        }
       }
       const committed = await this.ledger.reserve(
         sessionId,

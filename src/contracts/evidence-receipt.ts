@@ -5,6 +5,17 @@ import { AgentIdSchema, JobIdSchema } from "./agent-ids"
 const counter = z.number().int().nonnegative()
 const nonempty = z.string().trim().min(1).max(1_024)
 const commit = z.string().regex(/^[0-9a-f]{40}$/)
+const hash = z.string().regex(/^[0-9a-f]{64}$/)
+const artifactHashes = z
+  .array(hash)
+  .min(1)
+  .max(32)
+  .readonly()
+  .superRefine((values, context) => {
+    if (new Set(values).size !== values.length) {
+      context.addIssue({ code: "custom", message: "duplicate artifact hash" })
+    }
+  })
 
 export const WorkerRoleSchema = z.enum([
   "omp-lazy-worker-low",
@@ -35,6 +46,84 @@ export const CleanupReceiptClaimSchema = z
   })
   .strict()
 
+export const ResourceEvidenceSchema = z
+  .object({
+    resourceId: nonempty,
+    kind: z.enum(["tool", "process", "worktree", "resource"]),
+  })
+  .strict()
+
+const cleanupReceiptClaims = z.array(CleanupReceiptClaimSchema).min(1).max(32).readonly()
+
+export const CleanupEvidenceSchema = z.union([
+  cleanupReceiptClaims,
+  z.discriminatedUnion("status", [
+    z
+      .object({
+        status: z.literal("receipts"),
+        claims: cleanupReceiptClaims,
+      })
+      .strict(),
+    z
+      .object({
+        status: z.literal("not_applicable"),
+        declaration: z
+          .object({
+            scenarioId: nonempty,
+            resourceKinds: z.tuple([]),
+          })
+          .strict(),
+      })
+      .strict(),
+  ]),
+])
+export type CleanupEvidence = z.infer<typeof CleanupEvidenceSchema>
+
+export function isLegacyCleanupEvidence(
+  value: CleanupEvidence,
+): value is readonly z.infer<typeof CleanupReceiptClaimSchema>[] {
+  return Array.isArray(value)
+}
+
+export function cleanupClaimsForEvidence(
+  value: CleanupEvidence,
+): readonly z.infer<typeof CleanupReceiptClaimSchema>[] {
+  if (isLegacyCleanupEvidence(value)) return value
+  switch (value.status) {
+    case "receipts":
+      return value.claims
+    case "not_applicable":
+      return []
+    default:
+      return value satisfies never
+  }
+}
+
+export const CompactWorkerOutputSchema = z
+  .object({
+    status: z.enum(["PASS", "BLOCKED"]),
+    receiptId: hash,
+    artifactHashes,
+  })
+  .strict()
+
+export const CompactCriticOutputSchema = z
+  .object({
+    verdict: z.enum(["APPROVE", "BLOCKED"]),
+    receiptId: hash,
+    artifactHashes,
+  })
+  .strict()
+
+export const CompactQaOutputSchema = z
+  .object({
+    status: z.enum(["PASS", "BLOCKED"]),
+    receiptId: hash,
+    scenarioIds: z.array(nonempty).min(1).max(32).readonly(),
+    artifactHashes,
+  })
+  .strict()
+
 export const WorkerEvidenceReceiptSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -58,18 +147,32 @@ export const WorkerEvidenceReceiptSchema = z
       })
       .strict(),
     artifacts: z.array(EvidenceArtifactClaimSchema).min(1).max(32).readonly(),
-    cleanup: z.array(CleanupReceiptClaimSchema).min(1).max(32).readonly(),
+    resources: z.array(ResourceEvidenceSchema).max(32).readonly().default([]),
+    cleanup: CleanupEvidenceSchema,
   })
   .strict()
   .superRefine((receipt, context) => {
+    const typedCleanup = isLegacyCleanupEvidence(receipt.cleanup) ? null : receipt.cleanup
+    const cleanupClaims = cleanupClaimsForEvidence(receipt.cleanup)
     if (
       new Set(receipt.artifacts.map((artifact) => artifact.path)).size !==
         receipt.artifacts.length ||
-      new Set(receipt.cleanup.map((cleanup) => cleanup.resourceId)).size !==
-        receipt.cleanup.length ||
-      new Set(receipt.cleanup.map((cleanup) => cleanup.receiptPath)).size !== receipt.cleanup.length
+      new Set(receipt.resources.map((resource) => resource.resourceId)).size !==
+        receipt.resources.length ||
+      new Set(cleanupClaims.map((cleanup) => cleanup.resourceId)).size !== cleanupClaims.length ||
+      new Set(cleanupClaims.map((cleanup) => cleanup.receiptPath)).size !== cleanupClaims.length
     ) {
       context.addIssue({ code: "custom", message: "duplicate evidence claim" })
+    }
+    if (
+      typedCleanup?.status === "receipts" &&
+      (receipt.resources.length !== typedCleanup.claims.length ||
+        receipt.resources.some(
+          (resource) =>
+            !typedCleanup.claims.some((claim) => claim.resourceId === resource.resourceId),
+        ))
+    ) {
+      context.addIssue({ code: "custom", message: "resource cleanup receipt mismatch" })
     }
   })
 

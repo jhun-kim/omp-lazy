@@ -11,6 +11,7 @@ import { deadlineAfter } from "../state/repo-lock"
 import { checkWorkingDirectory } from "../state/repo-root"
 import { type EvidenceBundle, validateEvidenceBundle } from "./artifact-containment"
 import {
+  isLegacyCleanupEvidence,
   type WorkerAcceptanceInput,
   WorkerAcceptanceInputSchema,
   type WorkerRole,
@@ -88,6 +89,13 @@ function receiptBindingError(
   if (receipt.output.schemaOverridden) return "schema_overridden_output"
   if (receipt.output.aborted) return "aborted_output"
   if (receipt.output.blocked) return "blocked_output"
+  if (
+    !isLegacyCleanupEvidence(receipt.cleanup) &&
+    receipt.cleanup.status === "not_applicable" &&
+    dispatch.identity.actualJobId !== null
+  ) {
+    return "cleanup_required"
+  }
   if (
     receipt.artifacts.some(
       (artifact) =>
@@ -221,6 +229,13 @@ export class WorkerResultAcceptance {
         artifactHash: evidence.value.artifactHash,
         artifactPaths: evidence.value.artifacts.map((file) => file.relativePath),
         cleanupReceiptPaths: evidence.value.cleanupReceipts.map((file) => file.relativePath),
+        cleanupStatus:
+          isLegacyCleanupEvidence(receipt.cleanup) || receipt.cleanup.status === "receipts"
+            ? "receipts"
+            : "not_applicable",
+        ...(!isLegacyCleanupEvidence(receipt.cleanup) && receipt.cleanup.status === "not_applicable"
+          ? { cleanupScenarioId: receipt.cleanup.declaration.scenarioId }
+          : {}),
         taskId: dispatch.taskId,
         role: dispatch.role,
         semanticAttempt: semanticAttempt(dispatch.role),

@@ -45,19 +45,50 @@ async function rejectWithoutAcceptance(
   expect((await value.store.readRun(value.run.runId))?.revision).toBe(beforeRun?.revision)
 }
 
-test("Given current parent-bound evidence When accepted Then one durable receipt is recorded", async () => {
-  const value = await runtime("valid")
-  const evidence = await writeEvidence(value)
+test("Given parent evidence When false N/A rejects and no-resource N/A accepts Then hashes summarize", async () => {
+  const value = await acceptanceRuntime("valid", { jobId: null })
+  runtimes.push(value)
+  const falseClaim = await writeEvidence(value, {
+    actualJobId: null,
+    resources: [{ resourceId: "spawned-process", kind: "process" }],
+    cleanupEvidence: {
+      status: "not_applicable",
+      declaration: { scenarioId: "read-only-inspection", resourceKinds: [] },
+    },
+  })
+  await rejectWithoutAcceptance(value, falseClaim.receiptPath, "cleanup_required")
+  const evidence = await writeEvidence(value, {
+    actualJobId: null,
+    resources: [],
+    cleanupEvidence: {
+      status: "not_applicable",
+      declaration: { scenarioId: "read-only-inspection", resourceKinds: [] },
+    },
+  })
   const before = await value.store.readRun(value.run.runId)
 
   const result = await value.acceptance.accept(
     { sessionId: value.run.owner.sessionId, cwd: value.displayPath },
     { agentId: value.agentId, receiptPath: evidence.receiptPath },
   )
+  const summary = await value.acceptance.acceptanceLedger.compactSummary(value.run.runId)
 
   expect(result.kind).toBe("accepted")
   expect(await value.acceptance.acceptanceLedger.entries(value.run.runId)).toHaveLength(1)
   expect((await value.store.readRun(value.run.runId))?.revision).toBe(before?.revision)
+  expect(summary).toEqual({
+    runId: value.run.runId,
+    accepted: [
+      {
+        artifactHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        receiptId: expect.stringMatching(/^[0-9a-f]{64}$/),
+        role: value.role,
+        semanticAttempt: value.run.progressRevision,
+        taskId: "worker",
+      },
+    ],
+  })
+  expect(JSON.stringify(summary)).not.toContain("verified worker output")
 })
 
 describe("artifact containment", () => {

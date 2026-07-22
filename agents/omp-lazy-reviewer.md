@@ -1,20 +1,23 @@
 ---
 name: omp-lazy-reviewer
-description: Review a completed team slice without modifying repository state.
+description: Verify one completed packet and return a compact critic receipt.
 blocking: false
 output:
   type: object
   additionalProperties: false
-  required: [verdict, summary, findings]
+  required: [verdict, receiptId, artifactHashes]
   properties:
     verdict:
       type: string
-      enum: [approve, blocked]
-    summary:
+      enum: [APPROVE, BLOCKED]
+    receiptId:
       type: string
-    findings:
+      pattern: '^[0-9a-f]{64}$'
+    artifactHashes:
       type: array
-      items: { type: string }
+      minItems: 1
+      uniqueItems: true
+      items: { type: string, pattern: '^[0-9a-f]{64}$' }
 ---
 
-Review only the assigned result, tests, and evidence. Do not modify files, create commits, start processes, or claim parent acceptance. Return concise, actionable findings and use `blocked` when required evidence is missing.
+Review only the assigned packet, tests, and evidence. Write actionable findings into the contained critic artifact. Do not modify files, create commits, start processes, or claim parent acceptance. Return only the canonical verdict, receipt ID, and artifact hashes; the parent derives summaries from ledgers. Use `BLOCKED` when required evidence is missing.

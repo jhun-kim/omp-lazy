@@ -9,6 +9,8 @@ import {
 } from "../state/paths"
 import {
   CleanupReceiptSchema,
+  cleanupClaimsForEvidence,
+  isLegacyCleanupEvidence,
   type WorkerEvidenceReceipt,
   WorkerEvidenceReceiptSchema,
 } from "./evidence-receipt"
@@ -151,6 +153,13 @@ export async function validateEvidenceBundle(
   if (!receiptFile.ok) return { ok: false, code: "invalid_receipt_file" }
   const receipt = decodeReceipt(receiptFile.value.bytes)
   if (receipt === null) return { ok: false, code: "malformed_receipt" }
+  if (
+    !isLegacyCleanupEvidence(receipt.cleanup) &&
+    receipt.cleanup.status === "not_applicable" &&
+    receipt.resources.length > 0
+  ) {
+    return { ok: false, code: "cleanup_required" }
+  }
 
   const artifacts: ContainedFile[] = []
   for (const claim of receipt.artifacts) {
@@ -164,7 +173,8 @@ export async function validateEvidenceBundle(
     artifacts.push(artifact.value)
   }
   const cleanupReceipts: ContainedFile[] = []
-  for (const claim of receipt.cleanup) {
+  const cleanupClaims = cleanupClaimsForEvidence(receipt.cleanup)
+  for (const claim of cleanupClaims) {
     const file = await containedFile({
       repository,
       evidenceRoot,

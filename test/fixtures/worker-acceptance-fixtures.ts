@@ -21,7 +21,7 @@ export type AcceptanceRuntime = {
   readonly acceptance: WorkerResultAcceptance
   readonly run: StartWorkRun
   readonly agentId: AgentId
-  readonly jobId: JobId
+  readonly jobId: JobId | null
   readonly role: WorkerRole
 }
 
@@ -47,6 +47,22 @@ export type ReceiptOverrides = {
   readonly artifactCaptureCommit?: string
   readonly artifactClaimPath?: string
   readonly cleanupClaims?: readonly { readonly resourceId: string; readonly receiptPath: string }[]
+  readonly resources?: readonly {
+    readonly resourceId: string
+    readonly kind: "tool" | "process" | "worktree" | "resource"
+  }[]
+  readonly cleanupEvidence?:
+    | {
+        readonly status: "receipts"
+        readonly claims: readonly { readonly resourceId: string; readonly receiptPath: string }[]
+      }
+    | {
+        readonly status: "not_applicable"
+        readonly declaration: {
+          readonly scenarioId: string
+          readonly resourceKinds: readonly []
+        }
+      }
 }
 
 export type EvidenceFiles = {
@@ -64,7 +80,10 @@ function git(root: string, argumentsValue: readonly string[]): string {
   return new TextDecoder().decode(result.stdout).trim()
 }
 
-export async function acceptanceRuntime(label: string): Promise<AcceptanceRuntime> {
+export async function acceptanceRuntime(
+  label: string,
+  options: { readonly jobId?: JobId | null } = {},
+): Promise<AcceptanceRuntime> {
   const displayPath = await realpath(await mkdtemp(join(tmpdir(), `omp-lazy-accept-${label}-`)))
   git(displayPath, ["init", "--quiet"])
   git(displayPath, ["config", "user.email", "fixture@example.invalid"])
@@ -78,7 +97,7 @@ export async function acceptanceRuntime(label: string): Promise<AcceptanceRuntim
   const { store, run } = await initializedStore(root)
   const ledger = new TaskEventLedger(store)
   const agentId = AgentIdSchema.parse("actual-worker")
-  const jobId = JobIdSchema.parse("actual-job")
+  const jobId = options.jobId === undefined ? JobIdSchema.parse("actual-job") : options.jobId
   const role = "omp-lazy-worker-medium" as const
   await bindWorker(ledger, run.owner.sessionId, {
     toolCallId: ToolCallIdSchema.parse("worker-dispatch"),
@@ -104,7 +123,7 @@ export async function bindWorker(
   worker: {
     readonly toolCallId: ToolCallId
     readonly agentId: AgentId
-    readonly jobId: JobId
+    readonly jobId: JobId | null
     readonly role: WorkerRole
   },
 ): Promise<void> {
@@ -191,9 +210,11 @@ export async function writeEvidence(
         },
       },
     ],
-    cleanup: overrides.cleanupClaims ?? [
-      { resourceId: "worker-process", receiptPath: relative(runtime.displayPath, cleanupPath) },
-    ],
+    ...(overrides.resources === undefined ? {} : { resources: overrides.resources }),
+    cleanup: overrides.cleanupEvidence ??
+      overrides.cleanupClaims ?? [
+        { resourceId: "worker-process", receiptPath: relative(runtime.displayPath, cleanupPath) },
+      ],
   }
   await writeFile(receiptPath, JSON.stringify(receipt))
   return {

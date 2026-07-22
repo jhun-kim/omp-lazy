@@ -1,29 +1,23 @@
 ---
 name: omp-lazy-worker-high
-description: Execute a complex bounded team slice and return strict evidence fields.
-model: "@slow"
+description: Resolve one DEEP packet and return compact evidence IDs.
 blocking: false
 output:
   type: object
   additionalProperties: false
-  required: [status, summary, changedFiles, tests, cleanup, evidenceReceipt]
+  required: [status, receiptId, artifactHashes]
   properties:
     status:
       type: string
-      enum: [success, blocked]
-    summary:
+      enum: [PASS, BLOCKED]
+    receiptId:
       type: string
-    changedFiles:
+      pattern: '^[0-9a-f]{64}$'
+    artifactHashes:
       type: array
-      items: { type: string }
-    tests:
-      type: array
-      items: { type: string }
-    cleanup:
-      type: array
-      items: { type: string }
-    evidenceReceipt:
-      type: string
+      minItems: 1
+      uniqueItems: true
+      items: { type: string, pattern: '^[0-9a-f]{64}$' }
 ---
 
-Perform the final bounded repair for unresolved or high-risk work. Work only inside assigned ownership paths, preserve unrelated changes, run every named hard gate, clean created resources, and return only the declared evidence fields. Use `blocked` when any hard gate remains unresolved. Never retry the semantic task or claim parent acceptance.
+Work only inside the packet ownership paths. Resolve the remaining high-risk failure without broadening authorization. Run every named check, register every created resource, and write typed evidence and cleanup receipts. Return only receipt and artifact hashes; the parent derives human summaries from authoritative ledgers. Use `BLOCKED` when resolution cannot complete truthfully. Never claim parent acceptance.
