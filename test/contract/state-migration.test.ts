@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { migrateLifecycleState, recoverLifecycleMigration } from "../../src/state/migration"
 import { runSnapshotPath, statePaths } from "../../src/state/paths"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
+import "./state-migration-durable.test"
 
 const migrationRoots: string[] = []
 
@@ -35,7 +36,32 @@ describe("durable lifecycle migration", () => {
         attempt: 0,
         revision: 1,
         status: "active",
-        members: [],
+        members: [
+          {
+            requestedName: "alpha-one",
+            agentType: "omp-lazy-worker-low",
+            focus: "first migration worker",
+            ownership: ["src/one"],
+            deliverable: "first durable result",
+            isolated: false,
+            actualAgentId: "alpha-agent-one",
+            actualJobId: "alpha-job-one",
+            worktreePath: null,
+            acceptanceKey: null,
+          },
+          {
+            requestedName: "alpha-two",
+            agentType: "omp-lazy-worker-high",
+            focus: "second migration worker",
+            ownership: ["src/two"],
+            deliverable: "second durable result",
+            isolated: false,
+            actualAgentId: "alpha-agent-two",
+            actualJobId: "alpha-job-two",
+            worktreePath: null,
+            acceptanceKey: null,
+          },
+        ],
       }),
     )
 
@@ -62,6 +88,7 @@ describe("durable lifecycle migration", () => {
   test("Given an interruption at every durable boundary When recovery runs Then it restores v1 or completes v2", async () => {
     for (const boundary of [
       "prepared",
+      "backing_up",
       "backed_up",
       "staged",
       "publishing",
@@ -86,12 +113,12 @@ describe("durable lifecycle migration", () => {
       expect(recovered).toEqual(
         boundary === "prepared"
           ? { ok: false, code: "migration_recovery_required" }
-          : boundary === "committed"
+          : boundary === "commit_marker" || boundary === "committed"
             ? { ok: true, status: "finalized" }
             : { ok: true, status: "restored" },
       )
       expect(JSON.parse(await readFile(statePaths(root).activeIndex, "utf8"))).toMatchObject({
-        schemaVersion: boundary === "committed" ? 2 : 1,
+        schemaVersion: boundary === "commit_marker" || boundary === "committed" ? 2 : 1,
       })
     }
   })

@@ -162,4 +162,47 @@ describe("strict state codec", () => {
     // Then
     expect(result).toMatchObject({ ok: false, error: { code: "malformed_event" } })
   })
+
+  test("Given strict migrated v2 envelopes When decoded Then state readers retain their v1 internal view", () => {
+    // Given
+    const run = JSON.parse(validStartWorkJson())
+    run.schemaVersion = 2
+    run.packetHash = null
+    run.expectedHead = null
+    const index = {
+      schemaVersion: 2,
+      migrationRevision: 1,
+      revision: 0,
+      entries: [],
+    }
+    const event = {
+      schemaVersion: 2,
+      eventId: "44444444-4444-4444-8444-444444444444",
+      sequence: 1,
+      runId: run.runId,
+      workflow: "start_work",
+      kind: "workflow_controlled",
+      expected: {
+        indexRevision: 0,
+        runRevision: 2,
+        ownerSessionId: "session-a",
+        ownerEpoch: 1,
+        expectedHead: null,
+        taskGeneration: null,
+      },
+      mutation: { kind: "workflow_controlled", control: "pause" },
+      legacyAuditOnly: true,
+      at: "2026-07-13T00:02:00.000Z",
+    }
+
+    // When
+    const decodedRun = decodeRun(JSON.stringify(run), ROOT)
+    const decodedIndex = decodeActiveIndex(JSON.stringify(index))
+    const decodedEvent = decodeStateEvent(JSON.stringify(event))
+
+    // Then
+    expect(decodedRun).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
+    expect(decodedIndex).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
+    expect(decodedEvent).toMatchObject({ ok: true, value: { schemaVersion: 1 } })
+  })
 })

@@ -1,53 +1,59 @@
 import { createHash } from "node:crypto"
 import { copyFile, mkdir, readdir, readFile, rm } from "node:fs/promises"
 import { dirname, join, relative } from "node:path"
+import { z } from "zod"
 import { atomicReplace } from "./atomic-file"
 import type { CanonicalRoot } from "./domain"
+import {
+  identitiesFromTaskFacts,
+  isFutureLifecycleRecord,
+  migrateLifecycleRecord,
+} from "./migration-records"
 import { ensureStatePathContained, statePaths } from "./paths"
 import { type Deadline, deadlineAfter, RepoLock } from "./repo-lock"
 
-type JsonValue =
-  | boolean
-  | null
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue }
-type JsonRecord = {
-  readonly schemaVersion?: JsonValue
-  readonly status?: JsonValue
-  readonly expected?: JsonValue
-  readonly entries?: JsonValue
-  readonly items?: JsonValue
-  readonly published?: JsonValue
-  readonly phase?: JsonValue
-  readonly path?: JsonValue
-  readonly hash?: JsonValue
-  readonly [key: string]: JsonValue
-}
-type MigrationPhase = "prepared" | "backed_up" | "staged" | "publishing" | "committed"
+const HashSchema = z.string().regex(/^[0-9a-f]{64}$/)
+const ItemSchema = z.strictObject({
+  path: z.string().min(1),
+  sourceHash: HashSchema,
+  targetHash: HashSchema,
+})
+const PhaseSchema = z.enum([
+  "prepared",
+  "backing_up",
+  "backed_up",
+  "staged",
+  "publishing",
+  "committed",
+])
+const JournalSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  phase: PhaseSchema,
+  items: z.array(ItemSchema).min(1).readonly(),
+  published: z.array(z.string().min(1)).readonly(),
+})
+const CommitMarkerSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  complete: z.literal(true),
+  items: z
+    .array(z.strictObject({ path: z.string().min(1), hash: HashSchema }))
+    .min(1)
+    .readonly(),
+})
 
-type MigrationItem = {
-  readonly path: string
-  readonly hash: string
-}
-
-type MigrationJournal = {
-  readonly schemaVersion: 1
-  readonly phase: MigrationPhase
-  readonly items: readonly MigrationItem[]
-  readonly published: readonly string[]
-}
+type MigrationJournal = z.infer<typeof JournalSchema>
 
 export type MigrationBoundary =
   | "prepared"
+  | "backing_up"
   | "backed_up"
   | "staged"
   | "publishing"
   | "commit_marker"
   | "committed"
+  | `backup:${string}`
+  | `staged:${string}`
   | `published:${string}`
-
 export type MigrationResult =
   | { readonly ok: true; readonly status: "migrated" | "already_current" }
   | {
@@ -57,7 +63,6 @@ export type MigrationResult =
         | "migration_recovery_required"
         | "unknown_schema_version"
     }
-
 export type RecoveryResult =
   | { readonly ok: true; readonly status: "restored" | "finalized" | "not_needed" }
   | { readonly ok: false; readonly code: "migration_recovery_required" }
@@ -66,118 +71,62 @@ function hash(bytes: string): string {
   return createHash("sha256").update(bytes).digest("hex")
 }
 
-function isRecord(value: JsonValue): value is JsonRecord {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
+function crash(
+  callback: ((boundary: MigrationBoundary) => void) | undefined,
+  boundary: MigrationBoundary,
+): void {
+  callback?.(boundary)
 }
 
-function isSchemaVersion(value: JsonRecord): number | null {
-  const candidate = value.schemaVersion
-  return typeof candidate === "number" && Number.isInteger(candidate) ? candidate : null
+function rank(path: string): number {
+  if (path === "active.json") return 5
+  if (path.startsWith("teams/")) return 3
+  if (path.startsWith("runs/") || path.startsWith("events/")) return 2
+  return 1
 }
 
-function parseJson(bytes: string): JsonValue | null {
-  try {
-    const value: unknown = JSON.parse(bytes)
-    if (
-      value === null ||
-      typeof value === "boolean" ||
-      typeof value === "number" ||
-      typeof value === "string"
-    ) {
-      return value
-    }
-    if (Array.isArray(value)) return value as readonly JsonValue[]
-    if (typeof value === "object") return value as JsonRecord
-    return null
-  } catch {
-    return null
-  }
+function ordered<T extends { readonly path: string }>(items: readonly T[]): readonly T[] {
+  return [...items].sort(
+    (left, right) => rank(left.path) - rank(right.path) || left.path.localeCompare(right.path),
+  )
 }
 
-function v2Record(path: string, value: JsonRecord): JsonRecord | null {
-  const version = isSchemaVersion(value)
-  if (version === 2) return value
-  if (version !== 1) return null
-  if (path === "active.json") return { ...value, schemaVersion: 2, migrationRevision: 1 }
-  if (path.startsWith("teams/") && value.status === "active") {
-    return { ...value, schemaVersion: 2, status: "bound" }
-  }
-  if (path.startsWith("events/")) {
-    const currentExpected = value.expected
-    const expected =
-      currentExpected !== undefined && isRecord(currentExpected)
-        ? { ...currentExpected, expectedHead: null, taskGeneration: null }
-        : (currentExpected ?? null)
-    return { ...value, schemaVersion: 2, expected, legacyAuditOnly: true }
-  }
-  if (path.startsWith("runs/")) {
-    return {
-      ...value,
-      schemaVersion: 2,
-      packetHash: null,
-      expectedHead: null,
-      taskGeneration: null,
-    }
-  }
-  if (path.startsWith("task-facts/")) {
-    return { ...value, schemaVersion: 2, packetHash: null, tier: null, reservationId: null }
-  }
-  if (path.startsWith("worker-acceptance/") || path.startsWith("worker-rejections/")) {
-    const entries = value.entries
-    if (Array.isArray(entries) && entries.length > 0) return null
-    return { ...value, schemaVersion: 2 }
-  }
-  return { ...value, schemaVersion: 2 }
+function isLifecyclePath(path: string): boolean {
+  return (
+    path === "active.json" ||
+    /^runs\/[0-9a-f-]+\/run\.json$/.test(path) ||
+    /^events\/\d{16}-[0-9a-f-]+\.json$/.test(path) ||
+    /^task-facts\/[0-9a-f-]+\.json$/.test(path) ||
+    /^worker-acceptance\/[0-9a-f-]+(?:\.wal\.jsonl|\.json)$/.test(path) ||
+    /^worker-rejections\/[0-9a-f-]+\.json$/.test(path) ||
+    /^teams\/[a-z0-9-]+\.json$/.test(path)
+  )
 }
 
-function migrateBytes(path: string, bytes: string): string | null {
-  if (path.endsWith(".jsonl")) {
-    const lines = bytes.split("\n").filter((line) => line.length > 0)
-    if (lines.length > 0) return null
-    return bytes
-  }
-  const parsed = parseJson(bytes)
-  if (parsed === null || !isRecord(parsed)) return null
-  const migrated = v2Record(path, parsed)
-  return migrated === null ? null : JSON.stringify(migrated)
-}
-
-async function files(root: string, directory = root): Promise<readonly string[]> {
-  const entries = await readdir(directory, { withFileTypes: true })
-  const result: string[] = []
-  for (const entry of entries) {
-    const path = join(directory, entry.name)
-    if (entry.name === "migration" || entry.name === "state.lock" || entry.name.includes(".tmp-"))
-      continue
-    if (entry.isDirectory()) result.push(...(await files(root, path)))
-    if (entry.isFile()) result.push(relative(root, path).replaceAll("\\", "/"))
-  }
-  return result
-}
-
-function ordered(items: readonly string[]): readonly string[] {
-  return [...items].sort((left, right) => {
-    const rank = (path: string): number => {
-      if (path === "active.json") return 4
-      if (path.startsWith("runs/") || path.startsWith("events/")) return 2
-      if (path.startsWith("teams/")) return 3
-      return 1
-    }
-    return rank(left) - rank(right) || left.localeCompare(right)
-  })
-}
-
-function paths(root: CanonicalRoot): {
+function migrationPaths(root: CanonicalRoot): {
   readonly journal: string
   readonly backup: string
   readonly staged: string
 } {
-  const migration = join(statePaths(root).root, "migration")
+  const directory = join(statePaths(root).root, "migration")
   return {
-    journal: join(migration, "journal.json"),
-    backup: join(migration, "backup"),
-    staged: join(migration, "staged"),
+    journal: join(directory, "journal.json"),
+    backup: join(directory, "backup"),
+    staged: join(directory, "staged"),
   }
+}
+
+async function sourceFiles(root: string, directory = root): Promise<readonly string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const result: string[] = []
+  for (const entry of entries) {
+    if (entry.name === "migration" || entry.name === "state.lock" || entry.name.includes(".tmp-"))
+      continue
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) result.push(...(await sourceFiles(root, path)))
+    if (entry.isFile()) result.push(relative(root, path).replaceAll("\\", "/"))
+  }
+  return result
 }
 
 async function writeJournal(
@@ -185,53 +134,38 @@ async function writeJournal(
   journal: MigrationJournal,
   deadline: Deadline,
 ): Promise<void> {
-  const destination = paths(root).journal
-  await atomicReplace(destination, JSON.stringify(journal), {
+  await atomicReplace(migrationPaths(root).journal, JSON.stringify(journal), {
     deadline,
     guard: (path) => ensureStatePathContained(root, path),
   })
 }
 
-async function readJournal(root: CanonicalRoot): Promise<MigrationJournal | null> {
+async function readJournal(root: CanonicalRoot): Promise<"absent" | "invalid" | MigrationJournal> {
   try {
-    const parsed = parseJson(await readFile(paths(root).journal, "utf8"))
-    if (!isRecord(parsed)) return null
-    const schemaVersion = parsed.schemaVersion
-    const rawItems = parsed.items
-    const rawPublished = parsed.published
-    if (schemaVersion !== 1 || !Array.isArray(rawItems) || !Array.isArray(rawPublished)) return null
-    const phase = parsed.phase
-    if (
-      phase !== "prepared" &&
-      phase !== "backed_up" &&
-      phase !== "staged" &&
-      phase !== "publishing" &&
-      phase !== "committed"
+    const parsed = JournalSchema.safeParse(
+      JSON.parse(await readFile(migrationPaths(root).journal, "utf8")),
     )
-      return null
-    const items = rawItems.flatMap((item) => {
-      if (!isRecord(item)) return []
-      const path = item.path
-      const itemHash = item.hash
-      return typeof path === "string" && typeof itemHash === "string"
-        ? [{ path, hash: itemHash }]
-        : []
-    })
-    if (items.length !== rawItems.length) return null
-    const published = rawPublished.filter((item): item is string => typeof item === "string")
-    if (published.length !== rawPublished.length) return null
-    return { schemaVersion: 1, phase, items, published }
-  } catch {
-    return null
+    if (
+      !parsed.success ||
+      new Set(parsed.data.items.map((item) => item.path)).size !== parsed.data.items.length
+    )
+      return "invalid"
+    const known = new Set(parsed.data.items.map((item) => item.path))
+    return parsed.data.published.every((path) => known.has(path)) ? parsed.data : "invalid"
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return "absent"
+    if (error instanceof SyntaxError) return "invalid"
+    throw error
   }
 }
 
-async function copyBackup(root: CanonicalRoot, item: MigrationItem): Promise<boolean> {
-  const source = join(statePaths(root).root, item.path)
-  const destination = join(paths(root).backup, item.path)
-  await mkdir(dirname(destination), { recursive: true })
-  await copyFile(source, destination)
-  return hash(await readFile(destination, "utf8")) === item.hash
+async function verified(path: string, expected: string): Promise<boolean> {
+  try {
+    return hash(await readFile(path, "utf8")) === expected
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
 }
 
 async function restore(
@@ -239,30 +173,92 @@ async function restore(
   journal: MigrationJournal,
   deadline: Deadline,
 ): Promise<RecoveryResult> {
-  for (const item of journal.items) {
-    const backup = join(paths(root).backup, item.path)
-    try {
-      if (hash(await readFile(backup, "utf8")) !== item.hash)
-        return { ok: false, code: "migration_recovery_required" }
-    } catch {
-      return { ok: false, code: "migration_recovery_required" }
-    }
+  const paths = migrationPaths(root)
+  if (
+    !(
+      await Promise.all(
+        journal.items.map((item) => verified(join(paths.backup, item.path), item.sourceHash)),
+      )
+    ).every(Boolean)
+  )
+    return { ok: false, code: "migration_recovery_required" }
+  for (const item of ordered(journal.items)) {
+    await atomicReplace(
+      join(statePaths(root).root, item.path),
+      await readFile(join(paths.backup, item.path), "utf8"),
+      {
+        deadline,
+        guard: (path) => ensureStatePathContained(root, path),
+      },
+    )
   }
-  for (const item of ordered(journal.items.map((item) => item.path))) {
-    const backup = join(paths(root).backup, item)
-    await atomicReplace(join(statePaths(root).root, item), await readFile(backup, "utf8"), {
-      deadline,
-      guard: (path) => ensureStatePathContained(root, path),
-    })
-  }
+  const history = join(
+    dirname(paths.journal),
+    "history",
+    `${Date.now()}-${crypto.randomUUID()}.json`,
+  )
+  await mkdir(dirname(history), { recursive: true })
+  await copyFile(paths.journal, history)
+  await rm(paths.journal)
   return { ok: true, status: "restored" }
+}
+
+async function discardUnpublishedJournal(
+  root: CanonicalRoot,
+  journal: MigrationJournal,
+): Promise<RecoveryResult> {
+  const paths = migrationPaths(root)
+  const history = join(
+    dirname(paths.journal),
+    "history",
+    `${Date.now()}-${crypto.randomUUID()}.json`,
+  )
+  await mkdir(dirname(history), { recursive: true })
+  await atomicReplace(history, JSON.stringify(journal), {
+    deadline: deadlineAfter(2_000),
+    guard: (path) => ensureStatePathContained(root, path),
+  })
+  await rm(paths.journal)
+  return { ok: true, status: "restored" }
+}
+
+async function finalize(
+  root: CanonicalRoot,
+  journal: MigrationJournal,
+  deadline: Deadline,
+): Promise<RecoveryResult> {
+  const paths = migrationPaths(root)
+  let rawMarker: unknown
+  try {
+    rawMarker = JSON.parse(await readFile(join(paths.staged, "commit.json"), "utf8"))
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      return restore(root, journal, deadline)
+    if (error instanceof SyntaxError) return restore(root, journal, deadline)
+    throw error
+  }
+  const marker = CommitMarkerSchema.safeParse(rawMarker)
+  if (!marker.success || marker.data.items.length !== journal.items.length)
+    return restore(root, journal, deadline)
+  const marked = new Map(marker.data.items.map((item) => [item.path, item.hash]))
+  const complete = await Promise.all(
+    journal.items.map(
+      async (item) =>
+        (await verified(join(statePaths(root).root, item.path), item.targetHash)) &&
+        marked.get(item.path) === item.targetHash,
+    ),
+  )
+  if (!complete.every(Boolean)) return restore(root, journal, deadline)
+  await writeJournal(root, { ...journal, phase: "committed" }, deadline)
+  return { ok: true, status: "finalized" }
 }
 
 export async function recoverLifecycleMigration(root: CanonicalRoot): Promise<RecoveryResult> {
   const deadline = deadlineAfter(2_000)
   const state = statePaths(root)
-  const lock = new RepoLock(state.lock, (path) => ensureStatePathContained(root, path))
-  const handle = await lock.tryAcquire({
+  const handle = await new RepoLock(state.lock, (path) =>
+    ensureStatePathContained(root, path),
+  ).tryAcquire({
     deadline,
     purpose: "command",
     sessionId: "migration-recovery",
@@ -271,9 +267,11 @@ export async function recoverLifecycleMigration(root: CanonicalRoot): Promise<Re
   if (handle === null) return { ok: false, code: "migration_recovery_required" }
   try {
     const journal = await readJournal(root)
-    if (journal === null) return { ok: true, status: "not_needed" }
-    if (journal.phase === "committed") return { ok: true, status: "finalized" }
-    return restore(root, journal, deadline)
+    if (journal === "absent") return { ok: true, status: "not_needed" }
+    if (journal === "invalid") return { ok: false, code: "migration_recovery_required" }
+    if (journal.phase === "backing_up") return discardUnpublishedJournal(root, journal)
+    if (journal.phase === "committed") return finalize(root, journal, deadline)
+    return await finalize(root, journal, deadline)
   } finally {
     await handle.release()
   }
@@ -286,8 +284,9 @@ export async function migrateLifecycleState(request: {
 }): Promise<MigrationResult> {
   const deadline = request.deadline ?? deadlineAfter(2_000)
   const state = statePaths(request.root)
-  const lock = new RepoLock(state.lock, (path) => ensureStatePathContained(request.root, path))
-  const handle = await lock.tryAcquire({
+  const handle = await new RepoLock(state.lock, (path) =>
+    ensureStatePathContained(request.root, path),
+  ).tryAcquire({
     deadline,
     purpose: "command",
     sessionId: "migration",
@@ -295,85 +294,104 @@ export async function migrateLifecycleState(request: {
   })
   if (handle === null) return { ok: false, code: "migration_recovery_required" }
   try {
-    const existing = await readJournal(request.root)
-    if (existing !== null && existing.phase !== "committed")
+    const prior = await readJournal(request.root)
+    if (prior === "invalid") return { ok: false, code: "migration_recovery_required" }
+    if (prior !== "absent") {
+      if (prior.phase !== "committed") return { ok: false, code: "migration_recovery_required" }
+      const finalized = await finalize(request.root, prior, deadline)
+      return finalized.ok
+        ? { ok: true, status: "already_current" }
+        : { ok: false, code: "migration_recovery_required" }
+    }
+    const names = await sourceFiles(state.root)
+    if (names.length === 0 || names.some((path) => !isLifecyclePath(path)))
       return { ok: false, code: "migration_recovery_required" }
-    const source = ordered(await files(state.root))
-    const originals = await Promise.all(
-      source.map(async (path) => ({ path, bytes: await readFile(join(state.root, path), "utf8") })),
+    const source = await Promise.all(
+      names.map(async (path) => ({ path, bytes: await readFile(join(state.root, path), "utf8") })),
     )
-    const versioned = originals.filter(
-      ({ path }) => path.endsWith(".json") || path.endsWith(".jsonl"),
-    )
-    const migrated = versioned.map(({ path, bytes }) => ({
-      path,
-      bytes: migrateBytes(path, bytes),
+    if (source.some((item) => isFutureLifecycleRecord(item.bytes)))
+      return { ok: false, code: "unknown_schema_version" }
+    const identities = identitiesFromTaskFacts(source)
+    if (identities === null) return { ok: false, code: "migration_recovery_required" }
+    const converted = source.map((item) => ({
+      path: item.path,
+      source: item.bytes,
+      result: migrateLifecycleRecord(item.path, item.bytes, identities),
     }))
-    if (migrated.some((item) => item.bytes === null)) {
-      const future = originals.some(({ bytes }) => {
-        const value = parseJson(bytes)
-        return isRecord(value) && (isSchemaVersion(value) ?? 0) > 2
-      })
-      return { ok: false, code: future ? "unknown_schema_version" : "migration_recovery_required" }
-    }
-    if (
-      migrated.every(
-        (item) =>
-          item.bytes === originals.find((sourceItem) => sourceItem.path === item.path)?.bytes,
-      )
-    ) {
+    if (converted.some((item) => item.result.kind === "invalid"))
+      return { ok: false, code: "migration_recovery_required" }
+    if (converted.every((item) => item.result.kind === "current"))
       return { ok: true, status: "already_current" }
-    }
-    const journal: MigrationJournal = {
+    if (converted.some((item) => item.result.kind === "current"))
+      return { ok: false, code: "migration_recovery_required" }
+    const targets = converted.flatMap((item) =>
+      item.result.kind === "migrated"
+        ? [{ path: item.path, source: item.source, bytes: item.result.bytes }]
+        : [],
+    )
+    if (targets.length !== converted.length)
+      return { ok: false, code: "migration_recovery_required" }
+    const journal = JournalSchema.parse({
       schemaVersion: 1,
       phase: "prepared",
-      items: originals.map(({ path, bytes }) => ({ path, hash: hash(bytes) })),
+      items: targets.map((item) => ({
+        path: item.path,
+        sourceHash: hash(item.source),
+        targetHash: hash(item.bytes),
+      })),
       published: [],
-    }
+    })
     await writeJournal(request.root, journal, deadline)
-    request.crash?.("prepared")
-    if (
-      !(await Promise.all(journal.items.map((item) => copyBackup(request.root, item)))).every(
-        Boolean,
-      )
-    )
-      return { ok: false, code: "migration_recovery_required" }
+    crash(request.crash, "prepared")
+    const paths = migrationPaths(request.root)
+    await writeJournal(request.root, { ...journal, phase: "backing_up" }, deadline)
+    crash(request.crash, "backing_up")
+    for (const item of journal.items) {
+      const destination = join(paths.backup, item.path)
+      await mkdir(dirname(destination), { recursive: true })
+      await copyFile(join(state.root, item.path), destination)
+      if (!(await verified(destination, item.sourceHash)))
+        return { ok: false, code: "migration_recovery_required" }
+      crash(request.crash, `backup:${item.path}`)
+    }
     await writeJournal(request.root, { ...journal, phase: "backed_up" }, deadline)
-    request.crash?.("backed_up")
-    for (const item of migrated) {
-      const bytes = item.bytes
-      if (bytes === null) return { ok: false, code: "migration_recovery_required" }
-      const stage = join(paths(request.root).staged, item.path)
-      await atomicReplace(stage, bytes, {
+    crash(request.crash, "backed_up")
+    for (const item of targets) {
+      const destination = join(paths.staged, item.path)
+      await atomicReplace(destination, item.bytes, {
         deadline,
         guard: (path) => ensureStatePathContained(request.root, path),
       })
-      if (hash(await readFile(stage, "utf8")) !== hash(bytes))
+      if (!(await verified(destination, hash(item.bytes))))
         return { ok: false, code: "migration_recovery_required" }
+      crash(request.crash, `staged:${item.path}`)
     }
     await writeJournal(request.root, { ...journal, phase: "staged" }, deadline)
-    request.crash?.("staged")
-    let publishing: MigrationJournal = { ...journal, phase: "publishing" }
+    crash(request.crash, "staged")
+    let publishing = { ...journal, phase: "publishing" as const }
     await writeJournal(request.root, publishing, deadline)
-    request.crash?.("publishing")
-    for (const item of migrated) {
-      await atomicReplace(
-        join(state.root, item.path),
-        await readFile(join(paths(request.root).staged, item.path), "utf8"),
-        { deadline, guard: (path) => ensureStatePathContained(request.root, path) },
-      )
+    crash(request.crash, "publishing")
+    for (const item of ordered(targets)) {
+      await atomicReplace(join(state.root, item.path), item.bytes, {
+        deadline,
+        guard: (path) => ensureStatePathContained(request.root, path),
+      })
       publishing = { ...publishing, published: [...publishing.published, item.path] }
       await writeJournal(request.root, publishing, deadline)
-      request.crash?.(`published:${item.path}`)
+      crash(request.crash, `published:${item.path}`)
     }
     await atomicReplace(
-      join(paths(request.root).staged, "commit.json"),
-      JSON.stringify({ schemaVersion: 1, complete: true }),
+      join(paths.staged, "commit.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        complete: true,
+        items: journal.items.map((item) => ({ path: item.path, hash: item.targetHash })),
+      }),
       { deadline, guard: (path) => ensureStatePathContained(request.root, path) },
     )
-    request.crash?.("commit_marker")
+    crash(request.crash, "commit_marker")
     await writeJournal(request.root, { ...publishing, phase: "committed" }, deadline)
-    request.crash?.("committed")
+    crash(request.crash, "committed")
     return { ok: true, status: "migrated" }
   } catch {
     return { ok: false, code: "migration_interrupted" }
@@ -383,6 +401,5 @@ export async function migrateLifecycleState(request: {
 }
 
 export async function removeLifecycleMigrationArtifacts(root: CanonicalRoot): Promise<void> {
-  const migration = dirname(paths(root).journal)
-  await rm(migration, { recursive: true, force: true })
+  await rm(dirname(migrationPaths(root).journal), { recursive: true, force: true })
 }

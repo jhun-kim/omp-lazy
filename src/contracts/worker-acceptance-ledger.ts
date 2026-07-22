@@ -15,7 +15,7 @@ const hash = z.string().regex(/^[0-9a-f]{64}$/)
 const commit = z.string().regex(/^[0-9a-f]{40}$/)
 const nonempty = z.string().trim().min(1)
 
-const acceptanceEventSchema = z
+export const acceptanceEventSchema = z
   .object({
     sequence: counter.positive(),
     idempotencyKey: nonempty,
@@ -40,7 +40,7 @@ const acceptanceEventSchema = z
 
 export type WorkerAcceptanceEvent = z.infer<typeof acceptanceEventSchema>
 
-const acceptanceLedgerSchema = z
+export const acceptanceLedgerSchema = z
   .object({
     schemaVersion: z.literal(1),
     runId: UuidSchema,
@@ -58,7 +58,7 @@ const acceptanceLedgerSchema = z
     }
   })
 
-const rejectionEntrySchema = z
+export const rejectionEntrySchema = z
   .object({
     runId: UuidSchema,
     attempt: counter,
@@ -71,7 +71,7 @@ const rejectionEntrySchema = z
   })
   .strict()
 
-const rejectionLedgerSchema = z
+export const rejectionLedgerSchema = z
   .object({
     schemaVersion: z.literal(1),
     runId: UuidSchema,
