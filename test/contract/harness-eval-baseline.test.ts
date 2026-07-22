@@ -126,4 +126,23 @@ describe("frozen legacy baseline evaluator", () => {
       await rm(root, { force: true, recursive: true })
     }
   })
+
+  it("removes an interrupted disposable clone without registering a worktree", async () => {
+    const before = Bun.spawnSync(["git", "worktree", "list", "--porcelain"]).stdout.toString()
+    const root = await mkdtemp(join(tmpdir(), "omp-lazy-baseline-interrupt-"))
+    try {
+      await expect(
+        runBaselineEvaluation({
+          abortAfterClone: true,
+          manifestPath,
+          outputPath: join(root, "unwritten.json"),
+        }),
+      ).rejects.toThrow("baseline execution interrupted")
+      expect(Bun.spawnSync(["git", "worktree", "list", "--porcelain"]).stdout.toString()).toBe(
+        before,
+      )
+    } finally {
+      await rm(root, { force: true, recursive: true })
+    }
+  })
 })

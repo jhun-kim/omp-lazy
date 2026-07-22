@@ -113,6 +113,7 @@ async function publish(path: string, receipt: BaselineReceipt): Promise<void> {
 }
 
 export async function runBaselineEvaluation(options: {
+  readonly abortAfterClone?: boolean
   readonly manifestPath: string
   readonly outputPath: string
 }): Promise<BaselineReceipt> {
@@ -139,6 +140,7 @@ export async function runBaselineEvaluation(options: {
       undefined
     )
       throw new TypeError("baseline clone unavailable")
+    if (options.abortAfterClone === true) throw new TypeError("baseline execution interrupted")
     if (
       git(["checkout", "--detach", manifest.baselineTargetCommit], target) === undefined ||
       git(["rev-parse", "HEAD"], target) !== manifest.baselineTargetCommit ||
