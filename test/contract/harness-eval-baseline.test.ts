@@ -50,6 +50,10 @@ describe("frozen legacy baseline evaluator", () => {
       expect(receipt.baseline.targetCommit).not.toBe(
         Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout.toString().trim(),
       )
+      expect(receipt.evaluator.closureCommit).toBe(
+        (JSON.parse(await readFile("harness-eval.lock.json", "utf8")) as { closureCommit: string })
+          .closureCommit,
+      )
       expect(await readFile(output, "utf8")).not.toContain(process.cwd())
       expect(await readFile(output, "utf8")).not.toMatch(/sk-|api[_-]?key|secret/i)
     } finally {
