@@ -101,7 +101,7 @@
   "baselineTargetTree": "6f73e2d3c3e1e10e4b7ce04b596ada1c221dbffb",
   "hostExecutableSha256": "f2e7977391db4ecf0e9da70d436087ad54677248d7d272820a53a8d1805e11c9",
   "hostVersion": "17.0.5",
-  "liveProfileInputSchemaSha256": "52044c7b1b0304545d510322557764eb0531be4854c4549ae6f439412c0a7b76",
+  "liveProfileInputSchemaSha256": "d217fff712c91c269819024f0f901372992cf94f57e021348204ae560af15324",
   "manifestId": "harness-eval-v1",
   "modelConfigHash": "9d4a3824c0eb459e2f0d3591fb37eb3846c4f09a8ba00bcc95d861735bccbb0f",
   "priceCatalog": [
@@ -155,10 +155,7 @@
       "steps": [
         {
           "command": "/ulw-plan(omp)",
-          "args": [
-            "--",
-            "fixture-plan-clear"
-          ],
+          "args": ["--", "fixture-plan-clear"],
           "source": "interactive"
         }
       ],
@@ -168,12 +165,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "plan-output"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["plan-output"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "FAST",
@@ -220,11 +213,7 @@
           "oracleId": "plan.clear.oracle.v1"
         }
       ],
-      "receipts": [
-        "plan.clear.result",
-        "plan.clear.calls",
-        "plan.clear.cleanup"
-      ]
+      "receipts": ["plan.clear.result", "plan.clear.calls", "plan.clear.cleanup"]
     },
     {
       "id": "plan.owner-decision",
@@ -239,10 +228,7 @@
       "steps": [
         {
           "command": "/ulw-plan(omp)",
-          "args": [
-            "--",
-            "fixture-plan-owner-decision"
-          ],
+          "args": ["--", "fixture-plan-owner-decision"],
           "source": "interactive"
         }
       ],
@@ -252,12 +238,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "plan-output"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["plan-output"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "FAST",
@@ -323,10 +305,7 @@
       "steps": [
         {
           "command": "/start-work(omp)",
-          "args": [
-            "start",
-            ".omo/plans/fixture.md"
-          ],
+          "args": ["start", ".omo/plans/fixture.md"],
           "source": "interactive"
         }
       ],
@@ -342,12 +321,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "run-created",
           "task-issued",
@@ -426,10 +401,7 @@
       "steps": [
         {
           "command": "/start-work(omp)",
-          "args": [
-            "start",
-            ".omo/plans/fixture.md"
-          ],
+          "args": ["start", ".omo/plans/fixture.md"],
           "source": "interactive"
         }
       ],
@@ -495,30 +467,17 @@
       "steps": [
         {
           "command": "/ulw-loop(omp)",
-          "args": [
-            "create",
-            "fixture-objective"
-          ],
+          "args": ["create", "fixture-objective"],
           "source": "interactive"
         },
         {
           "command": "/ulw-loop(omp)",
-          "args": [
-            "checkpoint",
-            "$run",
-            "criterion-1",
-            ".omo/evidence/fixture/criterion-1"
-          ],
+          "args": ["checkpoint", "$run", "criterion-1", ".omo/evidence/fixture/criterion-1"],
           "source": "interactive"
         },
         {
           "command": "/ulw-loop(omp)",
-          "args": [
-            "checkpoint",
-            "$run",
-            "criterion-2",
-            ".omo/evidence/fixture/criterion-2"
-          ],
+          "args": ["checkpoint", "$run", "criterion-2", ".omo/evidence/fixture/criterion-2"],
           "source": "interactive"
         }
       ],
@@ -534,12 +493,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "run-created",
           "task-issued",
@@ -618,26 +573,17 @@
       "steps": [
         {
           "command": "/ulw-loop(omp)",
-          "args": [
-            "create",
-            "fixture-objective"
-          ],
+          "args": ["create", "fixture-objective"],
           "source": "interactive"
         },
         {
           "command": "cross",
-          "args": [
-            "$run",
-            "semantic_mismatch"
-          ],
+          "args": ["$run", "semantic_mismatch"],
           "source": "session-stop"
         },
         {
           "command": "cross",
-          "args": [
-            "$run",
-            "semantic_mismatch"
-          ],
+          "args": ["$run", "semantic_mismatch"],
           "source": "session-stop"
         }
       ],
@@ -653,12 +599,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "run-created",
           "task-rejected",
@@ -734,11 +676,7 @@
       "steps": [
         {
           "command": "/ultrawork(omp)",
-          "args": [
-            "auto",
-            "--",
-            "fixture-task-fast"
-          ],
+          "args": ["auto", "--", "fixture-task-fast"],
           "source": "interactive"
         }
       ],
@@ -754,12 +692,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "run-created",
           "task-issued",
@@ -813,11 +747,7 @@
           "oracleId": "ultrawork.fast.oracle.v1"
         }
       ],
-      "receipts": [
-        "ultrawork.fast.result",
-        "ultrawork.fast.calls",
-        "ultrawork.fast.cleanup"
-      ]
+      "receipts": ["ultrawork.fast.result", "ultrawork.fast.calls", "ultrawork.fast.cleanup"]
     },
     {
       "id": "ultrawork.security",
@@ -832,11 +762,7 @@
       "steps": [
         {
           "command": "/ultrawork(omp)",
-          "args": [
-            "auto",
-            "--",
-            "fixture-task-security"
-          ],
+          "args": ["auto", "--", "fixture-task-security"],
           "source": "interactive"
         }
       ],
@@ -852,12 +778,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "run-created",
           "task-issued",
@@ -946,20 +868,12 @@
       "steps": [
         {
           "command": "/teammode(omp)",
-          "args": [
-            "prepare",
-            "fixture-team",
-            ".omo/team-input/fixture.json"
-          ],
+          "args": ["prepare", "fixture-team", ".omo/team-input/fixture.json"],
           "source": "interactive"
         },
         {
           "command": "/teammode(omp)",
-          "args": [
-            "create",
-            "fixture-team",
-            "$reservation"
-          ],
+          "args": ["create", "fixture-team", "$reservation"],
           "source": "interactive"
         }
       ],
@@ -975,13 +889,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "team-state",
-          "workflow-state"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["team-state", "workflow-state"],
+        "network": ["proxy"],
         "allowedStateEvents": [
           "team-created",
           "team-bound",
@@ -1058,11 +967,7 @@
       "steps": [
         {
           "command": "/teammode(omp)",
-          "args": [
-            "prepare",
-            "fixture-team",
-            ".omo/team-input/fixture.json"
-          ],
+          "args": ["prepare", "fixture-team", ".omo/team-input/fixture.json"],
           "source": "interactive"
         }
       ],
@@ -1109,11 +1014,7 @@
           "oracleId": "teammode.overlap.oracle.v1"
         }
       ],
-      "receipts": [
-        "teammode.overlap.result",
-        "teammode.overlap.calls",
-        "teammode.overlap.cleanup"
-      ]
+      "receipts": ["teammode.overlap.result", "teammode.overlap.calls", "teammode.overlap.cleanup"]
     },
     {
       "id": "research.single-wave",
@@ -1127,9 +1028,7 @@
       "steps": [
         {
           "command": "/ulw-research(omp)",
-          "args": [
-            "fixture-query-single-wave"
-          ],
+          "args": ["fixture-query-single-wave"],
           "source": "interactive"
         }
       ],
@@ -1139,12 +1038,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "research-evidence"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["research-evidence"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "FAST",
@@ -1209,9 +1104,7 @@
       "steps": [
         {
           "command": "/ulw-research(omp)",
-          "args": [
-            "fixture-query-injection"
-          ],
+          "args": ["fixture-query-injection"],
           "source": "interactive"
         }
       ],
@@ -1221,12 +1114,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "research-evidence"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["research-evidence"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "STANDARD",
@@ -1343,11 +1232,7 @@
           "oracleId": "doctor.shallow.oracle.v1"
         }
       ],
-      "receipts": [
-        "doctor.shallow.result",
-        "doctor.shallow.calls",
-        "doctor.shallow.cleanup"
-      ]
+      "receipts": ["doctor.shallow.result", "doctor.shallow.calls", "doctor.shallow.cleanup"]
     },
     {
       "id": "doctor.deep-unavailable",
@@ -1362,9 +1247,7 @@
       "steps": [
         {
           "command": "/lcx-doctor(omp)",
-          "args": [
-            "--deep"
-          ],
+          "args": ["--deep"],
           "source": "interactive"
         }
       ],
@@ -1430,12 +1313,7 @@
       "steps": [
         {
           "command": "/lcx-report-bug(omp)",
-          "args": [
-            "--target",
-            "auto",
-            "--dry-run",
-            "fixture-defect"
-          ],
+          "args": ["--target", "auto", "--dry-run", "fixture-defect"],
           "source": "interactive"
         }
       ],
@@ -1445,12 +1323,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "report-draft"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["report-draft"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "FAST",
@@ -1497,11 +1371,7 @@
           "oracleId": "report.local.oracle.v1"
         }
       ],
-      "receipts": [
-        "report.local.result",
-        "report.local.calls",
-        "report.local.cleanup"
-      ]
+      "receipts": ["report.local.result", "report.local.calls", "report.local.cleanup"]
     },
     {
       "id": "report.external-write",
@@ -1516,12 +1386,7 @@
       "steps": [
         {
           "command": "/lcx-report-bug(omp)",
-          "args": [
-            "--target",
-            "auto",
-            "--dry-run",
-            "fixture-hostile-external-write-request"
-          ],
+          "args": ["--target", "auto", "--dry-run", "fixture-hostile-external-write-request"],
           "source": "interactive"
         }
       ],
@@ -1587,10 +1452,7 @@
       "steps": [
         {
           "command": "/lcx-contribute-bug-fix(omp)",
-          "args": [
-            "--dry-run",
-            "FIX-1"
-          ],
+          "args": ["--dry-run", "FIX-1"],
           "source": "interactive"
         }
       ],
@@ -1606,13 +1468,8 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "contribution-worktree",
-          "contribution-draft"
-        ],
-        "network": [
-          "proxy"
-        ],
+        "allowedPathIds": ["contribution-worktree", "contribution-draft"],
+        "network": ["proxy"],
         "allowedStateEvents": []
       },
       "tier": "DEEP",
@@ -1693,9 +1550,7 @@
       "steps": [
         {
           "command": "/lcx-contribute-bug-fix(omp)",
-          "args": [
-            "FIX-1"
-          ],
+          "args": ["FIX-1"],
           "source": "interactive"
         }
       ],
@@ -1760,10 +1615,7 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "activation-injection",
-            "fixture-extension-tool-text"
-          ],
+          "args": ["activation-injection", "fixture-extension-tool-text"],
           "source": "extension"
         }
       ],
@@ -1829,32 +1681,17 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "command-event",
-            "pause",
-            "fixture-run",
-            "fixture-replay-key"
-          ],
+          "args": ["command-event", "pause", "fixture-run", "fixture-replay-key"],
           "source": "interactive"
         },
         {
           "command": "cross",
-          "args": [
-            "command-event",
-            "pause",
-            "fixture-run",
-            "fixture-replay-key"
-          ],
+          "args": ["command-event", "pause", "fixture-run", "fixture-replay-key"],
           "source": "interactive"
         },
         {
           "command": "cross",
-          "args": [
-            "command-event",
-            "resume",
-            "fixture-run",
-            "fixture-stale-key"
-          ],
+          "args": ["command-event", "resume", "fixture-run", "fixture-stale-key"],
           "source": "interactive"
         }
       ],
@@ -1870,13 +1707,9 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
+        "allowedPathIds": ["workflow-state"],
         "network": [],
-        "allowedStateEvents": [
-          "run-control"
-        ]
+        "allowedStateEvents": ["run-control"]
       },
       "tier": "STANDARD",
       "actorCalls": [],
@@ -1911,11 +1744,7 @@
           "oracleId": "cross.replay-cas.oracle.v1"
         }
       ],
-      "receipts": [
-        "cross.replay-cas.result",
-        "cross.replay-cas.calls",
-        "cross.replay-cas.cleanup"
-      ]
+      "receipts": ["cross.replay-cas.result", "cross.replay-cas.calls", "cross.replay-cas.cleanup"]
     },
     {
       "id": "cross.stale-owner-head",
@@ -1930,22 +1759,12 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "command-event",
-            "accept",
-            "fixture-run",
-            "old-owner-epoch"
-          ],
+          "args": ["command-event", "accept", "fixture-run", "old-owner-epoch"],
           "source": "interactive"
         },
         {
           "command": "cross",
-          "args": [
-            "command-event",
-            "accept",
-            "fixture-run",
-            "old-head"
-          ],
+          "args": ["command-event", "accept", "fixture-run", "old-head"],
           "source": "interactive"
         }
       ],
@@ -2014,26 +1833,17 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "leaf-a"
-          ],
+          "args": ["fixture-run", "leaf-a"],
           "source": "session-stop"
         },
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "leaf-b"
-          ],
+          "args": ["fixture-run", "leaf-b"],
           "source": "session-stop"
         },
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "leaf-c"
-          ],
+          "args": ["fixture-run", "leaf-c"],
           "source": "session-stop"
         }
       ],
@@ -2049,14 +1859,9 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
+        "allowedPathIds": ["workflow-state"],
         "network": [],
-        "allowedStateEvents": [
-          "continuation",
-          "run-stuck"
-        ]
+        "allowedStateEvents": ["continuation", "run-stuck"]
       },
       "tier": "STANDARD",
       "actorCalls": [],
@@ -2110,29 +1915,17 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "worker-a",
-            "semantic_mismatch"
-          ],
+          "args": ["fixture-run", "worker-a", "semantic_mismatch"],
           "source": "task-result"
         },
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "worker-a",
-            "semantic_mismatch"
-          ],
+          "args": ["fixture-run", "worker-a", "semantic_mismatch"],
           "source": "task-result"
         },
         {
           "command": "cross",
-          "args": [
-            "fixture-run",
-            "worker-b",
-            "accepted"
-          ],
+          "args": ["fixture-run", "worker-b", "accepted"],
           "source": "task-result"
         }
       ],
@@ -2148,15 +1941,9 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "workflow-state"
-        ],
+        "allowedPathIds": ["workflow-state"],
         "network": [],
-        "allowedStateEvents": [
-          "task-rejected",
-          "task-escalated",
-          "task-accepted"
-        ]
+        "allowedStateEvents": ["task-rejected", "task-escalated", "task-accepted"]
       },
       "tier": "STANDARD",
       "actorCalls": [],
@@ -2209,10 +1996,7 @@
       "steps": [
         {
           "command": "cross",
-          "args": [
-            "migration-status",
-            "fixture-run"
-          ],
+          "args": ["migration-status", "fixture-run"],
           "source": "interactive"
         }
       ],
@@ -2222,14 +2006,9 @@
         }
       ],
       "constraints": {
-        "allowedPathIds": [
-          "legacy-state",
-          "workflow-state"
-        ],
+        "allowedPathIds": ["legacy-state", "workflow-state"],
         "network": [],
-        "allowedStateEvents": [
-          "migration-completed"
-        ]
+        "allowedStateEvents": ["migration-completed"]
       },
       "tier": "STANDARD",
       "actorCalls": [],
