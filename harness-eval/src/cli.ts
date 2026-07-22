@@ -1,4 +1,10 @@
 import { access, readFile } from "node:fs/promises"
+import {
+  BASELINE_RECEIPT_PATH,
+  parseBaselineFlags,
+  runBaselineEvaluation,
+  verifyBaselineReceipt,
+} from "./baseline"
 import { validateClosureLock } from "./closure-lock"
 import { SCENARIO_IDS } from "./constants"
 import { validateDeterministicCorpus } from "./corpus"
@@ -130,10 +136,38 @@ async function run(flags: Flags): Promise<CliReceipt> {
 
 async function execute(argv: readonly string[]): Promise<CliReceipt> {
   const [command, ...arguments_] = argv
+  if (command === "run" && arguments_[0] === "--mode" && arguments_[1] === "baseline") {
+    const parsed = parseBaselineFlags(arguments_.slice(2))
+    if (parsed === undefined) return { code: "malformed_cli", status: "FAIL" }
+    const lock = await validateClosureLock(parsed.manifestPath)
+    if (lock.status === "FAIL") return lock
+    await runBaselineEvaluation({
+      manifestPath: parsed.manifestPath,
+      outputPath: BASELINE_RECEIPT_PATH,
+    })
+    return { status: "PASS" }
+  }
   const flags = parseFlags(arguments_)
   if (flags === undefined) return { code: "malformed_cli", status: "FAIL" }
   if (command === "run") return run(flags)
   if (command === "verify") {
+    const baselineReceipt = value(flags, "--baseline-receipt")
+    if (baselineReceipt !== undefined) {
+      const manifest = value(flags, "--manifest")
+      const targetCommit = value(flags, "--target-commit")
+      if (
+        manifest === undefined ||
+        targetCommit === undefined ||
+        !hasExactKeys(flags, ["--baseline-receipt", "--manifest", "--target-commit"])
+      ) {
+        return { code: "malformed_cli", status: "FAIL" }
+      }
+      return verifyBaselineReceipt({
+        manifestPath: manifest,
+        receiptPath: baselineReceipt,
+        targetCommit,
+      })
+    }
     const bundle = value(flags, "--bundle")
     if (
       bundle !== undefined &&
