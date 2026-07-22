@@ -1,4 +1,7 @@
+import { isAbsolute, posix } from "node:path"
 import { z } from "zod"
+import { BoundaryTagSchema, TaskTierSchema } from "./task-packet"
+import { sortedUniqueStrings } from "./task-packet-canonical"
 
 const canonicalPath = z
   .string()
@@ -6,30 +9,37 @@ const canonicalPath = z
   .max(512)
   .regex(/^(?:\.|[A-Za-z0-9][A-Za-z0-9._/-]*)$/)
   .superRefine((path, context) => {
-    if (path.includes("\\") || path.split("/").includes("..") || path.includes("//")) {
+    const normalized = path.replaceAll("\\", "/")
+    if (
+      path !== normalized ||
+      isAbsolute(path) ||
+      normalized.startsWith("/") ||
+      normalized.split("/").includes("..") ||
+      posix.normalize(normalized) !== normalized ||
+      (normalized !== "." && (normalized.startsWith("./") || normalized.endsWith("/")))
+    ) {
       context.addIssue({ code: "custom", message: "bucket path must be canonical" })
     }
   })
 
 export const ParallelismHistoryKeySchema = z
   .object({
-    moduleBuckets: z.array(canonicalPath).min(1).max(32).readonly(),
-    fileBuckets: z.array(canonicalPath).min(1).max(128).readonly(),
+    executionMode: z.enum(["serial", "parallel"]),
+    tier: TaskTierSchema,
+    moduleCount: z.number().int().positive().max(64),
+    fileBucket: canonicalPath,
+    boundaryTags: z.array(BoundaryTagSchema).min(1).max(8).readonly(),
   })
   .strict()
   .superRefine((key, context) => {
-    const buckets = [key.moduleBuckets, key.fileBuckets]
-    if (
-      buckets.some(
-        (values) =>
-          new Set(values).size !== values.length ||
-          values.some((value, index) => index > 0 && values[index - 1]?.localeCompare(value) === 1),
-      )
-    ) {
+    if (!sortedUniqueStrings(key.boundaryTags)) {
       context.addIssue({
         code: "custom",
-        message: "parallelism key buckets must be sorted and unique",
+        message: "parallelism boundary tags must be sorted and unique",
       })
+    }
+    if (key.boundaryTags.includes("none") && key.boundaryTags.length !== 1) {
+      context.addIssue({ code: "custom", message: "none boundary tag is exclusive" })
     }
   })
 export type ParallelismHistoryKey = z.infer<typeof ParallelismHistoryKeySchema>
@@ -42,7 +52,6 @@ export const ParallelismHistorySampleSchema = z
     cleanupCompletedAtMs: z.number().finite().nonnegative(),
     startupCommittedAtMs: z.number().finite().nonnegative(),
     firstProviderRequestAtMs: z.number().finite().nonnegative(),
-    executionMode: z.enum(["serial", "parallel"]),
   })
   .strict()
   .superRefine((sample, context) => {
@@ -65,49 +74,52 @@ export const ParallelismHistorySchema = z
   .strict()
 export type ParallelismHistory = z.infer<typeof ParallelismHistorySchema>
 
-export type ParallelismHistorySummary =
-  | {
-      readonly eligibleCount: number
-      readonly durationMedianMs: number
-      readonly durationP95Ms: number
-      readonly startupMedianMs: number
-      readonly startupP95Ms: number
-    }
+export type ParallelismStatistic =
+  | { readonly eligibleCount: number; readonly medianMs: number; readonly p95Ms: number }
   | { readonly eligibleCount: number; readonly code: "parallelism_history_insufficient" }
+
+export type ParallelismHistorySummary = {
+  readonly eligibleCount: number
+  readonly serialDuration: ParallelismStatistic
+  readonly startup: ParallelismStatistic
+}
 
 function median(values: readonly number[]): number {
   const lowerIndex = Math.floor((values.length - 1) / 2)
   const upperIndex = Math.ceil((values.length - 1) / 2)
-  return (
-    values.reduce(
-      (total, value, index) =>
-        index === lowerIndex || index === upperIndex ? total + value : total,
-      0,
-    ) / (lowerIndex === upperIndex ? 1 : 2)
-  )
+  const lower = values[lowerIndex]
+  const upper = values[upperIndex]
+  if (lower === undefined || upper === undefined) throw new RangeError("median requires values")
+  return (lower + upper) / 2
 }
 
 function nearestRankP95(values: readonly number[]): number {
-  const rank = Math.ceil(values.length * 0.95) - 1
-  return values.reduce((result, value, index) => (index === rank ? value : result), 0)
+  const value = values[Math.ceil(values.length * 0.95) - 1]
+  if (value === undefined) throw new RangeError("p95 requires values")
+  return value
+}
+
+function summarizeStatistic(values: readonly number[]): ParallelismStatistic {
+  if (values.length < 5) {
+    return { eligibleCount: values.length, code: "parallelism_history_insufficient" }
+  }
+  const sorted = [...values].sort((left, right) => left - right)
+  return { eligibleCount: sorted.length, medianMs: median(sorted), p95Ms: nearestRankP95(sorted) }
 }
 
 export function summarizeParallelismHistory(value: unknown): ParallelismHistorySummary {
   const history = ParallelismHistorySchema.parse(value)
   const eligible = history.samples.filter((sample) => sample.status === "PASS").slice(-50)
-  if (eligible.length < 5)
-    return { eligibleCount: eligible.length, code: "parallelism_history_insufficient" }
-  const durations = eligible
-    .map((sample) => sample.cleanupCompletedAtMs - sample.reservationConsumedAtMs)
-    .sort((left, right) => left - right)
-  const startups = eligible
-    .map((sample) => sample.firstProviderRequestAtMs - sample.startupCommittedAtMs)
-    .sort((left, right) => left - right)
+  const serialDurations =
+    history.key.executionMode === "serial"
+      ? eligible.map((sample) => sample.cleanupCompletedAtMs - sample.reservationConsumedAtMs)
+      : []
+  const startups = eligible.map(
+    (sample) => sample.firstProviderRequestAtMs - sample.startupCommittedAtMs,
+  )
   return {
     eligibleCount: eligible.length,
-    durationMedianMs: median(durations),
-    durationP95Ms: nearestRankP95(durations),
-    startupMedianMs: median(startups),
-    startupP95Ms: nearestRankP95(startups),
+    serialDuration: summarizeStatistic(serialDurations),
+    startup: summarizeStatistic(startups),
   }
 }

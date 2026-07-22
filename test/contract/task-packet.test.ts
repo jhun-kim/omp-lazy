@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { compileTaskPacket } from "../../src/contracts/task-packet"
+import { compareOrdinalStrings } from "../../src/contracts/task-packet-canonical"
 
 function validPacket() {
   return {
@@ -99,5 +100,81 @@ describe("task packet contract", () => {
     // Then
     expect(escapingResult).toEqual({ ok: false, code: "malformed_packet" })
     expect(forgedResult).toEqual({ ok: false, code: "malformed_packet" })
+  })
+
+  test("Given criteria and required evidence without bidirectional closure When compiled Then the packet is rejected", () => {
+    // Given
+    const missingRequirement = {
+      ...validPacket(),
+      criteria: [{ ...validPacket().criteria[0], evidenceLogicalId: "T04.missing" }],
+    }
+    const unreferencedRequiredRequirement = {
+      ...validPacket(),
+      evidenceRequirements: [
+        ...validPacket().evidenceRequirements,
+        { logicalId: "T04.unused", kind: "artifact", required: true },
+      ],
+    }
+
+    // When
+    const results = [
+      compileTaskPacket(missingRequirement),
+      compileTaskPacket(unreferencedRequiredRequirement),
+    ]
+
+    // Then
+    expect(results).toEqual([
+      { ok: false, code: "malformed_packet" },
+      { ok: false, code: "malformed_packet" },
+    ])
+  })
+
+  test("Given an unreferenced optional evidence requirement When compiled Then the packet remains valid", () => {
+    // Given
+    const packet = {
+      ...validPacket(),
+      evidenceRequirements: [
+        ...validPacket().evidenceRequirements,
+        { logicalId: "T04.optional", kind: "citation", required: false },
+      ],
+    }
+
+    // When
+    const result = compileTaskPacket(packet)
+
+    // Then
+    expect(result).toMatchObject({ ok: true })
+  })
+
+  test("Given ordinally distinct identifiers When canonicalized Then ordering is locale-independent", () => {
+    // Given
+    const packet = {
+      ...validPacket(),
+      referenceIds: ["z", "A", "a"],
+      criteria: [
+        { ...validPacket().criteria[0], id: "criterion-z", evidenceLogicalId: "z" },
+        { ...validPacket().criteria[0], id: "criterion-A", evidenceLogicalId: "A" },
+        { ...validPacket().criteria[0], id: "criterion-a", evidenceLogicalId: "a" },
+      ],
+      evidenceRequirements: [
+        { logicalId: "z", kind: "test", required: true },
+        { logicalId: "A", kind: "artifact", required: true },
+        { logicalId: "a", kind: "citation", required: true },
+      ],
+    }
+
+    // When
+    const result = compileTaskPacket(packet)
+
+    // Then
+    expect(compareOrdinalStrings("A", "a")).toBeLessThan(0)
+    expect(result).toMatchObject({ ok: true })
+    if (!result.ok) return
+    expect(result.packet.referenceIds).toEqual(["A", "a", "z"])
+    expect(result.packet.evidenceRequirements.map((requirement) => requirement.logicalId)).toEqual([
+      "A",
+      "a",
+      "z",
+    ])
   })
 })

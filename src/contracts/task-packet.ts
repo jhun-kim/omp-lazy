@@ -3,7 +3,9 @@ import { isAbsolute, posix } from "node:path"
 import { z } from "zod"
 import {
   canonicalJson,
+  compareOrdinalStrings,
   normalizeNfc,
+  sameStringSet,
   sortedStrings,
   sortedUniqueStrings,
 } from "./task-packet-canonical"
@@ -138,6 +140,16 @@ export const TaskPacketSchema = taskPacketBaseSchema.superRefine((packet, contex
   if (packet.boundaryTags.includes("none") && packet.boundaryTags.length !== 1) {
     context.addIssue({ code: "custom", message: "none boundary tag is exclusive" })
   }
+  if (
+    !sameStringSet(
+      packet.criteria.map((criterion) => criterion.evidenceLogicalId),
+      packet.evidenceRequirements
+        .filter((requirement) => requirement.required)
+        .map((requirement) => requirement.logicalId),
+    )
+  ) {
+    context.addIssue({ code: "custom", message: "criteria must cover required evidence" })
+  }
   if (!tierMatchesBudget(packet.tier, packet.budgets)) {
     context.addIssue({ code: "custom", message: "tier budget mismatch" })
   }
@@ -225,7 +237,7 @@ function canonicalPacket(input: TaskPacketInput): TaskPacket | null {
     boundaryTags,
     evidenceRequirements: input.evidenceRequirements
       .map((requirement) => ({ ...requirement, logicalId: normalizeNfc(requirement.logicalId) }))
-      .sort((left, right) => left.logicalId.localeCompare(right.logicalId)),
+      .sort((left, right) => compareOrdinalStrings(left.logicalId, right.logicalId)),
   }
   const parsed = TaskPacketSchema.safeParse(candidate)
   return parsed.success ? parsed.data : null

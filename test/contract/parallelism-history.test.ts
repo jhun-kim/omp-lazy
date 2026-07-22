@@ -1,31 +1,42 @@
 import { describe, expect, test } from "bun:test"
-import { summarizeParallelismHistory } from "../../src/contracts/parallelism-history"
+import {
+  ParallelismHistoryKeySchema,
+  summarizeParallelismHistory,
+} from "../../src/contracts/parallelism-history"
 
 describe("parallelism history contract", () => {
   test("Given pass and non-pass timing samples When summarized Then only the last fifty eligible durations shape median and p95", () => {
     // Given
-    const samples = Array.from({ length: 52 }, (_value, index) => ({
-      status: "PASS",
-      reservationConsumedAtMs: index,
-      parentAcceptedAtMs: index + 10,
-      cleanupCompletedAtMs: index + 20,
-      startupCommittedAtMs: index,
-      firstProviderRequestAtMs: index + 5,
-      executionMode: "serial",
-    }))
+    const samples = Array.from({ length: 52 }, (_value, index) => {
+      const durationMs = index < 2 ? 1_000 + index : index - 1
+      const startupMs = index < 2 ? 2_000 + index : index - 1
+      return {
+        status: "PASS" as const,
+        reservationConsumedAtMs: 0,
+        parentAcceptedAtMs: durationMs,
+        cleanupCompletedAtMs: durationMs,
+        startupCommittedAtMs: 0,
+        firstProviderRequestAtMs: startupMs,
+      }
+    })
     const history = {
       version: 1,
-      key: { moduleBuckets: ["src/contracts"], fileBuckets: ["src/contracts/task-packet.ts"] },
+      key: {
+        executionMode: "serial",
+        tier: "FAST",
+        moduleCount: 1,
+        fileBucket: "src/contracts/task-packet.ts",
+        boundaryTags: ["none"],
+      },
       samples: [
         ...samples,
         {
           status: "FAILED",
-          reservationConsumedAtMs: 1,
-          parentAcceptedAtMs: 2,
-          cleanupCompletedAtMs: 3,
-          startupCommittedAtMs: 1,
-          firstProviderRequestAtMs: 2,
-          executionMode: "serial",
+          reservationConsumedAtMs: 0,
+          parentAcceptedAtMs: 9_999,
+          cleanupCompletedAtMs: 9_999,
+          startupCommittedAtMs: 0,
+          firstProviderRequestAtMs: 9_999,
         },
       ],
     }
@@ -36,10 +47,8 @@ describe("parallelism history contract", () => {
     // Then
     expect(result).toEqual({
       eligibleCount: 50,
-      durationMedianMs: 20,
-      durationP95Ms: 20,
-      startupMedianMs: 5,
-      startupP95Ms: 5,
+      serialDuration: { eligibleCount: 50, medianMs: 25.5, p95Ms: 48 },
+      startup: { eligibleCount: 50, medianMs: 25.5, p95Ms: 48 },
     })
   })
 
@@ -47,7 +56,13 @@ describe("parallelism history contract", () => {
     // Given
     const history = {
       version: 1,
-      key: { moduleBuckets: ["src/contracts"], fileBuckets: ["src/contracts/task-packet.ts"] },
+      key: {
+        executionMode: "serial",
+        tier: "FAST",
+        moduleCount: 1,
+        fileBucket: "src/contracts/task-packet.ts",
+        boundaryTags: ["none"],
+      },
       samples: [
         {
           status: "PASS",
@@ -56,7 +71,6 @@ describe("parallelism history contract", () => {
           cleanupCompletedAtMs: 20,
           startupCommittedAtMs: 0,
           firstProviderRequestAtMs: 4,
-          executionMode: "serial",
         },
         {
           status: "BLOCKED",
@@ -65,7 +79,6 @@ describe("parallelism history contract", () => {
           cleanupCompletedAtMs: 20,
           startupCommittedAtMs: 0,
           firstProviderRequestAtMs: 4,
-          executionMode: "serial",
         },
       ],
     }
@@ -74,6 +87,70 @@ describe("parallelism history contract", () => {
     const result = summarizeParallelismHistory(history)
 
     // Then
-    expect(result).toEqual({ eligibleCount: 1, code: "parallelism_history_insufficient" })
+    expect(result).toEqual({
+      eligibleCount: 1,
+      serialDuration: { eligibleCount: 1, code: "parallelism_history_insufficient" },
+      startup: { eligibleCount: 1, code: "parallelism_history_insufficient" },
+    })
+  })
+
+  test("Given a parallel exact key with enough passes When summarized Then startup emits while serial duration remains gated", () => {
+    // Given
+    const history = {
+      version: 1,
+      key: {
+        executionMode: "parallel",
+        tier: "STANDARD",
+        moduleCount: 2,
+        fileBucket: "src/contracts/critic-receipt.ts",
+        boundaryTags: ["network", "security"],
+      },
+      samples: Array.from({ length: 5 }, (_value, index) => ({
+        status: "PASS",
+        reservationConsumedAtMs: index,
+        parentAcceptedAtMs: index + 10,
+        cleanupCompletedAtMs: index + 20,
+        startupCommittedAtMs: index,
+        firstProviderRequestAtMs: index + 5,
+      })),
+    }
+
+    // When
+    const result = summarizeParallelismHistory(history)
+
+    // Then
+    expect(result).toEqual({
+      eligibleCount: 5,
+      serialDuration: { eligibleCount: 0, code: "parallelism_history_insufficient" },
+      startup: { eligibleCount: 5, medianMs: 5, p95Ms: 5 },
+    })
+  })
+
+  test("Given a complete history key When canonical paths are parsed Then only repository-relative slash paths or dot are accepted", () => {
+    // Given
+    const valid = {
+      executionMode: "serial",
+      tier: "FAST",
+      moduleCount: 1,
+      fileBucket: ".",
+      boundaryTags: ["none"],
+    }
+    const nonCanonical = { ...valid, fileBucket: "src/./contracts" }
+    const incomplete = {
+      tier: "FAST",
+      moduleCount: 1,
+      fileBucket: ".",
+      boundaryTags: ["none"],
+    }
+
+    // When
+    const results = [
+      ParallelismHistoryKeySchema.safeParse(valid),
+      ParallelismHistoryKeySchema.safeParse(nonCanonical),
+      ParallelismHistoryKeySchema.safeParse(incomplete),
+    ]
+
+    // Then
+    expect(results.map((result) => result.success)).toEqual([true, false, false])
   })
 })

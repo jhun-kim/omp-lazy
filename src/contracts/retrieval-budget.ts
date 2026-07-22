@@ -15,6 +15,7 @@ export const RetrievalBudgetSchema = z
     if (
       budget.generalCalls > limits.maxCalls ||
       budget.retrievalCalls > limits.maxRetrievalCalls ||
+      budget.retrievalCalls > budget.generalCalls ||
       budget.retrievalBytes > limits.maxRetrievalBytes
     ) {
       context.addIssue({ code: "custom", message: "retrieval budget exceeds tier limits" })
