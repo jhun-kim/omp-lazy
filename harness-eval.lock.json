@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "closureCommit": "4dfcb07beeaf5c79b2ec6456c26966b09bb32f54",
+  "closureTreeHash": "d369d983b8a51fdcab7ca2119252542e47772c83",
+  "baselineTargetCommit": "14b3f36d6fb3ee378b19f4296d4d5a82b0661fbd",
+  "baselineTargetTree": "6f73e2d3c3e1e10e4b7ce04b596ada1c221dbffb",
+  "manifestSha256": "7ac4ece75026792ddcbfce7878d44654c84bfd7ab1913438a0716189430d8232",
+  "liveProfileInputSchemaSha256": "52044c7b1b0304545d510322557764eb0531be4854c4549ae6f439412c0a7b76"
+}
