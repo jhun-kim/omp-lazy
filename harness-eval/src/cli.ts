@@ -1,6 +1,6 @@
 import { access, readFile } from "node:fs/promises"
-import { SCENARIO_IDS } from "./constants"
 import { validateClosureLock } from "./closure-lock"
+import { SCENARIO_IDS } from "./constants"
 import { validateDeterministicCorpus } from "./corpus"
 import { readLiveProfileInput } from "./live-profile"
 import { writeSyntheticHarnessBundle } from "./synthetic-bundle"
