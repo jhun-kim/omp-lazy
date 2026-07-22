@@ -12,10 +12,15 @@ import { registerSessionStop } from "../continuation/register-session-stop"
 import { WorkerResultAcceptance } from "../contracts/worker-result-acceptance"
 import { TaskEventLedger } from "../gates/task-event-ledger"
 import { registerToolCallDispatcher, resolveCurrentRunScope } from "../gates/tool-call-dispatcher"
+import {
+  ProductRuntimeObserver,
+  registerProductRuntimeObservers,
+} from "../observers/product-runtime-observer"
 import { ToolResultObserver } from "../observers/tool-result-observer"
 import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
 import { registerWorkerResultTool } from "../tools/register-worker-result-tool"
+import { compilePromptStepContext, compileRunStepContext } from "../workflows/task-packet-compiler"
 
 class ContextualActivationState implements ActivationStatePort {
   constructor(readonly cwdBySession: ReadonlyMap<string, string>) {}
@@ -36,6 +41,7 @@ class ContextualActivationState implements ActivationStatePort {
 export function registerOmpLazyExtension(api: ExtensionAPI): void {
   const cwdBySession = new Map<string, string>()
   const activation = new ActivationProvenanceController(new ContextualActivationState(cwdBySession))
+  const runtimeObserver = new ProductRuntimeObserver()
 
   api.on("input", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId()
@@ -46,8 +52,27 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
   api.on("before_agent_start", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId()
     cwdBySession.set(sessionId, context.cwd)
+    const promptContext = compilePromptStepContext(event.prompt)
+    if (promptContext !== null) runtimeObserver.activate(sessionId, promptContext)
     const decision = await activation.consumeBeforeAgentStart({ sessionId, prompt: event.prompt })
     const scope = await resolveCurrentRunScope(context.cwd, sessionId)
+    if (scope.kind === "current") {
+      let planMarkdown: string | null = null
+      if (scope.run.workflow === "start_work") {
+        const plan = Bun.file(scope.run.payload.plan.displayPath)
+        planMarkdown = (await plan.exists()) ? await plan.text() : null
+      }
+      runtimeObserver.activate(
+        sessionId,
+        compileRunStepContext({
+          run: scope.run,
+          repositoryRoot: scope.root.displayPath,
+          planMarkdown,
+        }),
+      )
+    } else if (promptContext === null) {
+      runtimeObserver.activate(sessionId, null)
+    }
     const contextLines: string[] = []
     if (decision.kind === "activate") {
       contextLines.push(`Activate ${decision.workflow} from trusted command ${decision.command}.`)
@@ -95,6 +120,7 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
   })
 
   registerSessionStop(api, createDurableContinuationCoordinator(), activation)
+  registerProductRuntimeObservers(api, runtimeObserver)
   registerToolCallDispatcher(api)
 
   api.on("tool_result", async (event, context) => {
