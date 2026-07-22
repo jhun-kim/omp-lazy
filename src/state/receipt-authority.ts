@@ -102,7 +102,8 @@ export function exhaustedTaskId(run: AnyRun, authority: ReceiptAuthority): strin
         entry.ownerEpoch === run.owner.epoch &&
         entry.taskGeneration === authority.taskGeneration &&
         entry.count === 3 &&
-        entry.status === "needs_parent_decision",
+        entry.status === "needs_parent_decision" &&
+        currentAcceptance(run, authority, entry.taskId) === null,
     )?.taskId ?? null
   )
 }

@@ -97,6 +97,7 @@ export async function acceptTask(
     readonly suffix: string
     readonly exitCode?: number | undefined
     readonly expectedKind?: "accepted" | "rejected" | "needs_parent_decision" | undefined
+    readonly parentDecision?: "accept_after_review" | undefined
   },
 ): Promise<void> {
   const head = Bun.spawnSync(["git", "-C", root, "rev-parse", "HEAD"]).stdout.toString().trim()
@@ -155,7 +156,11 @@ export async function acceptTask(
   if (acceptance === undefined) throw new Error("public acceptance tool missing")
   const accepted = await acceptance.execute(
     `accept-${input.suffix}`,
-    { agentId: input.agentId, receiptPath: relative(root, receiptPath) },
+    {
+      agentId: input.agentId,
+      receiptPath: relative(root, receiptPath),
+      ...(input.parentDecision === undefined ? {} : { parentDecision: input.parentDecision }),
+    },
     undefined,
     undefined,
     {
