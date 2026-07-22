@@ -8,6 +8,7 @@ import {
   baselineReceiptSchema,
   baselineRows,
   digest,
+  readClosureBinding,
   readBaselineManifest,
 } from "./baseline-contract"
 
@@ -117,7 +118,10 @@ export async function runBaselineEvaluation(options: {
 }): Promise<BaselineReceipt> {
   const repositoryRoot = git(["rev-parse", "--show-toplevel"], process.cwd())
   if (repositoryRoot === undefined) throw new TypeError("baseline repository unavailable")
-  const { bytes, manifest } = await readBaselineManifest(options.manifestPath)
+  const [{ bytes, manifest }, closure] = await Promise.all([
+    readBaselineManifest(options.manifestPath),
+    readClosureBinding(options.manifestPath),
+  ])
   if (
     git(["rev-parse", `${manifest.baselineTargetCommit}^{tree}`], repositoryRoot) !==
     manifest.baselineTargetTree
@@ -143,8 +147,8 @@ export async function runBaselineEvaluation(options: {
       },
       cleanup: { profile: "not_applicable", temporary: "complete", worktree: "complete" },
       evaluator: {
-        closureCommit: git(["rev-parse", "HEAD"], repositoryRoot) ?? "",
-        closureTree: git(["rev-parse", "HEAD:harness-eval"], repositoryRoot) ?? "",
+        closureCommit: closure.closureCommit,
+        closureTree: closure.closureTreeHash,
         lockSha256: digest(await readFile(join(repositoryRoot, "harness-eval.lock.json"))),
         manifestSha256: digest(bytes),
       },

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { z } from "zod"
 import { SCENARIO_IDS, type ScenarioId } from "./constants"
 import { manifestSchema } from "./schema"
@@ -131,6 +131,20 @@ export async function readBaselineManifest(
   return { bytes, manifest: manifestSchema.parse(JSON.parse(new TextDecoder().decode(bytes))) }
 }
 
+export async function readClosureBinding(manifestPath: string): Promise<{
+  readonly closureCommit: string
+  readonly closureTreeHash: string
+}> {
+  return z
+    .object({ closureCommit: commitSchema, closureTreeHash: commitSchema })
+    .passthrough()
+    .parse(
+      JSON.parse(
+        await readFile(join(dirname(dirname(manifestPath)), "harness-eval.lock.json"), "utf8"),
+      ),
+    )
+}
+
 function validRows(rows: BaselineReceipt["rows"]): boolean {
   return (
     rows.length === baselineRows.length &&
@@ -148,8 +162,9 @@ export async function verifyBaselineReceipt(options: {
   readonly targetCommit?: string
 }): Promise<BaselineReceiptCheck> {
   try {
-    const [{ bytes, manifest }, contents] = await Promise.all([
+    const [{ bytes, manifest }, closure, contents] = await Promise.all([
       readBaselineManifest(options.manifestPath),
+      readClosureBinding(options.manifestPath),
       readFile(options.receiptPath, "utf8"),
     ])
     const receipt = baselineReceiptSchema.safeParse(JSON.parse(contents))
@@ -163,6 +178,8 @@ export async function verifyBaselineReceipt(options: {
       return { code: "baseline_receipt_invalid", status: "FAIL" }
     return receipt.data.baseline.targetCommit !== manifest.baselineTargetCommit ||
       receipt.data.baseline.targetTree !== manifest.baselineTargetTree ||
+      receipt.data.evaluator.closureCommit !== closure.closureCommit ||
+      receipt.data.evaluator.closureTree !== closure.closureTreeHash ||
       receipt.data.evaluator.manifestSha256 !== digest(bytes) ||
       (options.targetCommit !== undefined && options.targetCommit !== manifest.baselineTargetCommit)
       ? { code: "baseline_commit_mismatch", status: "FAIL" }
