@@ -80,6 +80,16 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
         store: new TransactionStore(root.value),
         suppression: activation,
         sendUserMessage: (message) => api.sendUserMessage(message),
+        publishResult: (result) =>
+          api.sendMessage(
+            {
+              customType: "omp-lazy-command-result",
+              content: JSON.stringify(result),
+              display: true,
+              details: result,
+            },
+            { triggerTurn: false },
+          ),
       }).execute(request)
     },
   })

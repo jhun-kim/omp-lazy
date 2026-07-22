@@ -6,7 +6,7 @@ import {
 import type { TaskEventLedger } from "./task-event-ledger"
 
 export type { ParsedTaskSpawn, TaskParseResult } from "./task-spawn-parser"
-export { parseTaskSpawn } from "./task-spawn-parser"
+export { canonicalTaskProjection, parseTaskSpawn } from "./task-spawn-parser"
 
 export type TaskSpawnRequest = {
   readonly toolName: string

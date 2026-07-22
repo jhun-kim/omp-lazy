@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { loadCapability, type Skill } from "@oh-my-pi/pi-coding-agent/discovery"
 import { discoverAgents } from "@oh-my-pi/pi-coding-agent/task/discovery"
 import { TeamDefinitionSchema } from "../../src/workflows/teammode-contract"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { removeTeamRuntime, teamDefinition, teamRuntime } from "../fixtures/teammode-fixtures"
 
 const cleanups: (() => Promise<void>)[] = []
@@ -93,7 +94,7 @@ describe("teammode contract", () => {
       join(sandbox, ".omp", "settings.json"),
       JSON.stringify({ extensions: [process.cwd()] }),
     )
-    cleanups.push(() => rm(sandbox, { recursive: true, force: true }))
+    cleanups.push(() => removeTestTree(sandbox))
 
     const [{ agents }, skills] = await Promise.all([
       discoverAgents(sandbox, home),

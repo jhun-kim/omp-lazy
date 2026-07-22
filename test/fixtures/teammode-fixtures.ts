@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { evidenceRootPath } from "../../src/contracts/artifact-containment"
@@ -9,6 +9,7 @@ import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
 import { ToolResultObserver } from "../../src/observers/tool-result-observer"
 import { canonicalComparisonPath } from "../../src/state/paths"
 import { type TeamDefinition, TeammodeContract } from "../../src/workflows/teammode-contract"
+import { removeTestTree } from "./remove-test-tree"
 import { initializedStore } from "./store-fixtures"
 
 function git(root: string, args: readonly string[]): string {
@@ -129,7 +130,7 @@ export async function observeTeam(
 export async function removeTeamRuntime(
   runtime: Awaited<ReturnType<typeof teamRuntime>>,
 ): Promise<void> {
-  await rm(runtime.displayPath, { recursive: true, force: true })
+  await removeTestTree(runtime.displayPath)
 }
 
 export async function acceptTeamResults(

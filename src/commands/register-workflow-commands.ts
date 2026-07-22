@@ -6,6 +6,7 @@ export type WorkflowCommandRequest = {
   readonly args: string
   readonly sessionId: string
   readonly cwd: string
+  readonly source?: "registered_command" | "extension" | undefined
 }
 
 export interface WorkflowCommandExecutor {
@@ -27,6 +28,7 @@ export function registerWorkflowCommands(
           args,
           sessionId: context.sessionManager.getSessionId(),
           cwd: context.cwd,
+          source: "registered_command",
         })
       },
     })

@@ -39,6 +39,11 @@ export const acceptanceEventSchema = z
   .strict()
 
 export type WorkerAcceptanceEvent = z.infer<typeof acceptanceEventSchema>
+export type ScopedWorkerAcceptanceEvent = WorkerAcceptanceEvent & {
+  readonly taskId: string | null
+  readonly role: z.infer<typeof WorkerRoleSchema> | null
+  readonly semanticAttempt: number | null
+}
 
 const acceptanceLedgerEntryV2Schema = acceptanceEventSchema
   .extend({
@@ -299,6 +304,15 @@ export class WorkerAcceptanceLedger {
             common)(entry)
         : entry,
     )
+  }
+
+  async scopedEntries(runId: string): Promise<readonly ScopedWorkerAcceptanceEvent[]> {
+    return (await this.#readAcceptance(runId)).entries.map((entry) => ({
+      ...entry,
+      taskId: "taskId" in entry ? entry.taskId : null,
+      role: "role" in entry ? entry.role : null,
+      semanticAttempt: "semanticAttempt" in entry ? entry.semanticAttempt : null,
+    }))
   }
 
   async #readAcceptance(runId: string): Promise<RuntimeAcceptanceLedger> {

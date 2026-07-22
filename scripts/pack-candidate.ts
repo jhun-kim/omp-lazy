@@ -18,6 +18,10 @@ const argumentsSchema = z.union([
   ]),
 ])
 
+const RETRYABLE_REMOVE_CODES = new Set(["EBUSY", "EMFILE", "ENFILE", "ENOTEMPTY", "EPERM"])
+const MAX_REMOVE_RETRIES = 10
+const REMOVE_RETRY_DELAY_MS = 100
+
 class PackageBuildError extends Error {
   override readonly name = "PackageBuildError"
 }
@@ -42,6 +46,25 @@ async function run(command: readonly string[], cwd: string): Promise<ProcessRece
     new Response(child.stderr).text(),
   ])
   return { exitCode, stderr, stdout }
+}
+
+async function removeMaterializedRoot(path: string): Promise<void> {
+  for (let retry = 0; ; retry += 1) {
+    try {
+      await rm(path, { force: true, recursive: true })
+      return
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? error.code : undefined
+      if (
+        typeof code !== "string" ||
+        !RETRYABLE_REMOVE_CODES.has(code) ||
+        retry === MAX_REMOVE_RETRIES
+      ) {
+        throw error
+      }
+      await Bun.sleep(REMOVE_RETRY_DELAY_MS * (retry + 1))
+    }
+  }
 }
 
 async function git(candidate: string, arguments_: readonly string[]): Promise<string> {
@@ -95,7 +118,7 @@ async function materializeCommittedCandidate(candidate: string): Promise<Materia
     }
     return { root, ...source }
   } catch (error) {
-    await rm(root, { force: true, recursive: true })
+    await removeMaterializedRoot(root)
     throw error
   }
 }
@@ -206,7 +229,7 @@ async function main(): Promise<void> {
     }
     process.stdout.write(`${JSON.stringify(receipt)}\n`)
   } finally {
-    if (materialized !== undefined) await rm(materialized.root, { force: true, recursive: true })
+    if (materialized !== undefined) await removeMaterializedRoot(materialized.root)
   }
 }
 

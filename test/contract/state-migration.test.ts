@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { migrateLifecycleState, recoverLifecycleMigration } from "../../src/state/migration"
 import { taskIdentities } from "../../src/state/migration-identities"
 import { migrateLifecycleRecord } from "../../src/state/migration-records"
 import { runSnapshotPath, statePaths } from "../../src/state/paths"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 import "./state-migration-durable.test"
 
@@ -18,9 +19,7 @@ async function migrationRoot(label: string) {
 
 describe("durable lifecycle migration", () => {
   afterEach(async () => {
-    await Promise.all(
-      migrationRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })),
-    )
+    await Promise.all(migrationRoots.splice(0).map(removeTestTree))
   })
 
   test("Given a complete v1 state When migrated Then every persisted lifecycle document is v2", async () => {

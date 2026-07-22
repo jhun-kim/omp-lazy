@@ -81,7 +81,7 @@ test("Given a capped prior dispatch When its owner adopts and rebinds Then the n
     "needs_parent_decision",
   ])
   expect(current.receiptPath).toBe(initial.receiptPath)
-  expect(oldOwner).toMatchObject({ kind: "rejected", code: "caller_not_current_parent" })
+  expect(oldOwner).toMatchObject({ kind: "rejected", code: "current_parent_required" })
   expect(accepted.kind).toBe("accepted")
   expect(replay.kind).toBe("replayed")
   expect(entries).toHaveLength(1)

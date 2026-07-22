@@ -189,13 +189,51 @@ export class TeammodeContract {
       if (current === null) return { ok: false, code: "team_missing" }
       if (current.status === "archived")
         return { ok: true, status: "replayed", state: current, runtimeAgentsArchived: false }
-      if (current.status !== "completed") return { ok: false, code: "team_not_completed" }
+      if (current.status !== "completed" && current.status !== "cancelled") {
+        return { ok: false, code: "team_not_completed" }
+      }
       const state = TeamStateSchema.parse({
         ...current,
         revision: current.revision + 1,
         status: "archived",
       })
       return { ok: true, status: "archived", state, runtimeAgentsArchived: false }
+    })
+  }
+
+  async cancel(caller: TeamCaller, teamName: string): Promise<TeamResult> {
+    return this.#transact(caller, teamName, async (current) => {
+      if (current === null) return { ok: false, code: "team_missing" }
+      if (current.status === "cancelled") return { ok: true, status: "replayed", state: current }
+      if (current.status !== "initializing" && current.status !== "active") {
+        return { ok: false, code: "invalid_team_state" }
+      }
+      const state = TeamStateSchema.parse({
+        ...current,
+        revision: current.revision + 1,
+        status: "cancelled",
+      })
+      return { ok: true, status: "cancelled", state }
+    })
+  }
+
+  async resume(caller: TeamCaller, teamName: string): Promise<TeamResult> {
+    return this.#transact(caller, teamName, async (current) => {
+      if (current === null) return { ok: false, code: "team_missing" }
+      if (current.status !== "cancelled") return { ok: false, code: "invalid_team_state" }
+      const state = TeamStateSchema.parse({
+        ...current,
+        revision: current.revision + 1,
+        status: "initializing",
+        members: current.members.map((member) => ({
+          ...member,
+          actualAgentId: null,
+          actualJobId: null,
+          worktreePath: null,
+          acceptanceKey: null,
+        })),
+      })
+      return { ok: true, status: "resumed", state }
     })
   }
 

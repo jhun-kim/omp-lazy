@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
@@ -9,6 +9,7 @@ import {
   loadRuntimeInventoryFromManifest,
 } from "../../scripts/product-runtime-contract"
 import { repositoryRoot } from "../fixtures/package-test-helpers"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 
 const mutableManifestSchema = z
   .object({
@@ -19,9 +20,7 @@ const mutableManifestSchema = z
 const temporaryRoots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })),
-  )
+  await Promise.all(temporaryRoots.splice(0).map(removeTestTree))
 })
 
 async function packageFixture(extensionSources: readonly string[]): Promise<string> {

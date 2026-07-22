@@ -1,13 +1,14 @@
 import { afterEach, expect, test } from "bun:test"
-import { readFile, rm } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 test("Given concurrent fan-out calls When real processes reserve Then durable CAS permits one", async () => {

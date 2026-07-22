@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, realpath, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
@@ -8,6 +8,7 @@ import { ToolResultObserver } from "../../src/observers/tool-result-observer"
 import type { CanonicalRoot } from "../../src/state/domain"
 import { canonicalComparisonPath } from "../../src/state/paths"
 import { TransactionStore } from "../../src/state/transaction-store"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
@@ -30,7 +31,7 @@ type DispatcherHandler = (
 ) => Promise<DispatcherResult>
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 function runGit(root: string, args: readonly string[]): void {

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
 import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
 import { decodeIrcResult } from "../../src/observers/irc-result-codec"
@@ -8,12 +7,13 @@ import { decodeTaskResult } from "../../src/observers/task-result-codec"
 import { ToolResultObserver } from "../../src/observers/tool-result-observer"
 import { newRunId, type StateEvent } from "../../src/state/domain"
 import { deadlineAfter } from "../../src/state/repo-lock"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, pauseEvent, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 function taskDetails(ids: readonly string[], primaryJobId: string | null) {

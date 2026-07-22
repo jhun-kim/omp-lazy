@@ -100,21 +100,25 @@ export const TeamStateSchema = z
     runId: UuidSchema,
     attempt: z.number().int().nonnegative(),
     revision: z.number().int().positive(),
-    status: z.enum(["initializing", "active", "completed", "archived"]),
+    status: z.enum(["initializing", "active", "completed", "cancelled", "archived"]),
     members: z.array(runtimeMemberSchema).min(2).max(8).readonly(),
   })
   .strict()
   .superRefine((team, context) => {
     const initializing = team.status === "initializing"
+    const archivedBound =
+      team.status === "archived" && team.members.some((member) => member.actualAgentId !== null)
+    const requiresIdentity =
+      team.status === "active" || team.status === "completed" || archivedBound
     const invalid = team.members.some((member) =>
       initializing
         ? member.actualAgentId !== null ||
           member.actualJobId !== null ||
           member.acceptanceKey !== null
-        : member.actualAgentId === null || member.actualJobId === null,
+        : requiresIdentity && (member.actualAgentId === null || member.actualJobId === null),
     )
     const missingAcceptance =
-      (team.status === "completed" || team.status === "archived") &&
+      (team.status === "completed" || archivedBound) &&
       team.members.some((member) => member.acceptanceKey === null)
     const actualIds = team.members.flatMap((member) =>
       member.actualAgentId === null ? [] : [member.actualAgentId],
@@ -134,7 +138,15 @@ export type TeamCaller = {
 export type TeamResult =
   | {
       readonly ok: true
-      readonly status: "created" | "replayed" | "bound" | "completed" | "archived" | "deleted"
+      readonly status:
+        | "created"
+        | "replayed"
+        | "bound"
+        | "completed"
+        | "cancelled"
+        | "resumed"
+        | "archived"
+        | "deleted"
       readonly state?: TeamState
       readonly runtimeAgentsArchived?: false
     }

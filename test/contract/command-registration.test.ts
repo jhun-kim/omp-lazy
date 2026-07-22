@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -7,11 +7,14 @@ import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensio
 import { expectedProductRuntime } from "../../scripts/product-runtime-contract"
 import { COMMAND_DEFINITIONS, COMMAND_REGISTRATIONS } from "../../src/commands/command-definitions"
 import { diagnoseCommandCollisions } from "../../src/commands/register-workflow-commands"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 
 const EXPECTED_GRAMMAR = {
   teammode: [
-    "create <team-name>",
+    "prepare <team-name> <roster-json-path>",
+    "create <team-name> <roster-reservation-id>",
     "status [team-name]",
+    "cancel <team-name>",
     "archive <team-name>",
     "delete <team-name>",
     "resume <team-name>",
@@ -39,7 +42,7 @@ const EXPECTED_GRAMMAR = {
     "checkpoint <run-id> <criterion-id> <evidence-path>",
     "steer <run-id> <steering-json-path>",
   ],
-  ulw_plan: ["[-- <brief>]"],
+  ulw_plan: ["[-- <brief>]", "approve <plan-path> <sha256>"],
   ulw_research: ["<query-text>"],
   doctor: ["[--json] [--deep]"],
   report_bug: ["[--target auto|omp-lazy|omp] [--dry-run] <summary-text>"],
@@ -49,9 +52,7 @@ const EXPECTED_GRAMMAR = {
 const temporaryPaths: string[] = []
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })),
-  )
+  await Promise.all(temporaryPaths.splice(0).map(removeTestTree))
 })
 
 async function fixtureExtension(body: string): Promise<string> {

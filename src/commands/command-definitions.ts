@@ -15,8 +15,10 @@ export const COMMAND_DEFINITIONS = [
     aliases: ["/teammode(omp)"],
     description: "Manage an OMP-native durable team",
     grammar: [
-      "create <team-name>",
+      "prepare <team-name> <roster-json-path>",
+      "create <team-name> <roster-reservation-id>",
       "status [team-name]",
+      "cancel <team-name>",
       "archive <team-name>",
       "delete <team-name>",
       "resume <team-name>",
@@ -68,7 +70,7 @@ export const COMMAND_DEFINITIONS = [
     canonical: "/omp-lazy-ulw-plan(omp)",
     aliases: ["/ulw-plan(omp)"],
     description: "Create or resume a decision-complete plan",
-    grammar: ["[-- <brief>]"],
+    grammar: ["[-- <brief>]", "approve <plan-path> <sha256>"],
   },
   {
     workflow: "ulw_research",

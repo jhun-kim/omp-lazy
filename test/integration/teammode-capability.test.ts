@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
 import { join } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
 import { TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
 import { checkTaskSurfaces, ToolResultObserver } from "../../src/observers/tool-result-observer"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 function taskDetails(ids: readonly string[], asyncJobId?: string) {

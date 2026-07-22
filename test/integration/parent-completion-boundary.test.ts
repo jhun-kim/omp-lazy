@@ -53,7 +53,7 @@ test("Given worker and parent callers When both submit Then only the current par
     { agentId: value.agentId, receiptPath: evidence.receiptPath },
   )
 
-  expect(worker).toMatchObject({ kind: "rejected", code: "caller_not_current_parent" })
+  expect(worker).toMatchObject({ kind: "rejected", code: "current_parent_required" })
   expect(afterWorker).toBeNull()
   expect(parent.kind).toBe("accepted")
 })
@@ -114,7 +114,7 @@ test("Given a prior task generation When a real later task result binds Then onl
     { agentId, receiptPath: current.receiptPath },
   )
 
-  expect(stale).toMatchObject({ kind: "rejected", code: "unowned_worker" })
+  expect(stale).toMatchObject({ kind: "rejected", code: "task_scope_mismatch" })
   expect(accepted).toMatchObject({ kind: "accepted" })
 })
 
@@ -152,6 +152,16 @@ test("Given owner adoption When prior and current epochs submit Then only the re
     { sessionId: value.run.owner.sessionId, cwd: value.displayPath },
     { agentId: value.agentId, receiptPath: prior.receiptPath },
   )
+  const staleEpoch = await writeEvidence(value, {
+    ownerEpoch: value.run.owner.epoch,
+    workerRole: "omp-lazy-worker-low",
+    actualAgentId: agentId,
+    actualJobId: jobId,
+  })
+  const staleEpochResult = await value.acceptance.accept(
+    { sessionId: adopted.owner.sessionId, cwd: value.displayPath },
+    { agentId, receiptPath: staleEpoch.receiptPath },
+  )
   const current = await writeEvidence(value, {
     workerRole: "omp-lazy-worker-low",
     actualAgentId: agentId,
@@ -162,7 +172,8 @@ test("Given owner adoption When prior and current epochs submit Then only the re
     { agentId, receiptPath: current.receiptPath },
   )
 
-  expect(oldOwner).toMatchObject({ kind: "rejected", code: "caller_not_current_parent" })
+  expect(oldOwner).toMatchObject({ kind: "rejected", code: "current_parent_required" })
+  expect(staleEpochResult).toMatchObject({ kind: "rejected", code: "owner_epoch_mismatch" })
   expect(newOwner).toMatchObject({ kind: "accepted" })
 })
 
@@ -204,7 +215,7 @@ test("Given cancellation or interruption When submitted Then acceptance bytes re
     controller.signal,
   )
 
-  expect(terminal).toMatchObject({ kind: "rejected", code: "caller_not_current_parent" })
+  expect(terminal).toMatchObject({ kind: "rejected", code: "current_parent_required" })
   expect(aborted).toMatchObject({ kind: "rejected", code: "interrupted" })
   expect(await acceptanceBytes(cancelled)).toBeNull()
   expect(await acceptanceBytes(interrupted)).toBeNull()

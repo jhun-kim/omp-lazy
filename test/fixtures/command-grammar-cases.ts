@@ -1,9 +1,11 @@
 import type { WorkflowActivationId } from "../../src/activation/types"
 
 export const VALID_COMMAND_GRAMMAR_CASES = [
-  ["teammode", "create alpha"],
+  ["teammode", 'prepare alpha "team/roster.json"'],
+  ["teammode", "create alpha reservation-1"],
   ["teammode", "status"],
   ["teammode", "status alpha"],
+  ["teammode", "cancel alpha"],
   ["teammode", "archive alpha"],
   ["teammode", "delete alpha"],
   ["teammode", "resume alpha"],
@@ -37,6 +39,7 @@ export const VALID_COMMAND_GRAMMAR_CASES = [
   ["ulw_loop", 'steer run-1 "steering/input file.json"'],
   ["ulw_plan", ""],
   ["ulw_plan", "-- build a safe plan"],
+  ["ulw_plan", `approve .omo/plans/work.md ${"a".repeat(64)}`],
   ["ulw_research", "research this topic"],
   ["doctor", ""],
   ["doctor", "--json"],

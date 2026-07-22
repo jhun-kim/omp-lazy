@@ -64,8 +64,8 @@ function receiptBindingError(
   if (receipt.runId !== run.runId) return "wrong_run"
   if (receipt.attempt !== run.progressRevision) return "wrong_attempt"
   if (receipt.runRevision !== run.revision) return "wrong_revision"
-  if (receipt.ownerEpoch !== run.owner.epoch) return "wrong_owner_epoch"
-  if (receipt.taskGeneration !== dispatch.generation) return "wrong_task_generation"
+  if (receipt.ownerEpoch !== run.owner.epoch) return "owner_epoch_mismatch"
+  if (receipt.taskGeneration !== dispatch.generation) return "task_scope_mismatch"
   if (receipt.actualAgentId !== dispatch.identity.actualAgentId) return "wrong_agent_id"
   if (receipt.actualJobId !== dispatch.identity.actualJobId) return "wrong_job_id"
   if (receipt.workerRole !== dispatch.identity.agentType) return "wrong_worker_role"
@@ -115,7 +115,7 @@ export class WorkerResultAcceptance {
       if (!cwd.ok) return { kind: "rejected", code: "cwd_mismatch", rejectionCount: 0 }
       const resolved = await this.taskLedger.resolve(caller.sessionId)
       if (resolved.kind !== "scope") {
-        return { kind: "rejected", code: "caller_not_current_parent", rejectionCount: 0 }
+        return { kind: "rejected", code: "current_parent_required", rejectionCount: 0 }
       }
       if (isTerminal(resolved.value.run)) {
         return { kind: "rejected", code: "terminal_run", rejectionCount: 0 }
@@ -125,7 +125,7 @@ export class WorkerResultAcceptance {
         (candidate) => candidate.actualAgentId === parsed.data.agentId,
       )
       if (generation === 0 || identity === undefined) {
-        return { kind: "rejected", code: "unowned_worker", rejectionCount: 0 }
+        return { kind: "rejected", code: "task_scope_mismatch", rejectionCount: 0 }
       }
       const role = WorkerRoleSchema.safeParse(identity.agentType)
       if (!role.success) {

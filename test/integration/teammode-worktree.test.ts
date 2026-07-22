@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { validateTeamWorktree } from "../../src/workflows/teammode-worktree"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import {
   acceptTeamResults,
   bindTeam,
@@ -27,7 +28,7 @@ describe("teammode worktree binding", () => {
       () => removeTeamRuntime(runtime),
       () => removeTeamRuntime(unrelated),
     )
-    cleanups.push(() => rm(related, { recursive: true, force: true }))
+    cleanups.push(() => removeTestTree(related))
 
     expect(await validateTeamWorktree(runtime.displayPath, related)).toMatchObject({ ok: true })
     expect(await validateTeamWorktree(runtime.displayPath, runtime.displayPath)).toEqual({
@@ -68,8 +69,8 @@ describe("teammode worktree binding", () => {
     const verification = createWorktree(runtime.displayPath, "team-init-verification")
     cleanups.push(() => removeTeamRuntime(runtime))
     cleanups.push(
-      () => rm(implementation, { recursive: true, force: true }),
-      () => rm(verification, { recursive: true, force: true }),
+      () => removeTestTree(implementation),
+      () => removeTestTree(verification),
     )
     await runtime.contract.initialize(runtime.caller, teamDefinition)
     await observeTeam(runtime)
@@ -116,9 +117,9 @@ describe("teammode worktree binding", () => {
     const changed = createWorktree(runtime.displayPath, "team-bind-changed")
     cleanups.push(() => removeTeamRuntime(runtime))
     cleanups.push(
-      () => rm(implementation, { recursive: true, force: true }),
-      () => rm(verification, { recursive: true, force: true }),
-      () => rm(changed, { recursive: true, force: true }),
+      () => removeTestTree(implementation),
+      () => removeTestTree(verification),
+      () => removeTestTree(changed),
     )
     await runtime.contract.initialize(runtime.caller, teamDefinition)
     await observeTeam(runtime)
@@ -167,8 +168,8 @@ describe("teammode worktree binding", () => {
     const changed = createWorktree(runtime.displayPath, "team-bind-raw-changed")
     cleanups.push(() => removeTeamRuntime(runtime))
     cleanups.push(
-      () => rm(implementation, { recursive: true, force: true }),
-      () => rm(changed, { recursive: true, force: true }),
+      () => removeTestTree(implementation),
+      () => removeTestTree(changed),
     )
     await runtime.contract.initialize(runtime.caller, teamDefinition)
     await observeTeam(runtime)
@@ -212,7 +213,7 @@ describe("teammode worktree binding", () => {
     const runtime = await teamRuntime("dirty-binding")
     const worktree = createWorktree(runtime.displayPath, "team-dirty-binding")
     cleanups.push(() => removeTeamRuntime(runtime))
-    cleanups.push(() => rm(worktree, { recursive: true, force: true }))
+    cleanups.push(() => removeTestTree(worktree))
     await runtime.contract.initialize(runtime.caller, teamDefinition)
     await observeTeam(runtime)
     await writeFile(join(worktree, "dirty.txt"), "dirty\n")

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import type { AgentId, JobId, ToolCallId } from "../../src/contracts/agent-ids"
@@ -11,6 +11,7 @@ import { type AnyRun, newRunId, type StartWorkRun, type StateEvent } from "../..
 import { canonicalComparisonPath } from "../../src/state/paths"
 import { deadlineAfter } from "../../src/state/repo-lock"
 import type { TransactionStore } from "../../src/state/transaction-store"
+import { removeTestTree } from "./remove-test-tree"
 import { initializedStore } from "./store-fixtures"
 
 export type AcceptanceRuntime = {
@@ -215,7 +216,7 @@ export async function acceptanceBytes(runtime: AcceptanceRuntime): Promise<strin
 }
 
 export async function removeRuntime(runtime: AcceptanceRuntime): Promise<void> {
-  await rm(runtime.displayPath, { recursive: true, force: true })
+  await removeTestTree(runtime.displayPath)
 }
 
 export async function controlRun(

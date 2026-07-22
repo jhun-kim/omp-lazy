@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
 import { ActivationProvenanceController } from "../../src/activation/provenance-controller"
 import { TransactionActivationState } from "../../src/activation/transaction-activation-state"
 import { COMMAND_DEFINITIONS, COMMAND_REGISTRATIONS } from "../../src/commands/command-definitions"
 import { parseWorkflowCommand } from "../../src/commands/command-parser"
+import type { WorkflowCommandResult } from "../../src/commands/command-result"
 import { DurableWorkflowCommandExecutor } from "../../src/commands/workflow-command-handler"
 import { TransactionStore } from "../../src/state/transaction-store"
 import { VALID_COMMAND_GRAMMAR_CASES } from "../fixtures/command-grammar-cases"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 function inactiveController(): ActivationProvenanceController {
@@ -245,10 +246,12 @@ describe("command grammar", () => {
     const root = await temporaryRoot("command-adopt")
     roots.push(root.displayPath)
     const { store, run } = await initializedStore(root)
+    const results: WorkflowCommandResult[] = []
     const executor = new DurableWorkflowCommandExecutor({
       store,
       suppression: inactiveController(),
       sendUserMessage: () => undefined,
+      publishResult: (result) => results.push(result),
     })
     const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work(omp)")
     if (registration === undefined) throw new Error("missing /start-work(omp) registration")
@@ -269,14 +272,44 @@ describe("command grammar", () => {
     const adopted = await store.readRun(run.runId)
     expect(adopted?.owner).toEqual({ sessionId: "session-b", epoch: 2 })
     expect(adopted?.payload.status).toBe("active")
-    await expect(
-      executor.execute({
-        registration,
-        args: `pause ${run.runId}`,
-        sessionId: "session-a",
-        cwd: root.displayPath,
-      }),
-    ).rejects.toThrow("owner_mismatch")
+    await executor.execute({
+      registration,
+      args: `pause ${run.runId}`,
+      sessionId: "session-a",
+      cwd: root.displayPath,
+    })
+    expect(results.at(-1)).toMatchObject({ status: "BLOCKED", code: "owner_mismatch" })
     expect((await store.readRun(run.runId))?.owner).toEqual({ sessionId: "session-b", epoch: 2 })
+  })
+
+  test("Given an extension-origin lifecycle request When executed Then no state mutation is authorized", async () => {
+    // Given: a current run and the direct command executor with an extension-origin request.
+    const root = await temporaryRoot("command-extension-origin")
+    roots.push(root.displayPath)
+    const { store, run } = await initializedStore(root)
+    const results: WorkflowCommandResult[] = []
+    const executor = new DurableWorkflowCommandExecutor({
+      store,
+      suppression: inactiveController(),
+      sendUserMessage: () => undefined,
+      publishResult: (result) => results.push(result),
+    })
+    const registration = COMMAND_REGISTRATIONS.find((entry) => entry.command === "/start-work(omp)")
+    if (registration === undefined) throw new Error("missing /start-work(omp) registration")
+
+    // When: extension text attempts a trusted lifecycle control directly.
+    await executor.execute({
+      registration,
+      args: `pause ${run.runId}`,
+      sessionId: run.owner.sessionId,
+      cwd: root.displayPath,
+      source: "extension",
+    })
+
+    // Then: the typed refusal is visible and the run remains active at its prior revision.
+    expect(results).toEqual([
+      expect.objectContaining({ status: "BLOCKED", code: "extension_origin_rejected" }),
+    ])
+    expect((await store.readRun(run.runId))?.payload.status).toBe("active")
   })
 })

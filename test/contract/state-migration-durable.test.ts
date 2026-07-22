@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { writeFileSync } from "node:fs"
-import { readdir, readFile, rm } from "node:fs/promises"
+import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { AgentIdSchema } from "../../src/contracts/agent-ids"
 import { WorkerAcceptanceLedger } from "../../src/contracts/worker-acceptance-ledger"
@@ -10,6 +10,7 @@ import { runSnapshotPath } from "../../src/state/paths"
 import { deadlineAfter } from "../../src/state/repo-lock"
 import { TransactionStore } from "../../src/state/transaction-store"
 import { durableStateVersions, writeDurableV1State } from "../fixtures/migration-fixtures"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
@@ -22,7 +23,7 @@ async function fixture(label: string) {
 
 describe("durable lifecycle migration publication", () => {
   afterEach(async () => {
-    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+    await Promise.all(roots.splice(0).map(removeTestTree))
   })
 
   test("Given non-empty v1 task, acceptance, WAL, rejection, run, event, and team stores When migrated Then each maps to a strict v2 identity", async () => {

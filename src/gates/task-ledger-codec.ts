@@ -11,6 +11,10 @@ const counter = z.number().int().nonnegative()
 const nonempty = z.string().trim().min(1)
 const requestSchema = z
   .object({
+    canonicalInputHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
     itemIndex: counter,
     requestedName: nonempty.nullable(),
     agentType: nonempty.nullable(),

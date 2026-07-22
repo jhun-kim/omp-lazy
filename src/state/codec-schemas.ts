@@ -57,6 +57,9 @@ const startWorkFields = {
       status: z.enum([
         "active",
         "paused",
+        "blocked",
+        "needs_user_decision",
+        "review_blocked",
         "stuck",
         "completed",
         "cancelled",
@@ -79,6 +82,9 @@ const startWorkRunV2Schema = z
 const criterionSchema = z
   .object({
     id: nonempty,
+    scenario: nonempty.optional(),
+    observable: nonempty.optional(),
+    evidenceLogicalId: nonempty.optional(),
     status: z.enum(["pending", "pass", "fail", "blocked"]),
     identicalFailureFingerprint: nonempty.nullable(),
     identicalFailureCount: counter.max(3),
@@ -115,6 +121,8 @@ const ulwLoopFields = {
   payload: z
     .object({
       kind: z.literal("ulw_loop"),
+      objective: nonempty.optional(),
+      annotation: z.string().max(512).optional(),
       status: z.enum([
         "active",
         "paused",
@@ -220,7 +228,37 @@ const mutationSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("plan_reconciled"),
       taskIds: uniqueStrings,
+      remainingTaskIds: uniqueStrings.optional(),
       taskFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("workflow_steered"),
+      criteria: z
+        .array(
+          z
+            .object({
+              id: nonempty,
+              scenario: nonempty,
+              observable: nonempty,
+              evidenceLogicalId: nonempty,
+            })
+            .strict(),
+        )
+        .min(1)
+        .readonly(),
+      annotation: z.string().max(512).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("criterion_settled"),
+      goalId: nonempty,
+      criterionId: nonempty,
+      evidenceRef: nonempty,
+      captureRevision: counter,
+      captureCommit: nonempty,
     })
     .strict(),
   z
@@ -253,6 +291,8 @@ export const stateEventSchema = z
       "workflow_controlled",
       "owner_adopted",
       "plan_reconciled",
+      "workflow_steered",
+      "criterion_settled",
       "continuation_attempted",
       "continuation_stuck",
       "goal_cycle_started",
@@ -288,6 +328,8 @@ export const stateEventV2Schema = z
       "workflow_controlled",
       "owner_adopted",
       "plan_reconciled",
+      "workflow_steered",
+      "criterion_settled",
       "continuation_attempted",
       "continuation_stuck",
       "goal_cycle_started",

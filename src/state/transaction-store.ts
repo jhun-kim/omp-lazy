@@ -16,7 +16,7 @@ import {
   StateRootContainmentError,
   statePaths,
 } from "./paths"
-import { type Deadline, RepoLock } from "./repo-lock"
+import { type Deadline, deadlineAfter, RepoLock } from "./repo-lock"
 import { prepareTransition, type TransitionErrorCode } from "./state-transition"
 
 export type CrashPoint = "before_event" | "after_event" | "after_run" | "after_index"
@@ -27,13 +27,24 @@ export type TransactionErrorCode =
   | "state_diverged"
   | "state_root_escaped"
   | "state_root_unreadable"
+  | "idempotency_conflict"
 
 export type TransactionResult =
-  | { readonly ok: true; readonly run: AnyRun; readonly index: ActiveIndex }
+  | {
+      readonly ok: true
+      readonly status: "committed" | "replayed"
+      readonly run: AnyRun
+      readonly index: ActiveIndex
+    }
   | { readonly ok: false; readonly code: TransactionErrorCode }
 
 function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+function eventSemantics(event: PersistedStateEvent): string {
+  const { eventId: _eventId, sequence: _sequence, at: _at, ...semantic } = event
+  return JSON.stringify(semantic)
 }
 
 export class TransactionStore {
@@ -79,6 +90,16 @@ export class TransactionStore {
     try {
       const index = await this.readIndex(false)
       const events = await this.events.readAll()
+      const replay = events.find((candidate) => candidate.eventId === event.eventId)
+      if (replay !== undefined) {
+        if (eventSemantics(replay) !== eventSemantics(event)) {
+          return { ok: false, code: "idempotency_conflict" }
+        }
+        const run = await this.readRun(event.runId, false)
+        return run === null
+          ? { ok: false, code: "state_diverged" }
+          : { ok: true, status: "replayed", run, index }
+      }
       const highest = events.at(-1)?.sequence ?? 0
       if (highest !== index.revision) return { ok: false, code: "state_diverged" }
       const current = await this.readRun(event.runId, false)
@@ -105,7 +126,7 @@ export class TransactionStore {
         guard: this.guard,
       })
       options.crash?.("after_index")
-      return { ok: true, ...prepared }
+      return { ok: true, status: "committed", ...prepared }
     } finally {
       await handle.release()
     }
@@ -147,6 +168,39 @@ export class TransactionStore {
     if (!retried.ok) throw new StateDecodeError(retried.code)
   }
 
+  async initializeLifecycle(): Promise<void> {
+    try {
+      await readFile(this.paths.activeIndex, "utf8")
+      await this.preflightLifecycle()
+      return
+    } catch (error) {
+      if (!isMissing(error)) throw error
+    }
+    const deadline = deadlineAfter(2_000)
+    const handle = await this.lock.tryAcquire({
+      deadline,
+      purpose: "command",
+      sessionId: "lifecycle-initialize",
+      maxWaitMs: Math.min(2_000, deadline.remainingMs()),
+    })
+    if (handle === null) throw new StateDecodeError("migration_recovery_required")
+    try {
+      try {
+        await readFile(this.paths.activeIndex, "utf8")
+        return
+      } catch (error) {
+        if (!isMissing(error)) throw error
+      }
+      await atomicReplace(
+        this.paths.activeIndex,
+        JSON.stringify({ schemaVersion: 2, migrationRevision: 1, revision: 0, entries: [] }),
+        { deadline, guard: this.guard },
+      )
+    } finally {
+      await handle.release()
+    }
+  }
+
   async readIndex(preflight = true): Promise<ActiveIndex> {
     if (preflight) await this.preflightLifecycle()
     await ensureStatePathContained(this.root, this.paths.activeIndex)
@@ -177,6 +231,13 @@ export class TransactionStore {
     const decoded = decodeRun(bytes, this.root)
     if (!decoded.ok) throw decoded.error
     return decoded.value
+  }
+
+  async readEvent(eventId: string): Promise<PersistedStateEvent | null> {
+    await this.preflightLifecycle()
+    const parsedId = UuidSchema.safeParse(eventId)
+    if (!parsedId.success) return null
+    return (await this.events.readAll()).find((event) => event.eventId === parsedId.data) ?? null
   }
 
   #persistedEvent(index: ActiveIndex, event: PersistedStateEvent): PersistedStateEvent {

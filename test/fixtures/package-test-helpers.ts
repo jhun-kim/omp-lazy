@@ -1,6 +1,7 @@
 import { setDefaultTimeout } from "bun:test"
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { removeTestTree } from "./remove-test-tree"
 
 export type CommandResult = {
   readonly exitCode: number
@@ -75,7 +76,7 @@ export function commitCandidate(candidate: string): string {
 }
 
 export async function removeCandidate(path: string): Promise<void> {
-  await rm(path, { force: true, recursive: true })
+  await removeTestTree(path)
 }
 
 export async function writeJson(path: string, value: object): Promise<void> {

@@ -60,8 +60,8 @@ export const RECEIPT_BINDING_CASES: readonly [
   ["run", () => ({ runId: UuidSchema.parse("99999999-9999-4999-8999-999999999999") }), "wrong_run"],
   ["attempt", (value) => ({ attempt: value.run.progressRevision + 1 }), "wrong_attempt"],
   ["revision", (value) => ({ runRevision: value.run.revision + 1 }), "wrong_revision"],
-  ["owner epoch", (value) => ({ ownerEpoch: value.run.owner.epoch + 1 }), "wrong_owner_epoch"],
-  ["generation", () => ({ taskGeneration: 1 }), "wrong_task_generation"],
+  ["owner epoch", (value) => ({ ownerEpoch: value.run.owner.epoch + 1 }), "owner_epoch_mismatch"],
+  ["generation", () => ({ taskGeneration: 1 }), "task_scope_mismatch"],
   ["commit", () => ({ captureCommit: "b".repeat(40) }), "wrong_capture_commit"],
   [
     "artifact attempt",

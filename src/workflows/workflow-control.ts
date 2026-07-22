@@ -79,7 +79,13 @@ function reduceStart(run: StartWorkRun, command: ControlCommand): ControlResult<
       }
     case "adopt":
       if (terminal) return { ok: false, code: "terminal" }
-      if (run.payload.status !== "paused" && run.payload.status !== "stuck") {
+      if (
+        run.payload.status !== "paused" &&
+        run.payload.status !== "stuck" &&
+        run.payload.status !== "blocked" &&
+        run.payload.status !== "needs_user_decision" &&
+        run.payload.status !== "review_blocked"
+      ) {
         return { ok: false, code: "invalid_transition" }
       }
       return {
@@ -102,6 +108,7 @@ function reduceStart(run: StartWorkRun, command: ControlCommand): ControlResult<
           progressRevision: run.progressRevision + 1,
           payload: {
             ...run.payload,
+            status: command.plan.remainingTaskIds.length === 0 ? "completed" : "active",
             plan: {
               ...run.payload.plan,
               taskIds: command.plan.taskIds,

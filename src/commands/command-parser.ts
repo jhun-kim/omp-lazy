@@ -119,7 +119,10 @@ export function parseWorkflowCommand(
       const operation = words[0]
       const rest = words.slice(1)
       if (operation === "status" && rest.length <= 1) return valid(operation, rest)
-      return ["create", "archive", "delete", "resume"].includes(operation ?? "") &&
+      if ((operation === "prepare" || operation === "create") && rest.length === 2) {
+        return valid(operation, rest)
+      }
+      return ["cancel", "archive", "delete", "resume"].includes(operation ?? "") &&
         rest.length === 1
         ? valid(operation ?? "", rest)
         : invalid()
@@ -135,6 +138,11 @@ export function parseWorkflowCommand(
         : invalid()
     }
     case "ulw_plan":
+      if (words[0] === "approve") {
+        return words.length === 3 && /^[0-9a-f]{64}$/u.test(words[2] ?? "")
+          ? valid("approve", words.slice(1))
+          : invalid()
+      }
       return words.length === 0 || (words[0] === "--" && words.length > 1)
         ? valid("plan", words.slice(1))
         : invalid()

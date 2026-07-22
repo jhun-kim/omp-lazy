@@ -7,6 +7,11 @@ export type TransitionErrorCode =
   | "run_revision_conflict"
   | "owner_conflict"
   | "epoch_conflict"
+  | "stale_revision"
+  | "owner_mismatch"
+  | "owner_epoch_mismatch"
+  | "stale_head"
+  | "task_scope_mismatch"
   | "invalid_mutation"
 
 export type PreparedTransition = {
@@ -52,11 +57,91 @@ function controlRun(run: AnyRun, event: PersistedStateEvent): AnyRun | null {
           expectedEpoch: run.owner.epoch,
           plan: {
             taskIds: mutation.taskIds,
-            remainingTaskIds: [],
+            remainingTaskIds: mutation.remainingTaskIds ?? mutation.taskIds,
             fingerprint: mutation.taskFingerprint,
           },
         })
         return result.ok ? result.run : null
+      }
+    case "workflow_steered":
+      if (run.workflow !== "ulw_loop" || run.payload.activeGoalId === null) return null
+      {
+        const existing = new Set(
+          run.payload.goals.flatMap((goal) => goal.criteria.map(({ id }) => id)),
+        )
+        if (mutation.criteria.some(({ id }) => existing.has(id))) return null
+        const goals = run.payload.goals.map((goal) =>
+          goal.id === run.payload.activeGoalId
+            ? {
+                ...goal,
+                criteria: [
+                  ...goal.criteria,
+                  ...mutation.criteria.map((criterion) => ({
+                    ...criterion,
+                    status: "pending" as const,
+                    identicalFailureFingerprint: null,
+                    identicalFailureCount: 0,
+                    evidenceRef: null,
+                    captureRevision: null,
+                    captureCommit: null,
+                  })),
+                ],
+              }
+            : goal,
+        )
+        return {
+          ...run,
+          revision: run.revision + 1,
+          progressRevision: run.progressRevision + 1,
+          payload: {
+            ...run.payload,
+            ...(mutation.annotation === undefined ? {} : { annotation: mutation.annotation }),
+            goals,
+          },
+        }
+      }
+    case "criterion_settled":
+      if (run.workflow !== "ulw_loop") return null
+      {
+        const goal = run.payload.goals.find(({ id }) => id === mutation.goalId)
+        const criterion = goal?.criteria.find(({ id }) => id === mutation.criterionId)
+        if (goal === undefined || criterion === undefined || criterion.status === "pass")
+          return null
+        const goals = run.payload.goals.map((candidate) => {
+          if (candidate.id !== mutation.goalId) return candidate
+          const criteria = candidate.criteria.map((item) =>
+            item.id === mutation.criterionId
+              ? {
+                  ...item,
+                  status: "pass" as const,
+                  evidenceRef: mutation.evidenceRef,
+                  captureRevision: mutation.captureRevision,
+                  captureCommit: mutation.captureCommit,
+                }
+              : item,
+          )
+          return {
+            ...candidate,
+            status: criteria.every(({ status }) => status === "pass")
+              ? ("complete" as const)
+              : candidate.status,
+            criteria,
+          }
+        })
+        const completed = goals.every((candidate) =>
+          candidate.criteria.every(({ status }) => status === "pass"),
+        )
+        return {
+          ...run,
+          revision: run.revision + 1,
+          progressRevision: run.progressRevision + 1,
+          payload: {
+            ...run.payload,
+            activeGoalId: completed ? null : run.payload.activeGoalId,
+            status: completed ? "completed" : run.payload.status,
+            goals,
+          },
+        }
       }
     case "continuation_attempted":
       if (run.continuation.lastProcessedLeafId === mutation.leafId) return null
@@ -165,7 +250,9 @@ export function prepareTransition(
   current: AnyRun | null,
   event: PersistedStateEvent,
 ): PreparedTransition | { readonly code: TransitionErrorCode } {
-  if (event.expected.indexRevision !== index.revision) return { code: "index_revision_conflict" }
+  if (event.expected.indexRevision !== index.revision) {
+    return { code: event.schemaVersion === 2 ? "stale_revision" : "index_revision_conflict" }
+  }
   if (event.sequence !== index.revision + 1) return { code: "invalid_mutation" }
   let next: AnyRun | null
   if (event.mutation.kind === "run_created") {
@@ -177,9 +264,32 @@ export function prepareTransition(
     next = event.mutation.run
   } else {
     if (current === null) return { code: "run_revision_conflict" }
-    if (current.revision !== event.expected.runRevision) return { code: "run_revision_conflict" }
-    if (current.owner.sessionId !== event.expected.ownerSessionId) return { code: "owner_conflict" }
-    if (current.owner.epoch !== event.expected.ownerEpoch) return { code: "epoch_conflict" }
+    if (current.revision !== event.expected.runRevision) {
+      return { code: event.schemaVersion === 2 ? "stale_revision" : "run_revision_conflict" }
+    }
+    if (current.owner.sessionId !== event.expected.ownerSessionId) {
+      return { code: event.schemaVersion === 2 ? "owner_mismatch" : "owner_conflict" }
+    }
+    if (current.owner.epoch !== event.expected.ownerEpoch) {
+      return { code: event.schemaVersion === 2 ? "owner_epoch_mismatch" : "epoch_conflict" }
+    }
+    if (event.schemaVersion === 2) {
+      if (
+        event.expected.expectedHead !== null &&
+        (current.schemaVersion !== 2 || current.expectedHead !== event.expected.expectedHead)
+      ) {
+        return { code: "stale_head" }
+      }
+      const taskScoped =
+        event.kind === "plan_reconciled" ||
+        event.kind === "workflow_steered" ||
+        event.kind === "criterion_settled" ||
+        event.kind === "goal_cycle_started" ||
+        event.kind === "criterion_failure_recorded"
+      if (taskScoped !== (event.expected.taskGeneration !== null)) {
+        return { code: "task_scope_mismatch" }
+      }
+    }
     next = controlRun(current, event)
   }
   if (next === null || next.runId !== event.runId || next.workflow !== event.workflow) {

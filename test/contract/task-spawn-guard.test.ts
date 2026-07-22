@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions"
 import { TaskEventLedger } from "../../src/gates/task-event-ledger"
-import { parseTaskSpawn, TaskSpawnGuard } from "../../src/gates/task-spawn-guard"
+import {
+  canonicalTaskProjection,
+  parseTaskSpawn,
+  TaskSpawnGuard,
+} from "../../src/gates/task-spawn-guard"
 import { TransactionStore } from "../../src/state/transaction-store"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 describe("OMP 17.0.5 task input parsing", () => {
@@ -23,9 +28,29 @@ describe("OMP 17.0.5 task input parsing", () => {
       ok: true,
       value: {
         itemCount: 1,
-        requests: [{ itemIndex: 0, requestedName: "worker", agentType: "reviewer" }],
+        requests: [
+          {
+            canonicalInputHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            itemIndex: 0,
+            requestedName: "worker",
+            agentType: "reviewer",
+          },
+        ],
       },
     })
+  })
+
+  test("Given equivalent Task fields When projected Then bytes use the frozen lexical key order", () => {
+    // Given: Task values with omitted defaults and surrounding whitespace.
+    const input = { agent: " reviewer ", name: " worker ", task: " Review safely " }
+
+    // When: the coordinator projects the trusted spawn input.
+    const projection = canonicalTaskProjection(input)
+
+    // Then: all four keys and defaults serialize in exact lexical order without whitespace.
+    expect(projection).toBe(
+      '{"agent":"reviewer","isolated":false,"name":"worker","task":"Review safely"}',
+    )
   })
 
   test("Given a batch task When parsed Then every item consumes fan-out", () => {

@@ -43,6 +43,9 @@ type RunVersion =
 export type StartWorkStatus =
   | "active"
   | "paused"
+  | "blocked"
+  | "needs_user_decision"
+  | "review_blocked"
   | "stuck"
   | "completed"
   | "cancelled"
@@ -65,6 +68,9 @@ export type StartWorkPayload = {
 
 export type Criterion = {
   readonly id: string
+  readonly scenario?: string | undefined
+  readonly observable?: string | undefined
+  readonly evidenceLogicalId?: string | undefined
   readonly status: "pending" | "pass" | "fail" | "blocked"
   readonly identicalFailureFingerprint: string | null
   readonly identicalFailureCount: number
@@ -89,6 +95,8 @@ export type Goal = {
 
 export type UlwLoopPayload = {
   readonly kind: "ulw_loop"
+  readonly objective?: string | undefined
+  readonly annotation?: string | undefined
   readonly status:
     | "active"
     | "paused"
@@ -137,7 +145,26 @@ export type StateMutation =
   | {
       readonly kind: "plan_reconciled"
       readonly taskIds: readonly string[]
+      readonly remainingTaskIds?: readonly string[] | undefined
       readonly taskFingerprint: string
+    }
+  | {
+      readonly kind: "workflow_steered"
+      readonly criteria: readonly {
+        readonly id: string
+        readonly scenario: string
+        readonly observable: string
+        readonly evidenceLogicalId: string
+      }[]
+      readonly annotation?: string | undefined
+    }
+  | {
+      readonly kind: "criterion_settled"
+      readonly goalId: string
+      readonly criterionId: string
+      readonly evidenceRef: string
+      readonly captureRevision: number
+      readonly captureCommit: string
     }
   | {
       readonly kind: "continuation_attempted"

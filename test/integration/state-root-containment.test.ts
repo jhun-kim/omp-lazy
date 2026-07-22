@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import type { CanonicalRoot } from "../../src/state/domain"
 import { inspectRecovery } from "../../src/state/recovery"
+import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore } from "../fixtures/store-fixtures"
 
 const roots: string[] = []
@@ -29,11 +30,11 @@ type ExternalEntry =
   | { readonly kind: "file"; readonly path: string; readonly bytes: string }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map(removeTestTree))
 })
 
 afterAll(async () => {
-  await rm(runRoot, { recursive: true, force: true })
+  await removeTestTree(runRoot)
 })
 
 async function sandbox(label: string): Promise<string> {
