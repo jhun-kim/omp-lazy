@@ -53,3 +53,8 @@ const hubWaitResultSchema = z
 export function isHubWaitMessageResult(details: unknown): boolean {
   return hubWaitResultSchema.safeParse(details).success
 }
+
+export function isHubWaitStatusOnlyResult(details: unknown): boolean {
+  const parsed = hubWaitResultSchema.safeParse(details)
+  return parsed.success && parsed.data.waited === null
+}

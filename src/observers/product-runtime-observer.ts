@@ -19,13 +19,30 @@ import {
   type StepContextCompileResult,
   type TaskPacketMessage,
 } from "../workflows/task-packet-compiler"
+import { decodeIrcResult, isHubWaitStatusOnlyResult } from "./irc-result-codec"
+import { decodeJobResult } from "./job-result-codec"
 import { ModelCallObserver, type ModelCallSnapshot } from "./model-call-observer"
-
-const STATUS_ONLY_TOOLS = new Set(["hub", "irc", "job"])
 
 type ActivePacket = {
   readonly compiled: CompiledTaskPacket
   readonly message: TaskPacketMessage
+}
+
+function isJobStatusOnly(details: unknown): boolean {
+  const decoded = decodeJobResult(details)
+  return (
+    decoded.ok &&
+    decoded.value.jobs.every((job) => job.resultText === undefined && job.errorText === undefined)
+  )
+}
+
+function isStatusOnlyResult(toolName: string, details: unknown): boolean {
+  if (toolName === "job") return isJobStatusOnly(details)
+  if (toolName === "irc") return decodeIrcResult(details).ok
+  if (toolName !== "hub") return false
+  return (
+    isHubWaitStatusOnlyResult(details) || isJobStatusOnly(details) || decodeIrcResult(details).ok
+  )
 }
 
 export class ProductRuntimeObserver {
@@ -75,11 +92,12 @@ export class ProductRuntimeObserver {
     readonly toolCallId: string
     readonly toolName: string
     readonly content: readonly MeteredResultContent[]
+    readonly details: unknown
   }): ToolResultEventResult | undefined {
     const observed = this.#retrieval.observe({
       sessionId: input.sessionId,
       toolCallId: input.toolCallId,
-      statusOnly: STATUS_ONLY_TOOLS.has(input.toolName),
+      statusOnly: isStatusOnlyResult(input.toolName, input.details),
       content: input.content,
     })
     return observed.kind === "refused"
@@ -125,6 +143,7 @@ export function registerProductRuntimeObservers(
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       content: event.content,
+      details: event.details,
     }),
   )
   api.on("after_provider_response", (event, context) => {
