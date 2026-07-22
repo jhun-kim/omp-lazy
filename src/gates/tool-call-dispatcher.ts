@@ -4,7 +4,7 @@ import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
 import { authorizeImmutableToolCall } from "./immutable-tool-authorization"
 import { TaskEventLedger } from "./task-event-ledger"
-import { TaskSpawnGuard } from "./task-spawn-guard"
+import { currentTaskSpawnPacketPolicy, TaskSpawnGuard } from "./task-spawn-guard"
 
 export type CurrentRunScope =
   | { readonly kind: "foreign" }
@@ -100,9 +100,32 @@ export function registerToolCallDispatcher(api: ToolCallDispatcherApi, maxFanOut
     if (scope.kind === "conflict") {
       return { block: true, reason: "omp-lazy: active workflow state conflict" }
     }
-    return new TaskSpawnGuard(new TaskEventLedger(scope.store), maxFanOut).handleAuthorized({
-      authorization,
-      sessionId,
-    })
+    const ledger = new TaskEventLedger(scope.store)
+    try {
+      const taskScope = await ledger.resolve(sessionId)
+      if (
+        taskScope.kind !== "scope" ||
+        taskScope.value.run.runId !== scope.run.runId ||
+        taskScope.value.run.revision !== scope.run.revision ||
+        taskScope.value.run.transactionRevision !== scope.run.transactionRevision ||
+        taskScope.value.run.owner.sessionId !== sessionId ||
+        taskScope.value.run.owner.epoch !== scope.run.owner.epoch
+      ) {
+        return { block: true, reason: "omp-lazy: active workflow state conflict" }
+      }
+      return new TaskSpawnGuard(
+        ledger,
+        maxFanOut,
+        currentTaskSpawnPacketPolicy(taskScope.value),
+      ).handleAuthorized({
+        authorization,
+        sessionId,
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        return { block: true, reason: "omp-lazy: active workflow state conflict" }
+      }
+      throw error
+    }
   })
 }

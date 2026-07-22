@@ -5,6 +5,7 @@ import {
   type ImmutableToolAuthorization,
 } from "./immutable-tool-authorization"
 import type { TaskEventLedger } from "./task-event-ledger"
+import type { TaskRunScope } from "./task-sidecar-store"
 
 export type { ParsedTaskSpawn, TaskParseResult } from "./task-spawn-parser"
 export { canonicalTaskProjection, parseTaskSpawn } from "./task-spawn-parser"
@@ -73,6 +74,15 @@ const TierAgentEligibility = {
   ],
   DEEP: PublicTaskAgentSchema.options,
 } as const satisfies Record<TaskSpawnPacketPolicy["tier"], readonly string[]>
+
+export function currentTaskSpawnPacketPolicy(
+  scope: TaskRunScope,
+): TaskSpawnPacketPolicy | undefined {
+  if (scope.run.schemaVersion !== 2 || scope.ledger.schemaVersion !== 2) return undefined
+  const { packetHash, tier } = scope.ledger
+  if (packetHash === null || tier === null || scope.run.packetHash !== packetHash) return undefined
+  return { packetHash, tier, allowedAgentTypes: TierAgentEligibility[tier] }
+}
 
 export class TaskSpawnGuard {
   constructor(
