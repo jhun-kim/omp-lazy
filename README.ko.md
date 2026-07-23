@@ -90,6 +90,28 @@ manifest generation은 clean tracked worktree에서만 실행하세요. 생성�
 | Pinned OMP dogfood/profile fingerprint | No | POSIX | No | Yes |
 | Publish or registry upload | No | No | No | No |
 
+## Harness evaluation
+
+harness evaluator(`harness-eval/`)는 frozen closure입니다. evidence를 산출하는 동안 해당 byte와
+corpus manifest는 편집되지 않습니다. evaluation은 세 가지 mode로 실행됩니다.
+
+- **Deterministic.** `bun run eval:harness:deterministic`은 registry credential, network write, live model
+  access 없이 synthetic target을 상대로 corpus를 실행합니다. fixture, oracle, adapter contract를 검증하며,
+  fast gate와 release gate가 요구하는 유일한 harness mode입니다. deterministic `PASS`는 corpus contract가
+  성립함을 증명하며, live quality 결과가 아닙니다.
+- **Baseline.** `bun run eval:harness:baseline`은 고정된 pre-redesign defect set을 다시 실행해 regression을
+  보이게 유지합니다.
+- **Live.** `bun run eval:harness:live`는 credentialed paired profile을 실행합니다. secret이 아닌 operator
+  input `.omo/inputs/harness-live-profile.v1.json`이 필요하며, model call 전에 고정된 schema로 검증됩니다.
+  secret key는 environment 전용으로 유지되며 이 file에서 읽지 않습니다.
+
+live input이 없거나 schema가 유효하지 않으면 synthetic `PASS`가 아니라 `BLOCKED: live_profile_input_missing`
+(또는 `live_profile_input_schema_invalid`)입니다. `bun run verify:harness`는 고정된 receipt를 검증하며
+deterministic `PASS`와 live `PASS` 또는 `BLOCKED` 결과를 구별합니다. quality 및 cost ratio는 live 비교가 실제로
+측정되었을 때만 보고됩니다. 어떤 release surface도 관찰되지 않은 10% cost 또는 95% quality 수치를 광고하지
+않습니다. auditor 또는 live credential이 없으면 final approval은 `BLOCKED`로 남으며, `BLOCKED` 결과는 최종입니다.
+즉 approval로 주장할 수 없습니다.
+
 ## Package scripts
 
 alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 반영한 mirror입니다.
@@ -99,7 +121,7 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 | `typecheck` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile unit -- bun scripts/run-local-tsc.ts --noEmit` | 고정된 로컬 TypeScript check. |
 | `lint` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bunx biome check .` | Biome lint 및 formatting check. |
 | `test:unit` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/unit` | Unit suite. |
-| `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 180000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product 및 boundary contract. |
+| `test:contract` | `bun scripts/run-isolated.ts --timeout-ms 240000 --cwd . --env-profile unit -- bun test --timeout 30000 test/contract` | Product 및 boundary contract. |
 | `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
 | `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
 | `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |
@@ -117,7 +139,7 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 | `verify:readme` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun scripts/verify-readme-contract.ts` | README/package/runtime contract. |
 | `evidence:source` | `bun scripts/build-evidence-manifest.ts --mode source --root .omo/evidence/plugin-completion-60 --commit-from-git-head` | T01-T15 evidence를 clean `HEAD`에 binding. |
 | `evidence:review` | `bun scripts/build-evidence-manifest.ts --mode review --root .omo/evidence/plugin-completion-60 --commit-from-git-head` | source 및 F1-F4 receipt binding. |
-| `eval:harness:deterministic` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts run --mode deterministic` | 결정적 harness corpus를 실행합니다. |
+| `eval:harness:deterministic` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts run --mode deterministic --manifest harness-eval/manifest.v1.json --validate-corpus --synthetic-target harness-eval/fixtures/synthetic-target` | 결정적 harness corpus를 실행합니다. |
 | `eval:harness:baseline` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts run --mode baseline` | 고정된 baseline harness defect를 실행합니다. |
 | `eval:harness:live` | `bun scripts/run-isolated.ts --timeout-ms 7200000 --cwd . --env-profile omp -- bun harness-eval/src/cli.ts run --mode live` | credentialed live harness evaluation을 실행합니다. |
 | `verify:harness` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun harness-eval/src/cli.ts verify` | 고정된 harness receipt를 검증합니다. |
@@ -200,6 +222,24 @@ Windows에서 capability-probe receipt는 direct launcher exit와 해당 provide
 launcher가 종료된 뒤 arbitrary descendant를 containment한다고 증명하지는 않습니다. 이를 위해서는 pinned host
 runtime이 노출하지 않는 Windows Job Object 사전 등록이 필요합니다. Cooperative child cleanup은 기존 bounded test로
 계속 검증됩니다.
+
+## Migration
+
+durable state record는 명시적 `schemaVersion`을 가집니다. lifecycle store는 mutation 전에 repository lock
+아래에서 first access 시 legacy v1 record를 v2로 자동 migration합니다.
+
+- **자동 v1→v2 migration.** legacy state root에 처음 access하면 active, run, event, team, task-fact,
+  acceptance, WAL, rejection record 전부가 하나의 journaled transaction으로 schema v1에서 v2로 변환됩니다.
+  이미 current인 root에 다시 실행하면 no-op입니다.
+- **실패 시 rollback.** migration은 각 단계를 journal에 기록하고 먼저 원본 v1 byte를 backup합니다. 어떤
+  publication 단계에서든 crash 또는 검증 실패가 발생하면 완전한 v1 set을 복원하며, store는 부분적으로
+  migration된 혼합 상태를 남기지 않습니다.
+- **알 수 없는 version 거부.** 미래 또는 알 수 없는 `schemaVersion`의 record는 추측하지 않고
+  `unknown_schema_version`으로 거부됩니다. 손상된 backup이나 모호한 record identity는
+  `migration_recovery_required`로 fail closed됩니다.
+- **legacy plan은 reapproval 필요.** v1 plan을 v2 view로 정규화해도 해당 text approval은 migration되지
+  않습니다. legacy plan은 실행 전에 한 번의 trusted reapproval이 필요합니다. 과거 v1 event는 audit 전용으로
+  남으며 v2 work를 settle할 수 없습니다.
 
 ## Evidence handoff
 

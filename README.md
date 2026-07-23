@@ -90,6 +90,30 @@ ignored local artifacts.
 | Pinned OMP dogfood/profile fingerprint | No | POSIX | No | Yes |
 | Publish or registry upload | No | No | No | No |
 
+## Harness evaluation
+
+The harness evaluator (`harness-eval/`) is a frozen closure: its bytes and the corpus manifest are
+not edited while evidence is being produced. Evaluation runs in three modes.
+
+- **Deterministic.** `bun run eval:harness:deterministic` runs the corpus against a synthetic
+  target with no registry credentials, network writes, or live model access. It validates fixture,
+  oracle, and adapter contracts and is the only harness mode required by the fast and release
+  gates. A deterministic `PASS` proves the corpus contract holds; it is not a live quality result.
+- **Baseline.** `bun run eval:harness:baseline` replays the frozen pre-redesign defect set so
+  regressions stay visible.
+- **Live.** `bun run eval:harness:live` runs credentialed paired profiles. It requires the
+  non-secret operator input `.omo/inputs/harness-live-profile.v1.json`, validated against the
+  frozen schema before any model call. The secret key stays environment-only and is never read
+  from this file.
+
+A missing or schema-invalid live input is `BLOCKED: live_profile_input_missing` (or
+`live_profile_input_schema_invalid`), never a synthetic `PASS`. `bun run verify:harness` verifies
+frozen receipts and distinguishes a deterministic `PASS` from a live `PASS` or `BLOCKED` outcome.
+Quality and cost ratios are reported only when a live comparison has actually been measured; no
+release surface advertises a 10% cost or 95% quality figure that has not been observed. Missing
+auditor or live credentials leaves final approval `BLOCKED`, and a `BLOCKED` result is final: it
+cannot be claimed as an approval.
+
 ## Package scripts
 
 The alias and expansion columns are an exact machine-checked mirror of `package.json#scripts`.
@@ -201,6 +225,24 @@ On Windows, a capability-probe receipt proves direct launcher exit plus its prov
 cleanup. It does not prove containment of arbitrary descendants after their launcher exits; that
 requires pre-enrollment in a Windows Job Object, which the pinned host runtime does not expose.
 Cooperative child cleanup remains covered by its existing bounded tests.
+
+## Migration
+
+Durable state records carry an explicit `schemaVersion`. The lifecycle store migrates legacy v1
+records to v2 automatically on first access, under the repository lock, before any mutation.
+
+- **Automatic v1→v2 migration.** On first access to a legacy state root, every active, run, event,
+  team, task-fact, acceptance, WAL, and rejection record is converted from schema v1 to v2 in one
+  journaled transaction. A rerun against an already-current root is a no-op.
+- **Rollback on failure.** The migration journals each step and backs up the original v1 bytes
+  first. A crash or verification failure at any publication step restores the complete v1 set; the
+  store never leaves a partially migrated mix.
+- **Refusal of unknown versions.** Records with a future or unknown `schemaVersion` are refused
+  with `unknown_schema_version` rather than guessed at. Damaged backups or ambiguous record
+  identities fail closed with `migration_recovery_required`.
+- **Legacy plans need reapproval.** Normalizing a v1 plan into a v2 view never migrates its text
+  approval. A legacy plan requires one trusted reapproval before execution; historical v1 events
+  remain audit-only and cannot settle v2 work.
 
 ## Evidence handoff
 
