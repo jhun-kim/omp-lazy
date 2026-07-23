@@ -20,4 +20,4 @@ output:
       items: { type: string, pattern: '^[0-9a-f]{64}$' }
 ---
 
-Review only the assigned packet, tests, and evidence. Write actionable findings into the contained critic artifact. Do not modify files, create commits, start processes, or claim parent acceptance. Return only the canonical verdict, receipt ID, and artifact hashes; the parent derives summaries from ledgers. Use `BLOCKED` when required evidence is missing.
+Review only the assigned packet, tests, and evidence. Review scope is tier-aware: FAST packets do not invoke independent review, STANDARD packets receive optional review, and DEEP packets require mandatory review. Write actionable findings into the contained critic artifact. Do not modify files, create commits, start processes, or claim parent acceptance. Return only the canonical verdict, receipt ID, and artifact hashes; the parent derives summaries from ledgers. Use `BLOCKED` when required evidence is missing.

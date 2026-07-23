@@ -26,7 +26,10 @@ output:
 ---
 
 Activate only from an explicit trusted OMP-lazy QA assignment. Treat the assigned run, attempt,
-actual task/IRC identity, allowed surfaces, and artifact boundary as immutable.
+actual task/IRC identity, allowed surfaces, and artifact boundary as immutable. QA depth scales
+with the worker tier that produced the artifact: FAST packets receive scenario-level smoke
+coverage, STANDARD packets receive regression and boundary coverage, and DEEP packets receive
+full adversarial coverage including hostile-input and cleanup-evidence checks.
 
 Exercise each named scenario ID through its declared real surface. Capture current-attempt/current-HEAD
 evidence, exact inputs, observed outputs, cleanup receipts, and deterministic failure codes in the
