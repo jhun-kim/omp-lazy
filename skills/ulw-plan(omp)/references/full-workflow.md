@@ -3,11 +3,14 @@
 ## Contents
 
 - [Role and write boundary](#role-and-write-boundary)
+- [Tier classification](#tier-classification)
 - [Classify and ground](#classify-and-ground)
 - [Durable draft and approval](#durable-draft-and-approval)
 - [Generate the plan](#generate-the-plan)
 - [Plan template](#plan-template)
+- [Evidence packet handoff](#evidence-packet-handoff)
 - [Review identities](#review-identities)
+- [Legacy normalization](#legacy-normalization)
 - [Resume and failure rules](#resume-and-failure-rules)
 - [Stop rules](#stop-rules)
 
@@ -17,14 +20,33 @@ Remain the `omp-lazy-planner` for the entire task. Plan only; never implement. P
 read-only analysis are allowed. Writes are limited to `.omo/drafts/*.md` and `.omo/plans/*.md`.
 Do not activate, create, or mutate native Goal state.
 
-Plan mode is sticky. A later “do it”, “fix it”, or “start” message changes planning scope or approves
+Plan mode is sticky. A later "do it", "fix it", or "start" message changes planning scope or approves
 the brief only when its meaning is explicit; it never authorizes product edits. Approval is not
 execution.
 
+## Tier classification
+
+Every plan receives exactly one tier. The tier bounds research depth, review cost, and downstream
+execution budgets. Classification is canonical and lives here; other documents reference this
+section rather than restating it.
+
+| Tier | Criteria | Review | Interview |
+| --- | --- | --- | --- |
+| FAST | Outcome fully known, no owner decision, ≤2 components, no boundary risk | One Metis gap pass | None after routing if no owner decision |
+| STANDARD | Outcome known with owner decisions, 3-8 components, or unknown boundary tags | One Metis pass; Momus only if explicitly requested or high-risk classified | Owner decisions require explicit approval |
+| DEEP | Architecture-scale, >8 components, concrete boundary tags (security, network, privacy, external_write, authorization, containment), or public behavior change | Dual review: fresh Metis + fresh Momus, both must APPROVE independently | Full interview for irreversible choices |
+
+Classification inputs: component count, boundary tags from the compact packet schema
+(`src/contracts/task-packet.ts`), public behavior surface, and owner decision presence. When
+classification is ambiguous, choose the higher tier.
+
+Tier budgets for downstream execution are defined in `TierBudgets` within the task-packet contract.
+The planner records the tier; the executor inherits the matching budget.
+
 ## Classify and ground
 
-Classify work as trivial, standard, or architecture-scale. Use the classification only to size
-research and review cost. Ground in repository truth before routing intent.
+Ground in repository truth before routing intent. Use the tier classification above to size
+research and review cost.
 
 For broad work, collect independent evidence lanes, verify claims, turn verified facts into a design,
 challenge the design adversarially, and synthesize one plan. Stop research once the clearance check
@@ -52,6 +74,7 @@ Persist these fields before presenting the brief:
 status: awaiting-approval
 pending-action: write .omo/plans/<slug>.md
 approval: pending
+tier: FAST|STANDARD|DEEP
 ```
 
 Present findings, approach, scope, owner decisions or announced defaults, and test strategy once.
@@ -116,22 +139,54 @@ Keep this exact section order:
 Fill the TL;DR last. State what the user gets, why the approach is chosen, what is excluded, effort,
 risk, and decisions or defaults to inspect.
 
+## Evidence packet handoff
+
+Each plan todo maps to a compact task packet conforming to the schema in
+`src/contracts/task-packet.ts`. The packet carries objective, deliverable, allowed paths, boundary
+tags, criteria, evidence requirements, tier, and budgets. Downstream execution reads the packet
+directly; the plan never re-encodes execution policy.
+
+The planner records the tier in the plan header. The executor compiles the packet with the matching
+`TierBudgets` entry. Packet compilation rejects tier-budget mismatches and canonical risk
+disagreements.
+
 ## Review identities
 
-Mandatory gap analysis and high-accuracy review use OMP task dispatch and actual returned identities.
+Mandatory gap analysis and tier-gated review use OMP task dispatch and actual returned identities.
 Requested task labels do not prove identity.
 
-For a high-accuracy round, dispatch one fresh `omp-lazy-metis` and one fresh `omp-lazy-momus` against
-the same complete plan. Record distinct actual agent ids, input plan hash, artifact path and hash,
-verdict, and fixes in the draft. The two actual ids must differ, and neither lane may reuse the
-generation-gap identity. Treat same-reviewer reuse, acknowledgement-only output, missing artifacts,
-or conditional approval as `BLOCKED`.
+### FAST tier
+
+One `omp-lazy-metis` gap analysis pass. No Momus. No second interview when no owner decision exists.
+If Metis returns `BLOCKED`, fix cited findings and re-dispatch Metis fresh.
+
+### STANDARD tier
+
+One `omp-lazy-metis` pass is mandatory. Dispatch `omp-lazy-momus` only when the user explicitly
+requests high-accuracy review or the work is classified high-risk (concrete boundary tags, public
+behavior surface). When Momus runs, both reviewers must return unconditional `APPROVE`.
+
+### DEEP tier
+
+Dispatch one fresh `omp-lazy-metis` and one fresh `omp-lazy-momus` against the same complete plan.
+Record distinct actual agent ids, input plan hash, artifact path and hash, verdict, and fixes in the
+draft. The two actual ids must differ, and neither lane may reuse the generation-gap identity. Treat
+same-reviewer reuse, acknowledgement-only output, missing artifacts, or conditional approval as
+`BLOCKED`.
 
 Both reviewers must return unconditional `APPROVE`. Fix every cited blocker, then dispatch both fresh
 again against the new complete plan. Never cancel or duplicate a still-running reviewer merely
 because it is slow. A review is complete only when the final round has two independent receipts.
 
-CLEAR runs this dual review when requested. UNCLEAR runs it automatically unless classified trivial.
+## Legacy normalization
+
+Legacy v1 plans (bearing `<!-- omp-lazy-ulw-plan:plan:v1 -->`) normalize byte-preservingly: headings
+map to the v2 order, checklist items receive stable `LEGACY-` hash identities, and no content is
+dropped or rewritten. Normalization is read-only and produces a `NormalizedPlan` snapshot.
+
+A normalized legacy plan requires one trusted reapproval before execution. The executor must not
+treat a byte-preserved normalization receipt as execution authority; the owner must explicitly
+approve the normalized plan under the current approval gate.
 
 ## Resume and failure rules
 

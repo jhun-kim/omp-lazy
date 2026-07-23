@@ -11,6 +11,8 @@ Treat a doubtful classification as an owner decision.
 Lock the topology before depth: record one to six components that can succeed or fail
 independently. Give each component an outcome, status, and evidence path in the durable draft.
 
+Assign the tier per the tier classification in the full workflow. Record the tier in the draft.
+
 ## Filter questions
 
 Apply both filters to every candidate question:
@@ -32,7 +34,28 @@ Proceed to the brief only when the objective, scope in/out, approach, test strat
 blocking ambiguity are resolved. Persist `status: awaiting-approval` before presenting the brief.
 Approval is not execution.
 
+## FAST path (no owner decision)
+
+When the tier is FAST and no owner decision exists, the plan proceeds directly after the Metis gap
+pass without a second interview. The sequence is:
+
+1. Persist `status: approved` and `approval: explicit-user-approval` from the initial approval.
+2. Create the plan skeleton with `--plan`.
+3. Dispatch `omp-lazy-metis` for the mandatory gap analysis.
+4. Fold findings, append todos, fill TL;DR last.
+5. Deliver the plan and stop. Never implement.
+
+No Momus review runs for FAST tier. No additional interview round is required.
+
+## STANDARD and DEEP paths
+
 After explicit approval, persist `status: approved` and `approval: explicit-user-approval`, create
-the plan skeleton, run the mandatory gap review, and append the detailed plan. If review was already
-required, run the dual review. Otherwise ask whether to start work or run the dual review, then stop.
-Never implement.
+the plan skeleton, and run the tier-gated review from the full workflow:
+
+- STANDARD: one Metis pass; Momus only if explicitly requested or high-risk classified.
+- DEEP: dual review with fresh Metis and fresh Momus; both must APPROVE independently.
+
+If review was already required, run the tier-gated review. Otherwise ask whether to start work or
+run the review, then stop. Never implement.
+
+Do not activate, create, or mutate native Goal state.

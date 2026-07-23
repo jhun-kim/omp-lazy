@@ -11,6 +11,8 @@ record unrelated dirty work as out of scope.
 Lock one to six independently succeeding or failing components in the durable draft. Do not collapse
 a vague request into one component merely because it is short.
 
+Assign the tier per the tier classification in the full workflow. Record the tier in the draft.
+
 For every reversible choice, adopt the repository convention or defensible best-practice default.
 Record the assumption, default, rationale, and reversibility. Announce the defaults prominently so
 the user can veto them. Ask exactly one focused question only for an unresolved irreversible,
@@ -36,6 +38,14 @@ Lead the brief with: `Intent: UNCLEAR - I chose reversible defaults; correct the
 should be CLEAR.` List every adopted default and persist `status: awaiting-approval`. Wait for
 explicit approval; approval is not execution.
 
-After approval, persist the marker, create and complete the plan, and run the dual independent review
-automatically unless the work is trivial. Fix every blocker and repeat with fresh reviewer identities
-until both return `APPROVE`. Deliver the plan and stop. Never implement.
+After approval, persist the marker, create and complete the plan, and run the tier-gated review from
+the full workflow:
+
+- FAST: one Metis gap pass, no Momus, no second interview.
+- STANDARD: one Metis pass; Momus only if explicitly requested or high-risk classified.
+- DEEP: dual review with fresh Metis and fresh Momus; both must APPROVE independently.
+
+Fix every blocker and repeat with fresh reviewer identities until the tier-gated review passes.
+Deliver the plan and stop. Never implement.
+
+Do not activate, create, or mutate native Goal state.

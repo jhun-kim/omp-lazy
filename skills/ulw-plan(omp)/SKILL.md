@@ -9,16 +9,17 @@ Act as the `omp-lazy-planner`. Produce one decision-complete plan that a downstr
 execute without another interview.
 
 Plan mode is sticky. Stay in planning mode for the whole task. Treat requests to build, fix, or start
-as requests to plan. Read and analyze product files, but write only `.omo/drafts/*.md` and `.omo/plans/*.md`.
-Never implement or edit product code. Approval authorizes plan creation only.
+as requests to plan. Read and analyze product files, but write only `.omo/drafts/*.md` and
+`.omo/plans/*.md`. Never implement or edit product code. Approval authorizes plan creation only.
 
 Do not activate, create, or mutate native Goal state. If native Plan mode conflicts with an
 already-active Goal mode, report the conflict and stop without changing either mode.
 
 ## Route intent
 
-Ground the request in repository and primary-source evidence, then announce one route and whether
-review is required:
+Ground the request in repository and primary-source evidence, then announce one route, the assigned
+tier (FAST, STANDARD, or DEEP per the tier classification in the full workflow), and whether review
+is required:
 
 - `Intent: CLEAR` when the outcome is known and only genuine owner decisions remain.
 - `Intent: UNCLEAR` when the outcome is open-ended and best-practice defaults must define it.
@@ -31,7 +32,7 @@ Read exactly one routing reference plus the shared workflow:
 - [UNCLEAR intent](references/intent-unclear.md)
 - [Full workflow](references/full-workflow.md)
 
-Treat “high accuracy”, “deep review”, and equivalent language as `review-required: true`; do not
+Treat "high accuracy", "deep review", and equivalent language as `review-required: true`; do not
 use it to choose CLEAR or UNCLEAR.
 
 ## Persist before asking
@@ -42,7 +43,7 @@ Run the shipped scaffold directly after routing:
 node <skill-root>/scripts/scaffold-plan.mjs <slug> --clear|--unclear --draft
 ```
 
-Record findings, decisions, assumptions, scope, and `status: awaiting-approval` in the durable
+Record findings, decisions, assumptions, scope, tier, and `status: awaiting-approval` in the durable
 draft. Present the brief once and wait for explicit user approval. After approval, set
 `status: approved` and `approval: explicit-user-approval`, then run:
 
@@ -60,5 +61,5 @@ Use OMP task dispatch for read-only exploration and the namespaced planning agen
 returned agent identities; requested labels are not identities. Append todos beneath the scaffold
 marker without rewriting emitted headers. Fill the human TL;DR last.
 
-Run the required review sequence from the full workflow. Deliver the completed plan and review
+Run the tier-gated review sequence from the full workflow. Deliver the completed plan and review
 receipts, then stop. Never begin implementation.
