@@ -83,7 +83,7 @@ test("Given parent evidence When false N/A rejects and no-resource N/A accepts T
         artifactHash: expect.stringMatching(/^[0-9a-f]{64}$/),
         receiptId: expect.stringMatching(/^[0-9a-f]{64}$/),
         role: value.role,
-        semanticAttempt: value.run.progressRevision,
+        semanticAttempt: 2,
         taskId: "worker",
       },
     ],
