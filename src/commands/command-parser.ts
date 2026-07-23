@@ -146,6 +146,16 @@ export function parseWorkflowCommand(
       return words.length === 0 || (words[0] === "--" && words.length > 1)
         ? valid("plan", words.slice(1))
         : invalid()
+    case "ulw_deliver": {
+      const separator = words.indexOf("--")
+      const modes = separator < 0 ? words : words.slice(0, separator)
+      const task = separator < 0 ? [] : words.slice(separator + 1)
+      return modes.length <= 1 &&
+        [undefined, "fast", "standard", "deep"].includes(modes[0]) &&
+        (separator < 0 || task.length > 0)
+        ? valid("deliver", words)
+        : invalid()
+    }
     case "ulw_research":
       return words.length > 0 && !words[0]?.startsWith("--") ? valid("research", words) : invalid()
     case "doctor":

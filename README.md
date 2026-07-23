@@ -168,12 +168,14 @@ Both canonical names and aliases are registered exactly once.
 | `/omp-lazy-start-work(omp)` | Canonical plan execution command. |
 | `/omp-lazy-teammode(omp)` | Canonical durable team command. |
 | `/omp-lazy-ultrawork(omp)` | Canonical ultrawork command. |
+| `/omp-lazy-ulw-deliver(omp)` | Canonical full-lifecycle delivery command. |
 | `/omp-lazy-ulw-plan(omp)` | Canonical planning command. |
 | `/omp-lazy-ulw-research(omp)` | Canonical research command. |
 | `/start-work(omp)` | Plan execution alias. |
 | `/teammode(omp)` | Durable team alias. |
 | `/ultrawork(omp)` | Ultrawork alias. |
 | `/ulw(omp)` | Short ultrawork alias. |
+| `/ulw-deliver(omp)` | Full-lifecycle delivery alias. |
 | `/ulw-loop(omp)` | Bounded loop command. |
 | `/ulw-plan(omp)` | Planning alias. |
 | `/ulw-research(omp)` | Research alias. |
@@ -188,6 +190,7 @@ Both canonical names and aliases are registered exactly once.
 | `start-work(omp)` | Executes approved `.omo/plans` with evidence and parent acceptance. |
 | `teammode(omp)` | Coordinates capability-proven, non-overlapping durable teams. |
 | `ultrawork(omp)` | Drives rigorous bounded execution. |
+| `ulw-deliver(omp)` | Orchestrates sequential Plan, Implement, Verify, QA delivery. |
 | `ulw-loop(omp)` | Repeats a bounded goal-independent workflow. |
 | `ulw-plan(omp)` | Produces a decision-complete plan before execution. |
 | `ulw-research(omp)` | Runs evidence-saturated research with retained attribution. |

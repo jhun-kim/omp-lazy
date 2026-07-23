@@ -4,6 +4,7 @@ export type WorkflowActivationId =
   | "ultrawork"
   | "ulw_loop"
   | "ulw_plan"
+  | "ulw_deliver"
   | "ulw_research"
   | "doctor"
   | "report_bug"

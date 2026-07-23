@@ -12,6 +12,7 @@ export function durableWorkflowKind(workflow: WorkflowActivationId): WorkflowKin
     case "teammode":
     case "ultrawork":
     case "ulw_plan":
+    case "ulw_deliver":
     case "ulw_research":
     case "doctor":
     case "report_bug":

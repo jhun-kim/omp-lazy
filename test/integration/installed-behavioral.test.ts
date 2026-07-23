@@ -46,6 +46,8 @@ describe("installed behavioral coverage through production surfaces", () => {
       "omp-lazy-ultrawork(omp)",
       "ultrawork(omp)",
       "ulw(omp)",
+      "omp-lazy-ulw-deliver(omp)",
+      "ulw-deliver(omp)",
       "ulw-loop(omp)",
       "omp-lazy-ulw-plan(omp)",
       "ulw-plan(omp)",

@@ -166,12 +166,14 @@ canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.
 | `/omp-lazy-start-work(omp)` | Canonical plan execution command. |
 | `/omp-lazy-teammode(omp)` | Canonical durable team command. |
 | `/omp-lazy-ultrawork(omp)` | Canonical ultrawork command. |
+| `/omp-lazy-ulw-deliver(omp)` | Canonical full-lifecycle delivery command. |
 | `/omp-lazy-ulw-plan(omp)` | Canonical planning command. |
 | `/omp-lazy-ulw-research(omp)` | Canonical research command. |
 | `/start-work(omp)` | Plan execution alias. |
 | `/teammode(omp)` | Durable team alias. |
 | `/ultrawork(omp)` | Ultrawork alias. |
 | `/ulw(omp)` | Short ultrawork alias. |
+| `/ulw-deliver(omp)` | Full-lifecycle delivery alias. |
 | `/ulw-loop(omp)` | Bounded loop command. |
 | `/ulw-plan(omp)` | Planning alias. |
 | `/ulw-research(omp)` | Research alias. |
@@ -186,6 +188,7 @@ canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.
 | `start-work(omp)` | 승인된 `.omo/plans`를 evidence 및 parent acceptance와 함께 실행합니다. |
 | `teammode(omp)` | capability가 입증되고 겹치지 않는 durable team을 조정합니다. |
 | `ultrawork(omp)` | 엄격하고 경계가 정해진 실행을 진행합니다. |
+| `ulw-deliver(omp)` | Plan, Implement, Verify, QA를 순차적으로 오케스트레이션합니다. |
 | `ulw-loop(omp)` | 경계가 정해진 goal-independent workflow를 반복합니다. |
 | `ulw-plan(omp)` | 실행 전에 decision-complete plan을 만듭니다. |
 | `ulw-research(omp)` | retained attribution과 함께 증거 중심 research를 실행합니다. |

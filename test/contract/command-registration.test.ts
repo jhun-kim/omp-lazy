@@ -43,6 +43,7 @@ const EXPECTED_GRAMMAR = {
     "steer <run-id> <steering-json-path>",
   ],
   ulw_plan: ["[-- <brief>]", "approve <plan-path> <sha256>"],
+  ulw_deliver: ["[fast|standard|deep] [-- <task-text>]"],
   ulw_research: ["<query-text>"],
   doctor: ["[--json] [--deep]"],
   report_bug: ["[--target auto|omp-lazy|omp] [--dry-run] <summary-text>"],
@@ -85,17 +86,19 @@ describe("authoritative command catalog", () => {
       "omp-lazy-start-work(omp)",
       "omp-lazy-teammode(omp)",
       "omp-lazy-ultrawork(omp)",
+      "omp-lazy-ulw-deliver(omp)",
       "omp-lazy-ulw-plan(omp)",
       "omp-lazy-ulw-research(omp)",
       "start-work(omp)",
       "teammode(omp)",
       "ultrawork(omp)",
       "ulw(omp)",
+      "ulw-deliver(omp)",
       "ulw-loop(omp)",
       "ulw-plan(omp)",
       "ulw-research(omp)",
     ])
-    expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(18)
+    expect(new Set(COMMAND_REGISTRATIONS.map((entry) => entry.command)).size).toBe(20)
     expect(
       COMMAND_REGISTRATIONS.filter((entry) => entry.workflow === "ulw_loop").map(
         (entry) => entry.command,
@@ -114,7 +117,7 @@ describe("authoritative command catalog", () => {
 })
 
 describe("public OMP registration inventory", () => {
-  test("loads all 18 registrations through the public loader", async () => {
+  test("loads all 20 registrations through the public loader", async () => {
     const moduleUrl = pathToFileURL(
       join(process.cwd(), "src", "commands", "register-workflow-commands.ts"),
     ).href

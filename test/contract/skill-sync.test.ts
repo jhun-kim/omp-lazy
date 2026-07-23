@@ -35,6 +35,7 @@ describe("skill sync contract", () => {
       "start-work(omp)",
       "teammode(omp)",
       "ultrawork(omp)",
+      "ulw-deliver(omp)",
       "ulw-loop(omp)",
       "ulw-plan(omp)",
       "ulw-research(omp)",

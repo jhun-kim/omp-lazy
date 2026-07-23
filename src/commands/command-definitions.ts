@@ -73,6 +73,13 @@ export const COMMAND_DEFINITIONS = [
     grammar: ["[-- <brief>]", "approve <plan-path> <sha256>"],
   },
   {
+    workflow: "ulw_deliver",
+    canonical: "/omp-lazy-ulw-deliver(omp)",
+    aliases: ["/ulw-deliver(omp)"],
+    description: "Run full-lifecycle Plan, Implement, Verify, QA delivery",
+    grammar: ["[fast|standard|deep] [-- <task-text>]"],
+  },
+  {
     workflow: "ulw_research",
     canonical: "/omp-lazy-ulw-research(omp)",
     aliases: ["/ulw-research(omp)"],
