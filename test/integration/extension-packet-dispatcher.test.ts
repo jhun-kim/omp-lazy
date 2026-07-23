@@ -40,7 +40,8 @@ test("Given an active FAST packet When the public tool_call handler dispatches T
       reservationId: "packet-fast",
     }),
   )
-  const handler = runtime.extension.handlers.get("tool_call")?.[0]
+  const handlers = runtime.extension.handlers.get("tool_call")
+  const handler = handlers?.[handlers.length - 1]
   if (handler === undefined) throw new Error("public tool_call handler missing")
   const hostTaskSettings = {
     get(key: string): readonly string[] {
