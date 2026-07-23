@@ -15,10 +15,11 @@ Place `ULTRAWORK MODE ENABLED!` on the first visible line after activation. Acti
 
 ## Select the tier once
 
-Use the command mode when supplied. With no mode, start at LIGHT. Select or upgrade to HEAVY when the work adds a module, layer, domain model, or abstraction; crosses authentication, permission, session, concurrency, transaction, cache, external integration, schema, or domain boundaries; or requests careful or independent review. Never downgrade.
+Use the command mode when supplied. With no mode, start at FAST. Select or upgrade when the work adds a module, layer, domain model, or abstraction; crosses authentication, permission, session, concurrency, transaction, cache, external integration, schema, or domain boundaries; or requests careful or independent review. Never downgrade.
 
-- LIGHT: define one or two criteria covering the happy path and riskiest edge; run one real-surface proof; record a self-review.
-- HEAVY: define at least three criteria covering happy, edge, regression, and adversarial risks; run a separate scenario for each; require independent reviewer approval.
+- FAST: define one or two criteria covering the happy path and riskiest edge; run one real-surface proof; record a self-review. FAST does not invoke independent review.
+- STANDARD: define at least three criteria covering happy, edge, and regression risks; run a separate scenario for each; optional reviewer.
+- DEEP: define at least three criteria covering happy, edge, regression, and adversarial risks; run a separate scenario for each; require mandatory independent reviewer approval from a fresh Metis and Momus.
 
 The tier sizes the process, never the honesty of evidence or cleanup.
 
@@ -27,6 +28,10 @@ The tier sizes the process, never the honesty of evidence or cleanup.
 Write the user-visible outcome and tier justification before implementation. For each criterion, name the exact command, API request, or interaction with concrete input; one binary PASS or FAIL observable; the artifact path; and the failing-first proof to record before production changes.
 
 Keep criteria stable. Add a criterion when discovery exposes a new boundary; do not weaken an existing one.
+
+## Dispatch compact packets
+
+When dispatching bounded OMP task work, use a compact task packet (schema: `src/contracts/task-packet.ts`). The packet carries criteria, evidence requirements, boundary tags, tier, and tier budget. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
 
 ## Execute PIN, RED, GREEN, SURFACE, CLEAN
 

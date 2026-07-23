@@ -15,6 +15,12 @@ The extension works with Goal mode disabled and never activates Goal mode. Nativ
 
 Repeated create with the same session and objective is an idempotent replay. A different objective cannot replace an active run.
 
+## Compact packet execution
+
+Dispatch bounded OMP task work with a compact task packet (schema: `src/contracts/task-packet.ts`). The packet carries criteria, evidence requirements, boundary tags, tier, and tier budget. Workers receive the packet, not prose instructions. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
+
+Progress increments only on accepted packet, evidence, or criterion state change.
+
 ## Criteria and execution
 
 For every criterion define a concrete scenario, binary observable, evidence path, expected result, cleanup receipt, and adversarial boundary before implementation. Tests support a result but do not replace the faithful product or data surface.
@@ -30,7 +36,17 @@ For each cycle:
 
 Checkpoint documents are structured JSON with schema version, run ID, run revision, capture commit, criterion ID, status, evidence or receipt references, and an optional failure fingerprint. A `fail` requires a stable SHA-256 failure fingerprint. Replaying an exact durable checkpoint is a no-op; conflicting stale revision, HEAD, evidence, receipt, or failure data fails closed.
 
-## Completion and persisted bounds
+## Completion and state events
+
+Completion aligns with persisted state events:
+
+- `criterion_settled`: a criterion passes when its evidence is accepted for the current run, revision, and HEAD.
+- `task_evidence_accepted`: worker evidence is accepted through `omp_lazy_accept_worker_result` for the current task generation.
+- `workflow_terminal`: the run reaches `completed` or `failed` only after all required criteria are settled.
+
+Current accepted evidence is authoritative. A current `accepted` receipt supersedes stale rejection exhaustion; receipt authority follows the latest accepted state, not the oldest failure.
+
+Persisted bounds:
 
 - Empty required criteria fail closed.
 - Pending, failed, blocked, stale, prior-run, or prior-HEAD evidence never completes.

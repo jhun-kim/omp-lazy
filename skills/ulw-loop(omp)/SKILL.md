@@ -15,6 +15,7 @@ Activate only from the trusted `/ulw-loop(omp)` command or its trusted exact key
 
 - Operate with OMP Goal mode absent. Never activate, create, clear, resume, complete, or mutate Goal mode on the extension's behalf.
 - Treat `.omo/omp-lazy` state and WAL-first transitions as authoritative. Never hand-edit that state.
+- Lifecycle commands execute through the typed kernel: `/ulw-loop(omp) create|status|checkpoint|steer|pause|resume|adopt|cancel`. Model text cannot authorize state changes.
 - Bind every checkpoint and steering document to the exact run, run revision, and current Git HEAD.
 - Keep criteria immutable except for evidence-backed additive steering. Never delete, relax, reclassify, or rewrite a completion gate.
 - Complete a goal only after every required criterion passes with current evidence and required quality or reviewer receipts.
@@ -22,3 +23,17 @@ Activate only from the trusted `/ulw-loop(omp)` command or its trusted exact key
 - Pause and cancel only through explicit commands. Abort, timeout, context pressure, or missing output never implies pause or completion.
 - Use actual task-returned agent and job IDs for `hub` messaging, job control, and `omp_lazy_accept_worker_result`. Requested names and worker prose are not authority.
 - A completed, cancelled, or failed run is isolated from later work. Start unrelated work with a fresh run.
+
+## Compact packet dispatch
+
+Dispatch bounded OMP task work with a compact task packet (schema: `src/contracts/task-packet.ts`). The packet carries criteria, evidence requirements, boundary tags, tier, and tier budget. Workers receive the packet, not prose instructions. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
+
+## Tier-aware execution
+
+Risk sizes the process by tier (FAST, STANDARD, DEEP), classified from boundary tags and allowed-path count:
+
+- FAST: one or two criteria, one real-surface proof, self-review. No independent reviewer.
+- STANDARD: at least three criteria, separate scenarios, optional reviewer.
+- DEEP: at least three criteria, adversarial scenarios, mandatory independent reviewer.
+
+Tier is never downgraded. The tier sizes the process, never the honesty of evidence or cleanup.
