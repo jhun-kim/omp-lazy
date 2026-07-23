@@ -25,6 +25,12 @@ const resolutionInputSchema = z
 
 type ResolutionSource = "user_override" | "agent_default"
 
+const AgentNameDefaultRole: Record<string, string> = {
+  "omp-lazy-worker-low": "@smol",
+  "omp-lazy-worker-medium": "@task",
+  "omp-lazy-worker-high": "@slow",
+}
+
 export type ModelRoleResolutionReceipt =
   | {
       readonly schemaVersion: 1
@@ -106,7 +112,8 @@ export function resolveWorkerModelRole(inputValue: unknown): ModelRoleResolution
   }
   const override = parsed.data.agentModelOverrides[parsed.data.agentName]
   const source: ResolutionSource = override === undefined ? "agent_default" : "user_override"
-  const configured = override ?? parsed.data.agentModel
+  const configured =
+    override ?? parsed.data.agentModel ?? AgentNameDefaultRole[parsed.data.agentName]
   if (configured === undefined) {
     return blocked(
       { agentName: parsed.data.agentName, source, selector: "" },
