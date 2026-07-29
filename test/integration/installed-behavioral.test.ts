@@ -108,6 +108,21 @@ describe("installed behavioral coverage through production surfaces", () => {
     expect(runtime.prompts).toEqual([])
   })
 
+  test("Given a delimited objective When invoked through the registered ulw-loop command Then create is durable", async () => {
+    // Given: the production extension loaded against a clean repository.
+    const root = await workflowRepository("installed-ulw-delimiter")
+    const runtime = await publicWorkflowRuntime(root)
+
+    // When: a leading-delimiter objective runs through the registered ulw-loop command.
+    await runtime.invoke("ulw-loop(omp)", "-- installed delimited objective")
+    await runtime.invoke("ulw-loop(omp)", `status ${runtime.results[0]?.runId}`)
+
+    // Then: the delimiter maps to a durable create and status passes with no model prompt.
+    expect(runtime.results[0]).toMatchObject({ operation: "create", status: "PASS" })
+    expect(runtime.results[1]).toMatchObject({ operation: "status", status: "PASS" })
+    expect(runtime.prompts).toEqual([])
+  })
+
   test("Given a team roster When prepared through registered commands Then the reservation is durable", async () => {
     // Given: an active parent run and a non-overlapping two-member roster.
     const root = await workflowRepository("installed-team")

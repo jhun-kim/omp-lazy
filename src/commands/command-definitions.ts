@@ -55,7 +55,7 @@ export const COMMAND_DEFINITIONS = [
     aliases: [],
     description: "Run or control a bounded ULW goal-independent loop",
     grammar: [
-      "create <objective-text>",
+      "[<objective-text> | create <objective-text> | -- <objective-text>]",
       "status [run-id]",
       "pause [run-id]",
       "resume [run-id]",

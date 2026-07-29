@@ -33,7 +33,7 @@ const EXPECTED_GRAMMAR = {
   ],
   ultrawork: ["[auto|light|heavy] [-- <task-text>]"],
   ulw_loop: [
-    "create <objective-text>",
+    "[<objective-text> | create <objective-text> | -- <objective-text>]",
     "status [run-id]",
     "pause [run-id]",
     "resume [run-id]",

@@ -78,13 +78,29 @@ function parseStart(words: readonly string[]): ParsedWorkflowCommand {
 function parseUlwLoop(words: readonly string[]): ParsedWorkflowCommand {
   const operation = words[0]
   const rest = words.slice(1)
-  if (operation === "create" && rest.length > 0) return valid(operation, rest)
-  if (["status", "pause", "resume", "cancel"].includes(operation ?? "") && rest.length <= 1) {
-    return valid(operation ?? "", rest)
+  if (operation === "--") {
+    return rest.length > 0 && !rest.includes("--") ? valid("create", rest) : invalid()
   }
-  if (operation === "adopt" && rest.length === 1) return valid(operation, rest)
-  if (operation === "checkpoint" && rest.length === 3) return valid(operation, rest)
-  return operation === "steer" && rest.length === 2 ? valid(operation, rest) : invalid()
+  if (words.includes("--")) return invalid()
+  switch (operation) {
+    case undefined:
+      return valid("status", [])
+    case "create":
+      return rest.length > 0 ? valid(operation, rest) : invalid()
+    case "status":
+    case "pause":
+    case "resume":
+    case "cancel":
+      return rest.length <= 1 ? valid(operation, rest) : invalid()
+    case "adopt":
+      return rest.length === 1 ? valid(operation, rest) : invalid()
+    case "checkpoint":
+      return rest.length === 3 ? valid(operation, rest) : invalid()
+    case "steer":
+      return rest.length === 2 ? valid(operation, rest) : invalid()
+    default:
+      return valid("create", words)
+  }
 }
 
 function parseReport(words: readonly string[]): ParsedWorkflowCommand {

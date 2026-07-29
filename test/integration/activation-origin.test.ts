@@ -170,6 +170,48 @@ describe("command grammar", () => {
     expect(parseWorkflowCommand(workflow, args).ok).toBeTrue()
   })
 
+  test("maps convenient ULW loop forms onto typed lifecycle operations", () => {
+    expect(parseWorkflowCommand("ulw_loop", "")).toEqual({
+      ok: true,
+      operation: "status",
+      words: [],
+    })
+    expect(parseWorkflowCommand("ulw_loop", "테스트 작업 수행")).toEqual({
+      ok: true,
+      operation: "create",
+      words: ["테스트", "작업", "수행"],
+    })
+    expect(parseWorkflowCommand("ulw_loop", "-- 테스트 작업 수행")).toEqual({
+      ok: true,
+      operation: "create",
+      words: ["테스트", "작업", "수행"],
+    })
+  })
+
+  test.each([
+    "create",
+    "adopt",
+    "checkpoint run-1",
+    "steer run-1",
+  ])("rejects malformed reserved ULW loop operation: %s", (args) => {
+    expect(parseWorkflowCommand("ulw_loop", args)).toEqual({
+      ok: false,
+      code: "invalid_grammar",
+    })
+  })
+
+  test.each([
+    "--",
+    "objective -- tail",
+    "-- -- repeated",
+    "create -- x",
+  ])("rejects misplaced ULW loop delimiter: %s", (args) => {
+    expect(parseWorkflowCommand("ulw_loop", args)).toEqual({
+      ok: false,
+      code: "invalid_grammar",
+    })
+  })
+
   test("accepts authoritative forms and rejects malformed flags and positions", () => {
     expect(parseWorkflowCommand("start_work", "pause run-1").ok).toBeTrue()
     expect(parseWorkflowCommand("ultrawork", "heavy -- implement safely").ok).toBeTrue()
