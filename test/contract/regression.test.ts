@@ -113,7 +113,7 @@ describe("forged evidence regression", () => {
     expect(HOSTILE_SEEDS).toEqual([1357, 7331, 424242])
     expect(HOSTILE_ENVIRONMENTS).toEqual(["enabled", "disabled", "unlinked"])
     expect(actualRuns).toBe(expectedRuns)
-    expect(HOSTILE_SCENARIO_IDS).toHaveLength(25)
+    expect(HOSTILE_SCENARIO_IDS).toHaveLength(29)
     expect(HOSTILE_SCENARIO_TIMEOUT_CAP_MS).toBe(120_000)
     expect(HOSTILE_OVERALL_TIMEOUT_MS).toBe(900_000)
     expect(scenarioMap.G02).toContain("test/integration/state-root-containment.test.ts")

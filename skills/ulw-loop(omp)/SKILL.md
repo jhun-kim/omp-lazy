@@ -26,7 +26,7 @@ Activate only from the trusted `/ulw-loop(omp)` command or its trusted exact key
 
 ## Compact packet dispatch
 
-Dispatch bounded OMP task work with a compact task packet (schema: `src/contracts/task-packet.ts`). The packet carries criteria, evidence requirements, boundary tags, tier, and tier budget. Workers receive the packet, not prose instructions. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
+Dispatch bounded OMP task work using the host batch form: a `tasks[]` array (one `TaskItem` per dispatch with `name`, `agent`, `task`, and `isolated: true` for worktree isolation) plus a shared `context` string. The compact task packet (schema: `src/contracts/task-packet.ts`) carries criteria, evidence requirements, boundary tags, tier, and tier budget. Workers receive the packet, not prose instructions. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
 
 ## Tier-aware execution
 

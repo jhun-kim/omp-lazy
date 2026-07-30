@@ -18,10 +18,10 @@ async function temporaryEvidence(label: string): Promise<string> {
 }
 
 describe("bounded hostile replay", () => {
-  test("Given the frozen threat registry When loading scenario ownership Then G01-G25 each has tests and an independent bound", async () => {
+  test("Given the frozen threat registry When loading scenario ownership Then G01-G29 each has tests and an independent bound", async () => {
     // Given
     const expected = Array.from(
-      { length: 25 },
+      { length: 29 },
       (_, index) => `G${String(index + 1).padStart(2, "0")}`,
     )
 

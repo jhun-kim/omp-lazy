@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-worker-low
 description: Execute one FAST packet and return compact evidence IDs.
+model:
+  - "@smol"
+  - "@task"
+thinkingLevel: low
 blocking: false
 output:
   type: object

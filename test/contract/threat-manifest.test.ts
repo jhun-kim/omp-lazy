@@ -2,10 +2,10 @@ import { describe, expect, it } from "bun:test"
 import { threatManifest } from "../../scripts/threat-manifest"
 
 describe("threat manifest", () => {
-  it("maps every G01-G25 risk to an independent oracle and attestor", () => {
+  it("maps every G01-G29 risk to an independent oracle and attestor", () => {
     // Given
     const expectedIds = Array.from(
-      { length: 25 },
+      { length: 29 },
       (_, index) => `G${String(index + 1).padStart(2, "0")}`,
     )
 

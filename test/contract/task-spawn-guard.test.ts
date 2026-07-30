@@ -109,7 +109,7 @@ describe("durable fan-out reservation", () => {
     // Then
     expect(hiddenHigh).toEqual({
       block: true,
-      reason: "omp-lazy: agent not allowed by packet",
+      reason: "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-worker-low)",
     })
     expect(allowedLow).toBeUndefined()
     expect(
@@ -289,6 +289,118 @@ describe("durable fan-out reservation", () => {
       { block: true, reason: "omp-lazy: task state conflict" },
       { block: true, reason: "omp-lazy: task state conflict" },
     ])
+  })
+})
+
+describe("corrective spawn-block reasons", () => {
+  test("Given a FAST-tier packet When a tier-ineligible agent is requested Then the reason names the tier and sorted eligible agents", async () => {
+    // Given
+    const root = await temporaryRoot("task-guard-corrective-fast")
+    roots.push(root.displayPath)
+    const { store } = await initializedStore(root)
+    const ledger = new TaskEventLedger(store)
+    const guard = new TaskSpawnGuard(ledger, 3, {
+      packetHash: "f".repeat(64),
+      tier: "FAST",
+      allowedAgentTypes: [
+        "omp-lazy-explorer",
+        "omp-lazy-librarian",
+        "omp-lazy-planner",
+        "omp-lazy-researcher",
+        "omp-lazy-worker-low",
+      ],
+    })
+
+    // When
+    const result = await guard.handle({
+      toolName: "task",
+      toolCallId: "tool-corrective-fast",
+      input: { agent: "omp-lazy-worker-high", task: "attempt escalation" },
+      sessionId: "session-a",
+    })
+
+    // Then: reason preserves the omp-lazy: prefix, includes the tier and sorted eligible agents
+    expect(result).toBeDefined()
+    const blocked = result as { block: true; reason: string }
+    expect(blocked.block).toBe(true)
+    expect(blocked.reason).toContain("omp-lazy: ")
+    expect(blocked.reason).toContain("FAST")
+    expect(blocked.reason).toContain("omp-lazy-explorer")
+    expect(blocked.reason).toContain("omp-lazy-librarian")
+    expect(blocked.reason).toContain("omp-lazy-planner")
+    expect(blocked.reason).toContain("omp-lazy-researcher")
+    expect(blocked.reason).toContain("omp-lazy-worker-low")
+    // Agents must be sorted
+    const reason = blocked.reason
+    const explorerIdx = reason.indexOf("omp-lazy-explorer")
+    const librarianIdx = reason.indexOf("omp-lazy-librarian")
+    const plannerIdx = reason.indexOf("omp-lazy-planner")
+    const researcherIdx = reason.indexOf("omp-lazy-researcher")
+    const workerLowIdx = reason.indexOf("omp-lazy-worker-low")
+    expect(explorerIdx).toBeLessThan(librarianIdx)
+    expect(librarianIdx).toBeLessThan(plannerIdx)
+    expect(plannerIdx).toBeLessThan(researcherIdx)
+    expect(researcherIdx).toBeLessThan(workerLowIdx)
+  })
+
+  test("Given a STANDARD-tier packet When a tier-ineligible agent is requested Then the reason names STANDARD and its sorted eligible agents", async () => {
+    // Given
+    const root = await temporaryRoot("task-guard-corrective-std")
+    roots.push(root.displayPath)
+    const { store } = await initializedStore(root)
+    const ledger = new TaskEventLedger(store)
+    const guard = new TaskSpawnGuard(ledger, 3, {
+      packetHash: "d".repeat(64),
+      tier: "STANDARD",
+      allowedAgentTypes: [
+        "omp-lazy-explorer",
+        "omp-lazy-librarian",
+        "omp-lazy-metis",
+        "omp-lazy-planner",
+        "omp-lazy-qa",
+        "omp-lazy-researcher",
+        "omp-lazy-reviewer",
+        "omp-lazy-worker-low",
+        "omp-lazy-worker-medium",
+      ],
+    })
+
+    // When
+    const result = await guard.handle({
+      toolName: "task",
+      toolCallId: "tool-corrective-std",
+      input: { agent: "omp-lazy-worker-high", task: "attempt deep escalation" },
+      sessionId: "session-a",
+    })
+
+    // Then
+    expect(result).toBeDefined()
+    const blocked = result as { block: true; reason: string }
+    expect(blocked.block).toBe(true)
+    expect(blocked.reason).toContain("omp-lazy: ")
+    expect(blocked.reason).toContain("STANDARD")
+    expect(blocked.reason).toContain("omp-lazy-worker-medium")
+    expect(blocked.reason).not.toContain("omp-lazy-worker-high")
+  })
+
+  test("Given the state-conflict path When it triggers Then it still returns its original reason unchanged", async () => {
+    // Given
+    const root = await temporaryRoot("task-guard-state-conflict-unchanged")
+    roots.push(root.displayPath)
+    const { store } = await initializedStore(root)
+    await writeFile(store.paths.activeIndex, "{not-json", "utf8")
+    const guard = new TaskSpawnGuard(new TaskEventLedger(store), 2)
+
+    // When
+    const result = await guard.handle({
+      toolName: "task",
+      toolCallId: "tool-state-conflict",
+      input: { task: "test" },
+      sessionId: "session-a",
+    })
+
+    // Then: the state-conflict reason is EXACTLY the original string, unchanged
+    expect(result).toEqual({ block: true, reason: "omp-lazy: task state conflict" })
   })
 })
 

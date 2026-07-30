@@ -31,6 +31,10 @@ export const HOSTILE_SCENARIO_IDS = [
   "G23",
   "G24",
   "G25",
+  "G26",
+  "G27",
+  "G28",
+  "G29",
 ] as const
 export const HOSTILE_SCENARIO_TIMEOUT_CAP_MS = 120_000 as const
 export const HOSTILE_OVERALL_TIMEOUT_MS = 900_000 as const
@@ -87,6 +91,10 @@ const scenarioMapSchema = z
     G23: filesSchema,
     G24: filesSchema,
     G25: filesSchema,
+    G26: filesSchema,
+    G27: filesSchema,
+    G28: filesSchema,
+    G29: filesSchema,
   })
   .strict()
 

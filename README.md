@@ -60,7 +60,7 @@ bun run check
 
 The authoritative release gate runs every fast gate and then skill sync, README contract,
 source loader/discovery, committed candidate packing, ordinary-directory staged smoke, hostile
-G01-G25 replay, pinned host preflight, and the platform host gate. Windows runs link/list/doctor
+G01-G29 replay, pinned host preflight, and the platform host gate. Windows runs link/list/doctor
 coverage; Linux and other POSIX hosts run pinned dogfood with profile fingerprint verification.
 Every subgate is mandatory and empty or non-PASS structured evidence fails the release:
 
@@ -84,7 +84,7 @@ ignored local artifacts.
 | Skill sync and README contract | No | Yes | Yes | Yes |
 | Source loader and discovery | No | Yes | Yes | Yes |
 | Committed candidate pack and staged install | No | Yes | Yes | Yes |
-| Hostile G01-G25 replay | No | Yes | Yes | Yes |
+| Hostile G01-G29 replay | No | Yes | Yes | Yes |
 | Pinned OMP 17.0.5 preflight | No | Yes | Yes | Yes |
 | OMP link/list/doctor path | No | Windows | Yes | Through dogfood |
 | Pinned OMP dogfood/profile fingerprint | No | POSIX | No | Yes |
@@ -127,7 +127,7 @@ The alias and expansion columns are an exact machine-checked mirror of `package.
 | `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
 | `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
 | `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |
-| `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | Bounded hostile G01-G25 replay. |
+| `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | Bounded hostile G01-G29 replay. |
 | `test:regression` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/contract/regression.test.ts` | Focused regression suite. |
 | `preflight:omp` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun scripts/preflight-real-omp.ts` | Pinned host and async preflight. |
 | `smoke:loader` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun scripts/probe-loader.ts` | Source entrypoint inventory. |
@@ -260,7 +260,7 @@ records to v2 automatically on first access, under the repository lock, before a
 ## Evidence handoff
 
 `.omo/evidence/**` is ignored and must never be tracked. A source evidence root contains the exact
-T01-T15 receipt set plus the explicit T14 G01-G25 sidecars and only the raw files referenced by the
+T01-T15 receipt set plus the explicit T14 G01-G29 sidecars and only the raw files referenced by the
 T14 aggregate and rejection receipts. The builder rejects missing, extra, empty, symlinked,
 escaping, changed, or non-regular files and writes canonical sorted SHA-256 entries.
 

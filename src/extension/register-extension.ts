@@ -18,6 +18,12 @@ import {
   ProductRuntimeObserver,
   registerProductRuntimeObservers,
 } from "../observers/product-runtime-observer"
+import {
+  deriveModelRole,
+  deriveProgress,
+  StatusLinePublisher,
+  shortRunId,
+} from "../observers/status-line-publisher"
 import { ToolResultObserver } from "../observers/tool-result-observer"
 import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
@@ -77,6 +83,7 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
   const cwdBySession = new Map<string, string>()
   const activation = new ActivationProvenanceController(new ContextualActivationState(cwdBySession))
   const runtimeObserver = new ProductRuntimeObserver()
+  const statusLine = new StatusLinePublisher()
   const budget = new HookBudget(HANDLER_BUDGET)
   const guarded = guardedApi(api, budget)
 
@@ -122,6 +129,17 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
       contextLines.push(
         `Current OMP-lazy ${scope.run.workflow} run ${scope.run.runId} is ${scope.run.payload.status} at revision ${scope.run.revision}.`,
       )
+    }
+
+    // Publish run state to status line when a current run is resolved
+    if (scope.kind === "current") {
+      const modelRole = deriveModelRole(context)
+      statusLine.setRunStatus(context, {
+        workflow: scope.run.workflow,
+        runIdShort: shortRunId(scope.run.runId),
+        progress: deriveProgress(scope.run),
+        modelRole,
+      })
     }
 
     // Resolve and append the directive section when activation is triggered
@@ -192,8 +210,19 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
     },
   })
 
-  registerSessionStop(guarded, createDurableContinuationCoordinator(), activation)
-  registerProductRuntimeObservers(guarded, runtimeObserver)
+  registerSessionStop(guarded, createDurableContinuationCoordinator(), activation, undefined, {
+    resolveRoot: async (cwd) => {
+      const result = await resolveAuthoritativeRoot({ cwd })
+      return result.ok ? result.value : null
+    },
+    resolveActiveRunId: async (root, sessionId) => {
+      const store = new TransactionStore(root)
+      const index = await store.readIndex()
+      const entry = index.entries.find((e) => e.sessionId === sessionId)
+      return entry?.runId ?? null
+    },
+  })
+  registerProductRuntimeObservers(guarded, runtimeObserver, statusLine)
   registerToolCallDispatcher(guarded)
 
   guarded.on("tool_result", async (event, context) => {

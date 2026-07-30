@@ -51,7 +51,7 @@ export async function t14RawEvidenceContracts(
   const reject = rejectSchema.parse(JSON.parse(new TextDecoder().decode(rejectFile.bytes)))
   const scenarioIds = verdict.results.map((result) => result.scenarioId)
   if (JSON.stringify(scenarioIds) !== JSON.stringify(HOSTILE_SCENARIO_IDS)) {
-    throw new EvidenceManifestError("T14 hostile verdict must contain G01-G25 exactly once")
+    throw new EvidenceManifestError("T14 hostile verdict must contain G01-G29 exactly once")
   }
   const contracts = [...verdict.results.flatMap(references), ...references(reject)]
   const paths = contracts.map((contract) => contract.path)

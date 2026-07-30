@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-researcher
 description: Conduct a bounded evidence-saturated research run and return claim-level proof receipts.
+model:
+  - "@task"
+  - "@slow"
+thinkingLevel: high
 blocking: false
 output:
   type: object

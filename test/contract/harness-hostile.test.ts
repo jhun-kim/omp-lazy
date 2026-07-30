@@ -62,7 +62,11 @@ describe("harness hostile fail-closed behavior through installed surfaces", () =
     )
 
     // Then: the unknown agent type is blocked by the production surface.
-    expect(unauthorized).toEqual({ block: true, reason: "omp-lazy: agent not allowed by packet" })
+    expect(unauthorized).toEqual({
+      block: true,
+      reason:
+        "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-explorer, omp-lazy-librarian, omp-lazy-planner, omp-lazy-researcher, omp-lazy-worker-low)",
+    })
   })
 
   test("Given an active FAST packet When a tier-ineligible high worker reaches the registered tool_call handler Then it is blocked", async () => {
@@ -120,8 +124,16 @@ describe("harness hostile fail-closed behavior through installed surfaces", () =
     )
 
     // Then: both tier-ineligible agents are blocked by the production surface.
-    expect(high).toEqual({ block: true, reason: "omp-lazy: agent not allowed by packet" })
-    expect(medium).toEqual({ block: true, reason: "omp-lazy: agent not allowed by packet" })
+    expect(high).toEqual({
+      block: true,
+      reason:
+        "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-explorer, omp-lazy-librarian, omp-lazy-planner, omp-lazy-researcher, omp-lazy-worker-low)",
+    })
+    expect(medium).toEqual({
+      block: true,
+      reason:
+        "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-explorer, omp-lazy-librarian, omp-lazy-planner, omp-lazy-researcher, omp-lazy-worker-low)",
+    })
   })
 
   test("Given an active run When a forged green receipt reaches the registered acceptance tool Then it is rejected", async () => {

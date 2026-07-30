@@ -23,7 +23,7 @@ const scenarioSchema = z
 const rows = [...THREAT_ROWS_PRIMARY, ...THREAT_ROWS_SECONDARY] as const
 
 export const threatManifest = z
-  .object({ schemaVersion: z.literal(1), scenarios: z.array(scenarioSchema).length(25).readonly() })
+  .object({ schemaVersion: z.literal(1), scenarios: z.array(scenarioSchema).length(29).readonly() })
   .parse({
     schemaVersion: 1,
     scenarios: rows.map(

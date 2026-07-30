@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-worker-medium
 description: Repair one STANDARD packet and return compact evidence IDs.
+model:
+  - "@task"
+  - "@slow"
+thinkingLevel: medium
 blocking: false
 output:
   type: object

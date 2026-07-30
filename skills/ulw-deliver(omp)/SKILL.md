@@ -50,7 +50,7 @@ Choose the execution skill based on the plan structure:
 
 Follow the chosen skill's full contract:
 
-1. Use compact task packets (schema: `src/contracts/task-packet.ts`) for worker dispatch.
+1. Use the host batch form for worker dispatch: a `tasks[]` array (one `TaskItem` per dispatch with `name`, `agent`, `task`, and `isolated: true` for worktree isolation) plus a shared `context` string. Compact task packets (schema: `src/contracts/task-packet.ts`) carry criteria, evidence, and boundaries.
 2. Follow RED → GREEN → SURFACE for each criterion.
 3. Use tiered escalation: FAST dispatches a single `@smol` packet; STANDARD escalates
    `@smol → @task`; DEEP escalates `@smol → @task → @slow` with adversarial criteria.

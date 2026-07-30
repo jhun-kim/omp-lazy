@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-planner
 description: OMP-native planning consultant that produces one approval-gated decision-complete plan.
+model:
+  - "@slow"
+  - "@task"
+thinkingLevel: high
 blocking: false
 ---
 

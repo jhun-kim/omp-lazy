@@ -4,8 +4,22 @@ import type {
   SessionStopEventResult,
 } from "@oh-my-pi/pi-coding-agent"
 import type { ActivationSuppressionPort } from "../activation/types"
+import type { CanonicalRoot } from "../state/domain"
+import {
+  checkBudget,
+  exhaustedCounter,
+  incrementCounter,
+  readContinuationCounter,
+  writeContinuationCounter,
+} from "./continuation-budget"
 import type { ContinuationCoordinatorPort } from "./continuation-coordinator"
 import { createDeadlineFence, type DeadlineFence, type MonotonicClock } from "./deadline-fence"
+import { appendSteeringReminder } from "./steering-reminder"
+
+export type ContinuationBudgetPort = {
+  readonly resolveRoot: (cwd: string) => Promise<CanonicalRoot | null>
+  readonly resolveActiveRunId: (root: CanonicalRoot, sessionId: string) => Promise<string | null>
+}
 
 export type SessionStopInput = {
   readonly contextPercent: number | undefined
@@ -25,6 +39,7 @@ export async function handleSessionStop(
     readonly coordinator: ContinuationCoordinatorPort
     readonly suppression: ActivationSuppressionPort
     readonly createFence: FenceFactory
+    readonly budget?: ContinuationBudgetPort
   },
 ): Promise<SessionStopEventResult | undefined> {
   if (
@@ -51,13 +66,46 @@ export async function handleSessionStop(
       sessionId: input.sessionId,
     })
     if (result.kind === "quiet" || !fence.isValid()) return undefined
+
+    // Budget check: guard against unbounded continuations
+    if (dependencies.budget) {
+      const root = await dependencies.budget.resolveRoot(input.cwd)
+      if (!fence.isValid() || root === null) return undefined
+      const runId = await dependencies.budget.resolveActiveRunId(root, input.sessionId)
+      if (!fence.isValid()) return undefined
+      const effectiveRunId = runId ?? "unknown"
+      const counter = await readContinuationCounter(root, input.sessionId)
+      if (!fence.isValid()) return undefined
+      const budgetResult = checkBudget(counter, effectiveRunId, input.diagnosticTurnId)
+      if (!budgetResult.allowed) {
+        const updated = exhaustedCounter(
+          counter,
+          input.sessionId,
+          effectiveRunId,
+          input.diagnosticTurnId,
+        )
+        await writeContinuationCounter(root, updated, fence)
+        return undefined
+      }
+      // Increment counter for the continuation we're about to emit
+      const updated = incrementCounter(
+        counter,
+        input.sessionId,
+        effectiveRunId,
+        input.diagnosticTurnId,
+      )
+      await writeContinuationCounter(root, updated, fence)
+      if (!fence.isValid()) return undefined
+    }
+
+    const steeredContext = appendSteeringReminder(result.additionalContext)
     await dependencies.suppression.suppressNext({
       sessionId: input.sessionId,
-      text: result.additionalContext,
+      text: steeredContext,
       reason: "continuation",
     })
     if (!fence.isValid()) return undefined
-    return { continue: true, additionalContext: result.additionalContext }
+    return { continue: true, additionalContext: steeredContext }
   } catch (error) {
     if (error instanceof Error) return undefined
     throw error
@@ -80,6 +128,7 @@ export function registerSessionStop(
   coordinator: ContinuationCoordinatorPort,
   suppression: ActivationSuppressionPort,
   clock: MonotonicClock = { nowMs: () => performance.now() },
+  budget?: ContinuationBudgetPort,
 ): void {
   api.on("session_stop", async (event, context) => {
     const usage = context.getContextUsage()
@@ -97,6 +146,7 @@ export function registerSessionStop(
         coordinator,
         suppression,
         createFence: () => createDeadlineFence(2_000, clock),
+        ...(budget !== undefined ? { budget } : {}),
       },
     )
   })

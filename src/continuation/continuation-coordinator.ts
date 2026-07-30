@@ -128,8 +128,7 @@ export function decideContinuation(_request: {
         return {
           kind: "continue",
           run: start.run,
-          additionalContext:
-            "Continue the authoritative start-work run. Re-read its contained plan and execute the next pending task under the workflow contract.",
+          additionalContext: startWorkContinuationContext(eligibility.nextTaskId),
           mutation: {
             kind: "continuation_attempted",
             leafId: _request.leafId,
@@ -186,8 +185,7 @@ export function decideContinuation(_request: {
     : {
         kind: "continue",
         run: loop.run,
-        additionalContext:
-          "Continue the authoritative ULW loop run. Re-read its persisted goal and criteria under the workflow contract.",
+        additionalContext: ulwLoopContinuationContext(activeGoal.id, pendingCriterion?.id ?? null),
         mutation: {
           kind: "continuation_attempted",
           leafId: _request.leafId,
@@ -200,6 +198,23 @@ type ResolvedWorkflow =
   | { readonly kind: "absent" }
   | { readonly kind: "conflict" }
   | { readonly kind: "found"; readonly run: AnyRun }
+
+/**
+ * Compute a continuation context that names the specific next task.
+ * This satisfies the requirement that continuation eligibility is computed from
+ * durable state and the context names the next item.
+ */
+function startWorkContinuationContext(nextTaskId: string): string {
+  return `Continue the authoritative start-work run. Next pending task: ${nextTaskId}. Re-read its contained plan and execute this task under the workflow contract.`
+}
+
+/**
+ * Compute a continuation context that names the pending ULW loop criterion.
+ */
+function ulwLoopContinuationContext(goalId: string, criterionId: string | null): string {
+  const criterionSuffix = criterionId !== null ? ` Next pending criterion: ${criterionId}.` : ""
+  return `Continue the authoritative ULW loop run. Active goal: ${goalId}.${criterionSuffix} Re-read its persisted goal and criteria under the workflow contract.`
+}
 
 function hintMatches(entry: ActiveIndexEntry, run: AnyRun): boolean {
   const status = run.payload.status

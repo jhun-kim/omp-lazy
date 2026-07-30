@@ -24,6 +24,7 @@ import {
 import { decodeIrcResult, isHubWaitStatusOnlyResult } from "./irc-result-codec"
 import { decodeJobResult } from "./job-result-codec"
 import { ModelCallObserver, type ModelCallSnapshot } from "./model-call-observer"
+import type { StatusLinePublisher } from "./status-line-publisher"
 
 export const RULES_CUSTOM_TYPE = "omp-lazy-rules-context"
 export const CATALOG_CUSTOM_TYPE = "omp-lazy-catalog-context"
@@ -249,6 +250,7 @@ function injectRulesAndCatalog(
 export function registerProductRuntimeObservers(
   api: Pick<ExtensionAPI, "on">,
   observer: ProductRuntimeObserver,
+  statusLine?: StatusLinePublisher,
 ): void {
   api.on("context", (event, context) =>
     observer.context({
@@ -258,18 +260,24 @@ export function registerProductRuntimeObservers(
       timestamp: Date.now(),
     }),
   )
-  api.on("tool_call", (event, context) =>
-    observer.toolCall(context.sessionManager.getSessionId(), event.toolCallId),
-  )
-  api.on("tool_result", (event, context) =>
-    observer.toolResult({
+  api.on("tool_call", (event, context) => {
+    if (statusLine !== undefined) {
+      statusLine.setWorking(context, `omp-lazy: dispatching ${event.toolName}`)
+    }
+    return observer.toolCall(context.sessionManager.getSessionId(), event.toolCallId)
+  })
+  api.on("tool_result", (event, context) => {
+    if (statusLine !== undefined) {
+      statusLine.setWorking(context, "omp-lazy: processing result")
+    }
+    return observer.toolResult({
       sessionId: context.sessionManager.getSessionId(),
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       content: event.content,
       details: event.details,
-    }),
-  )
+    })
+  })
   api.on("after_provider_response", (event, context) => {
     observer.providerResponse(context.sessionManager.getSessionId(), event)
   })
@@ -278,5 +286,8 @@ export function registerProductRuntimeObservers(
   })
   api.on("session_shutdown", (_event, context) => {
     observer.clear(context.sessionManager.getSessionId())
+    if (statusLine !== undefined) {
+      statusLine.clear(context)
+    }
   })
 }

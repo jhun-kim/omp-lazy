@@ -32,7 +32,7 @@ Lifecycle commands execute through the typed kernel: `/start-work(omp) start|sta
 
 1. Re-read the persisted run and approved `.omo/plans` plan; choose the first unchecked counted task.
 2. Establish a passing baseline where behavior exists, then capture RED before production changes and GREEN after them.
-3. Dispatch bounded OMP task work with a compact task packet (schema: `src/contracts/task-packet.ts`). The packet carries criteria, evidence requirements, boundary tags, tier, and tier budget. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
+3. Dispatch bounded OMP task work using the host batch form: a `tasks[]` array (one `TaskItem` per dispatch with `name`, `agent`, `task`, and `isolated: true` for worktree isolation) plus a shared `context` string. The compact task packet (schema: `src/contracts/task-packet.ts`) carries criteria, evidence requirements, boundary tags, tier, and tier budget. Record actual returned agent and job IDs from the installed observer; requested names are not authority.
 4. Risk-sized evidence by tier: FAST uses one `@smol` attempt; STANDARD escalates `@smol` then `@task`; DEEP escalates `@smol` then `@task` then `@slow`. Tier is classified from boundary tags and allowed-path count and is never downgraded.
 5. Require real-surface QA, applicable adversarial probes, and cleanup receipts current to the run, plan id, task id, attempt, revision, owner epoch, and candidate HEAD.
 6. Submit worker evidence through `omp_lazy_accept_worker_result` from the current parent session. Worker prose, requested names, and self-reported success are untrusted.

@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-metis
 description: Review one grounded plan packet for actionable gaps.
+model:
+  - "@slow"
+  - "@task"
+thinkingLevel: high
 blocking: false
 output:
   type: object

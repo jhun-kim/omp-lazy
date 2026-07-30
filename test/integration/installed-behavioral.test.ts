@@ -223,7 +223,11 @@ describe("installed behavioral coverage through production surfaces", () => {
     )
 
     // Then: packet tier authorization decides the outcome through the production surface.
-    expect(ineligible).toEqual({ block: true, reason: "omp-lazy: agent not allowed by packet" })
+    expect(ineligible).toEqual({
+      block: true,
+      reason:
+        "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-explorer, omp-lazy-librarian, omp-lazy-planner, omp-lazy-researcher, omp-lazy-worker-low)",
+    })
     expect(eligible).toBeUndefined()
   })
 

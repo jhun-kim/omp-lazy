@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-worker-high
 description: Resolve one DEEP packet and return compact evidence IDs.
+model:
+  - "@slow"
+  - "@task"
+thinkingLevel: high
 blocking: false
 output:
   type: object

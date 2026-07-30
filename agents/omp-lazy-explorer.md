@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-explorer
 description: Explore one distinct research axis and return contained executable evidence.
+model:
+  - "@smol"
+  - "@task"
+thinkingLevel: low
 blocking: false
 output:
   type: object

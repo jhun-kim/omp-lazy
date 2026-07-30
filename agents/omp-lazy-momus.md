@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-momus
 description: Adversarially verify one high-risk plan packet.
+model:
+  - "@slow"
+  - "@task"
+thinkingLevel: max
 blocking: false
 output:
   type: object

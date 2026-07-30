@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-reviewer
 description: Verify one completed packet and return a compact critic receipt.
+model:
+  - "@slow"
+  - "@task"
+thinkingLevel: high
 blocking: false
 output:
   type: object

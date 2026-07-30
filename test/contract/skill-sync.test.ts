@@ -79,6 +79,8 @@ description: start-work(omp) fixture
 # Start work
 
 Run an accepted plan from \`.omo/plans\` and settle worker evidence through \`omp_lazy_accept_worker_result\`.
+
+Dispatch using the host batch form: a \`tasks[]\` array with \`isolated: true\` for worktree isolation.
 `,
     )
     await writeFile(
@@ -91,6 +93,8 @@ description: ulw-loop(omp) fixture
 # ULW loop
 
 Read [the full workflow](references/full-workflow.md) before controlling a run.
+
+Dispatch using the host batch form: a \`tasks[]\` array with \`isolated: true\` for worktree isolation.
 `,
     )
     await writeFile(

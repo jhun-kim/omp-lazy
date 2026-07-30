@@ -85,7 +85,11 @@ test("Given an active FAST packet When the public tool_call handler dispatches T
   )
 
   // Then: packet authorization, not task.disabledAgents, decides the pre-host outcome.
-  expect(high).toEqual({ block: true, reason: "omp-lazy: agent not allowed by packet" })
+  expect(high).toEqual({
+    block: true,
+    reason:
+      "omp-lazy: agent not allowed by packet (FAST tier; eligible: omp-lazy-explorer, omp-lazy-librarian, omp-lazy-planner, omp-lazy-researcher, omp-lazy-worker-low)",
+  })
   expect(low).toBeUndefined()
   expect(stale).toBeUndefined()
 })

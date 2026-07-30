@@ -77,5 +77,15 @@
     "test/contract/lcx-contract.test.ts",
     "test/integration/lcx-windows-args.test.ts"
   ],
-  "G25": ["test/contract/package-assets.test.ts", "test/contract/staged-candidate.test.ts"]
+  "G25": ["test/contract/package-assets.test.ts", "test/contract/staged-candidate.test.ts"],
+  "G26": [
+    "test/integration/directive-activation.test.ts",
+    "test/contract/directive-injection.test.ts"
+  ],
+  "G27": ["test/contract/continuation-budget.test.ts", "test/contract/steering-reminder.test.ts"],
+  "G28": [
+    "test/unit/context/rules-assembly.test.ts",
+    "test/contract/context-rules-injection.test.ts"
+  ],
+  "G29": ["test/contract/model-chain-provenance.test.ts"]
 }

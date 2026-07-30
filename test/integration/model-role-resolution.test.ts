@@ -121,8 +121,12 @@ test("Given the shipped worker agents When discovered and resolved Then their ex
     }
   })
 
-  // Then
-  expect(receipts.map((entry) => entry.model)).toEqual([undefined, undefined, undefined])
+  // Then - agents now declare model: arrays (todo 18)
+  expect(receipts.map((entry) => entry.model)).toEqual([
+    ["@smol", "@task"],
+    ["@task", "@slow"],
+    ["@slow", "@task"],
+  ])
   expect(receipts.map((entry) => entry.receipt.status)).toEqual(["PASS", "PASS", "PASS"])
   expect(
     receipts.map((entry) => (entry.receipt.status === "PASS" ? entry.receipt.model : null)),

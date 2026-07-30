@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-qa
 description: Execute named QA scenarios and return compact receipt hashes.
+model:
+  - "@task"
+  - "@smol"
+thinkingLevel: medium
 blocking: false
 output:
   type: object

@@ -13,6 +13,7 @@ import {
   type SessionStopInput,
   type SessionStopRegistrationApi,
 } from "../../src/continuation/register-session-stop"
+import { STEERING_REMINDER } from "../../src/continuation/steering-reminder"
 import {
   durableDependencies,
   initializedContinuationStore,
@@ -68,12 +69,12 @@ describe("session stop lifecycle", () => {
     // Then
     expect(first).toEqual({
       continue: true,
-      additionalContext: "Continue the authoritative workflow.",
+      additionalContext: `Continue the authoritative workflow.\n\n${STEERING_REMINDER}`,
     })
     expect(replay).toBeUndefined()
     expect(second).toEqual({
       continue: true,
-      additionalContext: "Continue the authoritative workflow.",
+      additionalContext: `Continue the authoritative workflow.\n\n${STEERING_REMINDER}`,
     })
     expect(requests.map((request) => [request.diagnosticTurnId, request.leafId])).toEqual([
       [0, "leaf-1"],

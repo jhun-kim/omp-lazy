@@ -60,7 +60,7 @@ bun run check
 
 권위 있는 release gate는 모든 fast gate를 실행한 뒤 skill sync, README contract,
 source loader/discovery, committed candidate packing, ordinary-directory staged smoke, hostile
-G01-G25 replay, pinned host preflight, platform host gate를 실행합니다. Windows는 link/list/doctor
+G01-G29 replay, pinned host preflight, platform host gate를 실행합니다. Windows는 link/list/doctor
 coverage를 실행합니다. Linux와 기타 POSIX host는 profile fingerprint verification이 포함된 pinned dogfood를
 실행합니다. 모든 subgate는 필수이며, 비어 있거나 non-PASS인 structured evidence는 release를 실패시킵니다.
 
@@ -84,7 +84,7 @@ manifest generation은 clean tracked worktree에서만 실행하세요. 생성�
 | Skill sync and README contract | No | Yes | Yes | Yes |
 | Source loader and discovery | No | Yes | Yes | Yes |
 | Committed candidate pack and staged install | No | Yes | Yes | Yes |
-| Hostile G01-G25 replay | No | Yes | Yes | Yes |
+| Hostile G01-G29 replay | No | Yes | Yes | Yes |
 | Pinned OMP 17.0.5 preflight | No | Yes | Yes | Yes |
 | OMP link/list/doctor path | No | Windows | Yes | Through dogfood |
 | Pinned OMP dogfood/profile fingerprint | No | POSIX | No | Yes |
@@ -125,7 +125,7 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 | `test:integration:core` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun test test/integration` | Core integration suite. |
 | `test:integration:capability` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun test test/host-integration` | Isolated real-OMP capability suite. |
 | `test:integration` | `bun scripts/run-integration.ts` | Serial core and real-OMP capability suites. |
-| `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | 경계가 정해진 hostile G01-G25 replay. |
+| `test:hostile` | `bun scripts/run-isolated.ts --timeout-ms 900000 --cwd . --env-profile integration -- bun scripts/replay-hostile.ts` | 경계가 정해진 hostile G01-G29 replay. |
 | `test:regression` | `bun scripts/run-isolated.ts --timeout-ms 120000 --cwd . --env-profile unit -- bun test test/contract/regression.test.ts` | 집중 regression suite. |
 | `preflight:omp` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile omp -- bun scripts/preflight-real-omp.ts` | 고정된 host 및 async preflight. |
 | `smoke:loader` | `bun scripts/run-isolated.ts --timeout-ms 300000 --cwd . --env-profile integration -- bun scripts/probe-loader.ts` | Source entrypoint inventory. |
@@ -257,7 +257,7 @@ durable state record는 명시적 `schemaVersion`을 가집니다. lifecycle sto
 ## Evidence handoff
 
 `.omo/evidence/**`는 ignored 상태이며 절대 tracked되어서는 안 됩니다. source evidence root는 정확한
-T01-T15 receipt set, 명시적 T14 G01-G25 sidecar, 그리고 T14 aggregate 및 rejection receipt가 참조하는 raw file만
+T01-T15 receipt set, 명시적 T14 G01-G29 sidecar, 그리고 T14 aggregate 및 rejection receipt가 참조하는 raw file만
 포함합니다. builder는 누락, 초과, 비어 있음, symlink, escape, 변경, non-regular file을 거부하며 canonical sorted
 SHA-256 entry를 씁니다.
 

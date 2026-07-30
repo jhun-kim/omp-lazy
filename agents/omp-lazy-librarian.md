@@ -1,6 +1,10 @@
 ---
 name: omp-lazy-librarian
 description: Verify cited source material for one research claim without making a conclusion.
+model:
+  - "@smol"
+  - "@task"
+thinkingLevel: low
 blocking: false
 output:
   type: object

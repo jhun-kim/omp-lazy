@@ -4,6 +4,7 @@ import type { ActivationSuppressionPort } from "../../src/activation/types"
 import type { ContinuationCoordinatorPort } from "../../src/continuation/continuation-coordinator"
 import { createDeadlineFence } from "../../src/continuation/deadline-fence"
 import { handleSessionStop } from "../../src/continuation/register-session-stop"
+import { STEERING_REMINDER } from "../../src/continuation/steering-reminder"
 
 type StopHandler = () => Promise<SessionStopEventResult | undefined>
 
@@ -64,7 +65,9 @@ describe("session stop extension order coexistence", () => {
     // Then
     expect(earlier?.additionalContext).toBe("hostile earlier extension")
     expect(callsAfterEarlier).toBe(0)
-    expect(later?.additionalContext).toBe("omp-lazy start-work continuation")
+    expect(later?.additionalContext).toBe(
+      `omp-lazy start-work continuation\n\n${STEERING_REMINDER}`,
+    )
     expect(productCalls).toBe(1)
   })
 })

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    },
+    "overrides": {
+      "additionalProperties": false,
+      "patternProperties": {
+        "^omp-lazy-(worker-low|worker-medium|worker-high|explorer|librarian|researcher|planner|metis|momus|qa|reviewer)$": {
+          "items": {
+            "pattern": "^@(smol|task|slow)$|^[a-z][a-z0-9._-]{0,63}/[a-z][a-z0-9._-]{0,63}$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": ["schemaVersion", "overrides"],
+  "type": "object"
+}

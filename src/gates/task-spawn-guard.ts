@@ -154,7 +154,12 @@ export class TaskSpawnGuard {
             return !requested.success || !allowed.has(requested.data)
           })
         ) {
-          return { block: true, reason: "omp-lazy: agent not allowed by packet" }
+          const tier = parsedPolicy.data.tier
+          const sortedEligible = [...parsedPolicy.data.allowedAgentTypes].sort()
+          return {
+            block: true,
+            reason: `omp-lazy: agent not allowed by packet (${tier} tier; eligible: ${sortedEligible.join(", ")})`,
+          }
         }
       }
       const committed = await this.ledger.reserve(
