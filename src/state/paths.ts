@@ -50,6 +50,37 @@ export function runSnapshotPath(root: CanonicalRoot, runId: Uuid): string {
   return join(statePaths(root).runs, UuidSchema.parse(runId), "run.json")
 }
 
+/**
+ * Identifier pattern for session and run ids used by the three parity record kinds.
+ * Exactly: starts with an alphanumeric character, followed by 0-63 alphanumeric, dot, underscore, or hyphen characters.
+ */
+export const LIFECYCLE_ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/
+
+export function isValidLifecycleId(id: string): boolean {
+  return LIFECYCLE_ID_PATTERN.test(id)
+}
+
+export function directiveActivationPath(root: CanonicalRoot, sessionId: string): string {
+  if (!isValidLifecycleId(sessionId)) {
+    throw new StateRootContainmentError("state_root_escaped")
+  }
+  return join(statePaths(root).root, "directive-activations", `${sessionId}.json`)
+}
+
+export function continuationCounterPath(root: CanonicalRoot, sessionId: string): string {
+  if (!isValidLifecycleId(sessionId)) {
+    throw new StateRootContainmentError("state_root_escaped")
+  }
+  return join(statePaths(root).root, "continuation-counters", `${sessionId}.json`)
+}
+
+export function modelChainProvenancePath(root: CanonicalRoot, runId: string): string {
+  if (!isValidLifecycleId(runId)) {
+    throw new StateRootContainmentError("state_root_escaped")
+  }
+  return join(statePaths(root).root, "model-chain-provenance", `${runId}.json`)
+}
+
 function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
 }

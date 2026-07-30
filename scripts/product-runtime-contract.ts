@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path"
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader"
 import { z } from "zod"
 import { COMMAND_REGISTRATIONS } from "../src/commands/command-definitions"
+import { HANDLER_COUNTS } from "../src/extension/handler-budget"
 import { WORKER_RESULT_TOOL_NAME } from "../src/tools/register-worker-result-tool"
 
 const manifestSchema = z.object({
@@ -37,17 +38,7 @@ export const expectedProductRuntime = {
     "omp-lazy-worker-medium",
   ],
   commandNames: COMMAND_REGISTRATIONS.map((registration) => registration.command.slice(1)).sort(),
-  handlerCounts: {
-    after_provider_response: 1,
-    auto_retry_start: 1,
-    before_agent_start: 1,
-    context: 1,
-    input: 1,
-    session_shutdown: 1,
-    session_stop: 1,
-    tool_call: 2,
-    tool_result: 2,
-  },
+  handlerCounts: HANDLER_COUNTS,
   skillNames: [
     "lcx-contribute-bug-fix(omp)",
     "lcx-doctor(omp)",

@@ -99,7 +99,10 @@ function isLifecyclePath(path: string): boolean {
     /^task-facts\/[0-9a-f-]+\.json$/.test(path) ||
     /^worker-acceptance\/[0-9a-f-]+(?:\.wal\.jsonl|\.json)$/.test(path) ||
     /^worker-rejections\/[0-9a-f-]+\.json$/.test(path) ||
-    /^teams\/[a-z0-9-]+\.json$/.test(path)
+    /^teams\/[a-z0-9-]+\.json$/.test(path) ||
+    /^directive-activations\/[0-9A-Za-z][0-9A-Za-z._-]{0,63}\.json$/.test(path) ||
+    /^continuation-counters\/[0-9A-Za-z][0-9A-Za-z._-]{0,63}\.json$/.test(path) ||
+    /^model-chain-provenance\/[0-9A-Za-z][0-9A-Za-z._-]{0,63}\.json$/.test(path)
   )
 }
 

@@ -7,10 +7,102 @@ const packageSchema = z.object({
   scripts: z.record(z.string().min(1), z.string().min(1)).readonly(),
 })
 
+export type RuntimeBehaviorRow = {
+  readonly id: string
+  readonly en: string
+  readonly ko: string
+  readonly description: string
+}
+
+/**
+ * Single source-of-truth constant for the runtime behavior table.
+ * Both README.md and README.ko.md must contain exactly these rows.
+ */
+export const RUNTIME_BEHAVIOR_ROWS: readonly RuntimeBehaviorRow[] = [
+  {
+    id: "directive_activation",
+    en: "Automatic directive activation",
+    ko: "자동 directive activation",
+    description:
+      "An allowlisted trigger token in a user prompt activates the matching workflow directive as a hidden injected message, with the user's own text byte-identical.",
+  },
+  {
+    id: "idle_continuation",
+    en: "Idle auto-continuation",
+    ko: "유휴 시 자동 continuation",
+    description:
+      "An active start-work plan or ulw-loop goal continues itself on agent idle under a bounded, persisted counter, with a steering reminder instead of a rewritten prompt.",
+  },
+  {
+    id: "delegation_model_chains",
+    en: "Category-equivalent delegation",
+    ko: "카테고리 동등 delegation",
+    description:
+      "Each agent declares an ordered model chain plus thinkingLevel; chain fallback is attempted in order with per-attempt provenance, and blocked spawns return a corrective reason.",
+  },
+  {
+    id: "status_line",
+    en: "Live observability",
+    ko: "실시간 observability",
+    description:
+      "The OMP status line and working message show the active workflow, run, progress and model role, degrading silently when there is no UI.",
+  },
+  {
+    id: "rules_injection",
+    en: "Contextual knowledge injection",
+    ko: "컨텍스트 기반 knowledge injection",
+    description:
+      "Repository-scoped .omo/rules/*.md glob-matched rules and a truncation-safe directive/skill catalog are assembled under an explicit byte budget with deterministic priority.",
+  },
+] as const
+
+export type RuntimeBehaviorVerifyResult =
+  | { readonly status: "PASS"; readonly ids: readonly string[] }
+  | {
+      readonly status: "FAIL"
+      readonly missing: readonly string[]
+      readonly extra: readonly string[]
+    }
+
+/**
+ * Verifies that a markdown string contains exactly the runtime behavior rows
+ * from the source-of-truth constant. Works on in-memory strings (no file I/O).
+ */
+export function verifyRuntimeBehaviorRows(markdown: string): RuntimeBehaviorVerifyResult {
+  const expectedIds = RUNTIME_BEHAVIOR_ROWS.map((row) => row.id).toSorted()
+  const lines = markdown.split(/\r?\n/)
+  const sectionStart = lines.findIndex((line) => line.trim() === "## Runtime behavior")
+  if (sectionStart < 0) {
+    return { status: "FAIL", missing: expectedIds, extra: [] }
+  }
+
+  const foundIds: string[] = []
+  for (const line of lines.slice(sectionStart + 1)) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith("## ") && trimmed !== "## Runtime behavior") break
+    if (!trimmed.startsWith("|")) continue
+    const match = /^\|\s*`([^`]+)`\s*\|/.exec(trimmed)
+    if (match?.[1] !== undefined) {
+      foundIds.push(match[1])
+    }
+  }
+
+  const foundSet = new Set(foundIds)
+  const expectedSet = new Set(expectedIds)
+  const missing = expectedIds.filter((id) => !foundSet.has(id))
+  const extra = foundIds.filter((id) => !expectedSet.has(id))
+
+  if (missing.length === 0 && extra.length === 0) {
+    return { status: "PASS", ids: foundIds.toSorted() }
+  }
+  return { status: "FAIL", missing, extra }
+}
+
 export type ReadmeContractReceipt = {
   readonly agentNames: readonly string[]
   readonly commandNames: readonly string[]
   readonly packageScripts: readonly string[]
+  readonly runtimeBehaviorIds: readonly string[]
   readonly shellCommands: readonly (readonly string[])[]
   readonly skillNames: readonly string[]
   readonly status: "PASS"
@@ -163,8 +255,9 @@ async function verifyCommandReference(
 
 export async function verifyReadmeContract(rootValue: string): Promise<ReadmeContractReceipt> {
   const root = await realpath(rootValue)
-  const [markdown, packageSource] = await Promise.all([
+  const [markdown, koMarkdown, packageSource] = await Promise.all([
     readFile(join(root, "README.md"), "utf8"),
+    readFile(join(root, "README.ko.md"), "utf8"),
     readFile(join(root, "package.json"), "utf8"),
   ])
   const manifest = packageSchema.parse(JSON.parse(packageSource))
@@ -195,10 +288,31 @@ export async function verifyReadmeContract(rootValue: string): Promise<ReadmeCon
   assertExact("product command", commandNames, expectedProductRuntime.commandNames)
   assertExact("skill", skillNames, expectedProductRuntime.skillNames)
   assertExact("agent", agentNames, expectedProductRuntime.agentNames)
+
+  // Verify runtime behavior rows in both READMEs
+  const enResult = verifyRuntimeBehaviorRows(markdown)
+  if (enResult.status === "FAIL") {
+    const parts: string[] = []
+    if (enResult.missing.length > 0) parts.push(`missing: ${enResult.missing.join(", ")}`)
+    if (enResult.extra.length > 0) parts.push(`extra: ${enResult.extra.join(", ")}`)
+    throw new ReadmeContractError(`README.md runtime behavior table mismatch: ${parts.join("; ")}`)
+  }
+
+  const koResult = verifyRuntimeBehaviorRows(koMarkdown)
+  if (koResult.status === "FAIL") {
+    const parts: string[] = []
+    if (koResult.missing.length > 0) parts.push(`missing: ${koResult.missing.join(", ")}`)
+    if (koResult.extra.length > 0) parts.push(`extra: ${koResult.extra.join(", ")}`)
+    throw new ReadmeContractError(
+      `README.ko.md runtime behavior table mismatch: ${parts.join("; ")}`,
+    )
+  }
+
   return {
     agentNames,
     commandNames,
     packageScripts: expectedScripts.map(([name]) => name),
+    runtimeBehaviorIds: enResult.ids,
     shellCommands,
     skillNames,
     status: "PASS",

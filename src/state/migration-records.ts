@@ -261,6 +261,16 @@ export function migrateLifecycleRecord(
       }),
     }
   }
+  if (
+    path.startsWith("directive-activations/") ||
+    path.startsWith("continuation-counters/") ||
+    path.startsWith("model-chain-provenance/")
+  ) {
+    const version = schemaVersion(value)
+    if (version === 2) return { kind: "current", bytes }
+    if (version !== 1) return { kind: "invalid" }
+    return { kind: "migrated", bytes: JSON.stringify({ ...value, schemaVersion: 2 }) }
+  }
   return { kind: "invalid" }
 }
 

@@ -151,6 +151,16 @@ alias와 expansion 열은 `package.json#scripts`를 machine check로 정확히 �
 `verify:candidate`는 제공된 hostile bundle을 조사할 때 package-script separator 뒤에
 `--bundle <verdict.json>`를 받습니다. 이는 live `verify:release`의 대체 수단이 아닙니다.
 
+## Runtime behavior
+
+| Behavior | Description |
+| --- | --- |
+| `directive_activation` | allowlist에 있는 trigger token이 user prompt에 포함되면 해당 workflow directive가 hidden injected message로 활성화되며, user의 원본 text는 byte 단위로 동일하게 유지됩니다. |
+| `idle_continuation` | 활성 start-work plan 또는 ulw-loop goal이 agent idle 시 bounded, persisted counter 아래에서 자체적으로 continuation하며, prompt를 재작성하지 않고 steering reminder를 사용합니다. |
+| `delegation_model_chains` | 각 agent가 ordered model chain과 thinkingLevel을 선언하며, chain fallback이 순서대로 시도되고 per-attempt provenance가 기록되며, blocked spawn은 corrective reason을 반환합니다. |
+| `status_line` | OMP status line과 working message가 활성 workflow, run, progress, model role을 표시하며, UI가 없을 때 silent하게 degradation됩니다. |
+| `rules_injection` | repository 범위 .omo/rules/*.md glob 매칭 rule과 truncation-safe directive/skill catalog가 명시적 byte budget 아래 deterministic priority로 조립됩니다. |
+
 ## Product commands
 
 canonical name과 alias는 모두 정확히 한 번씩 등록됩니다.

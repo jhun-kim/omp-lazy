@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
+import { dirname, join, relative } from "node:path"
 import { migrateLifecycleState, recoverLifecycleMigration } from "../../src/state/migration"
 import { taskIdentities } from "../../src/state/migration-identities"
 import { migrateLifecycleRecord } from "../../src/state/migration-records"
-import { runSnapshotPath, statePaths } from "../../src/state/paths"
+import {
+  continuationCounterPath,
+  directiveActivationPath,
+  isValidLifecycleId,
+  modelChainProvenancePath,
+  runSnapshotPath,
+  statePaths,
+} from "../../src/state/paths"
 import { removeTestTree } from "../fixtures/remove-test-tree"
 import { initializedStore, temporaryRoot } from "../fixtures/store-fixtures"
 import "./state-migration-durable.test"
@@ -15,6 +22,20 @@ async function migrationRoot(label: string) {
   const root = await temporaryRoot(label)
   migrationRoots.push(root.displayPath)
   return root
+}
+
+async function collectRelativePaths(root: string, directory = root): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const result: string[] = []
+  for (const entry of entries) {
+    const full = join(directory, entry.name)
+    if (entry.isDirectory()) {
+      result.push(...(await collectRelativePaths(root, full)))
+    } else if (entry.isFile()) {
+      result.push(relative(root, full).replaceAll("\\", "/"))
+    }
+  }
+  return result
 }
 
 describe("durable lifecycle migration", () => {
@@ -418,5 +439,296 @@ describe("durable lifecycle migration", () => {
 
     // Then
     expect(result).toEqual({ kind: "invalid" })
+  })
+
+  // === BASELINE CHARACTERIZATION: existing record kinds ===
+
+  test("BASELINE: Given a v1 state containing ONLY existing kinds When migrated Then the resulting file set and journal are pinned exactly", async () => {
+    // Given - a v1 root with the exact existing record kinds (same fixture as the first test)
+    const root = await migrationRoot("baseline-existing-kinds")
+    const { run } = await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "teams"), { recursive: true })
+    await writeFile(
+      join(paths.root, "teams", "baseline.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        teamName: "baseline",
+        runId: run.runId,
+        attempt: 0,
+        revision: 1,
+        status: "active",
+        members: [
+          {
+            requestedName: "b-one",
+            agentType: "omp-lazy-worker-low",
+            focus: "first",
+            ownership: ["src/a"],
+            deliverable: "first result",
+            isolated: false,
+            actualAgentId: "baseline-agent-one",
+            actualJobId: "baseline-job-one",
+            worktreePath: null,
+            acceptanceKey: null,
+          },
+          {
+            requestedName: "b-two",
+            agentType: "omp-lazy-worker-high",
+            focus: "second",
+            ownership: ["src/b"],
+            deliverable: "second result",
+            isolated: false,
+            actualAgentId: "baseline-agent-two",
+            actualJobId: "baseline-job-two",
+            worktreePath: null,
+            acceptanceKey: null,
+          },
+        ],
+      }),
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then - pin exact file set
+    expect(result).toEqual({ ok: true, status: "migrated" })
+    const allFiles = await collectRelativePaths(paths.root)
+    const lifecycleFiles = allFiles.filter((f) => !f.startsWith("migration/") && f !== "state.lock")
+    expect(lifecycleFiles.sort()).toEqual(
+      [
+        "active.json",
+        `runs/${run.runId}/run.json`,
+        "events/0000000000000001-55555555-5555-4555-8555-555555555555.json",
+        "teams/baseline.json",
+      ].sort(),
+    )
+    // Verify every file is v2
+    for (const file of lifecycleFiles) {
+      const content = JSON.parse(await readFile(join(paths.root, file), "utf8"))
+      expect(content.schemaVersion).toBe(2)
+    }
+    // Verify the journal has a committed phase
+    const journalPath = join(paths.root, "migration", "journal.json")
+    const journal = JSON.parse(await readFile(journalPath, "utf8"))
+    expect(journal.phase).toBe("committed")
+    expect(journal.schemaVersion).toBe(1)
+    expect(journal.items.length).toBe(lifecycleFiles.length)
+  })
+
+  // === NEW PARITY RECORD KINDS ===
+
+  test("Given a v1 root containing all three new parity kinds When migrated Then all become v2 in ONE journaled transaction", async () => {
+    // Given
+    const root = await migrationRoot("parity-kinds-v1-to-v2")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations"), { recursive: true })
+    await mkdir(join(paths.root, "continuation-counters"), { recursive: true })
+    await mkdir(join(paths.root, "model-chain-provenance"), { recursive: true })
+    await writeFile(
+      join(paths.root, "directive-activations", "session01.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        sessionId: "session01",
+        workflow: "ultrawork",
+        activatedAt: "2026-07-30T00:00:00Z",
+      }),
+    )
+    await writeFile(
+      join(paths.root, "continuation-counters", "session02.json"),
+      JSON.stringify({ schemaVersion: 1, sessionId: "session02", count: 3, maxContinuations: 8 }),
+    )
+    await writeFile(
+      join(paths.root, "model-chain-provenance", "run03.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        runId: "run03",
+        attempts: [{ alias: "@smol", outcome: "ok" }],
+      }),
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then
+    expect(result).toEqual({ ok: true, status: "migrated" })
+    const da = JSON.parse(
+      await readFile(join(paths.root, "directive-activations", "session01.json"), "utf8"),
+    )
+    const cc = JSON.parse(
+      await readFile(join(paths.root, "continuation-counters", "session02.json"), "utf8"),
+    )
+    const mcp = JSON.parse(
+      await readFile(join(paths.root, "model-chain-provenance", "run03.json"), "utf8"),
+    )
+    expect(da.schemaVersion).toBe(2)
+    expect(cc.schemaVersion).toBe(2)
+    expect(mcp.schemaVersion).toBe(2)
+    // Verify ONE journal transaction
+    const journal = JSON.parse(
+      await readFile(join(paths.root, "migration", "journal.json"), "utf8"),
+    )
+    expect(journal.phase).toBe("committed")
+  })
+
+  test("Given a filename violating the id pattern When migration encounters it Then it is refused with migration_recovery_required", async () => {
+    // The id pattern is: ^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$
+    // Invalid ids: starts with dot, has slashes, too long
+    const root = await migrationRoot("parity-invalid-filename")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations"), { recursive: true })
+    // Write a file with an invalid id (starts with dot)
+    await writeFile(
+      join(paths.root, "directive-activations", ".hidden.json"),
+      JSON.stringify({ schemaVersion: 1, sessionId: ".hidden" }),
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then - the isLifecyclePath regex rejects the invalid filename
+    expect(result).toEqual({ ok: false, code: "migration_recovery_required" })
+  })
+
+  test("Given a nested path like directive-activations/a/b.json When migration encounters it Then isLifecyclePath refuses it", async () => {
+    // nested path must be refused - the regex doesn't match nested directories
+    const root = await migrationRoot("parity-nested-path")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations", "a"), { recursive: true })
+    await writeFile(
+      join(paths.root, "directive-activations", "a", "b.json"),
+      JSON.stringify({ schemaVersion: 1, data: "test" }),
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "migration_recovery_required" })
+  })
+
+  test("Given a forced crash at the publish step for new parity kinds When recovery runs Then it restores the COMPLETE v1 set", async () => {
+    // Given
+    const root = await migrationRoot("parity-crash-publish")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations"), { recursive: true })
+    await mkdir(join(paths.root, "continuation-counters"), { recursive: true })
+    await mkdir(join(paths.root, "model-chain-provenance"), { recursive: true })
+    await writeFile(
+      join(paths.root, "directive-activations", "s1.json"),
+      JSON.stringify({ schemaVersion: 1, sessionId: "s1" }),
+    )
+    await writeFile(
+      join(paths.root, "continuation-counters", "s2.json"),
+      JSON.stringify({ schemaVersion: 1, sessionId: "s2", count: 0 }),
+    )
+    await writeFile(
+      join(paths.root, "model-chain-provenance", "r1.json"),
+      JSON.stringify({ schemaVersion: 1, runId: "r1" }),
+    )
+
+    // When - crash at publishing
+    const failed = await migrateLifecycleState({
+      root,
+      crash: (boundary) => {
+        if (boundary === "publishing") throw new Error("injected crash")
+      },
+    })
+    const recovered = await recoverLifecycleMigration(root)
+
+    // Then
+    expect(failed).toEqual({ ok: false, code: "migration_interrupted" })
+    expect(recovered).toEqual({ ok: true, status: "restored" })
+    // All files must still be v1
+    const da = JSON.parse(
+      await readFile(join(paths.root, "directive-activations", "s1.json"), "utf8"),
+    )
+    const cc = JSON.parse(
+      await readFile(join(paths.root, "continuation-counters", "s2.json"), "utf8"),
+    )
+    const mcp = JSON.parse(
+      await readFile(join(paths.root, "model-chain-provenance", "r1.json"), "utf8"),
+    )
+    expect(da.schemaVersion).toBe(1)
+    expect(cc.schemaVersion).toBe(1)
+    expect(mcp.schemaVersion).toBe(1)
+  })
+
+  test("Given an unknown schemaVersion in a new parity record When migrated Then it fails with unknown_schema_version", async () => {
+    // Given
+    const root = await migrationRoot("parity-unknown-version")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations"), { recursive: true })
+    await writeFile(
+      join(paths.root, "directive-activations", "s1.json"),
+      JSON.stringify({ schemaVersion: 99, sessionId: "s1" }),
+    )
+
+    // When
+    const result = await migrateLifecycleState({ root })
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "unknown_schema_version" })
+  })
+
+  test("Given a damaged backup of a new parity kind When recovery runs Then it yields migration_recovery_required with no partial mix", async () => {
+    // Given
+    const root = await migrationRoot("parity-damaged-backup")
+    await initializedStore(root)
+    const paths = statePaths(root)
+    await mkdir(join(paths.root, "directive-activations"), { recursive: true })
+    await writeFile(
+      join(paths.root, "directive-activations", "s1.json"),
+      JSON.stringify({ schemaVersion: 1, sessionId: "s1" }),
+    )
+
+    // Crash at backed_up to ensure backups exist
+    await migrateLifecycleState({
+      root,
+      crash: (boundary) => {
+        if (boundary === "backed_up") throw new Error("injected crash")
+      },
+    })
+    // Damage the backup
+    const backupDir = join(paths.root, "migration", "backup")
+    await writeFile(join(backupDir, "directive-activations", "s1.json"), "corrupt_bytes")
+
+    // When
+    const result = await recoverLifecycleMigration(root)
+
+    // Then
+    expect(result).toEqual({ ok: false, code: "migration_recovery_required" })
+  })
+
+  test("Given valid lifecycle ids Then isValidLifecycleId accepts them", () => {
+    expect(isValidLifecycleId("abc")).toBe(true)
+    expect(isValidLifecycleId("A1")).toBe(true)
+    expect(isValidLifecycleId("session.with_dots-and-dashes")).toBe(true)
+    expect(isValidLifecycleId("0")).toBe(true)
+    expect(isValidLifecycleId("a".repeat(64))).toBe(true)
+  })
+
+  test("Given invalid lifecycle ids Then isValidLifecycleId rejects them", () => {
+    expect(isValidLifecycleId("")).toBe(false)
+    expect(isValidLifecycleId(".starts-dot")).toBe(false)
+    expect(isValidLifecycleId("-starts-dash")).toBe(false)
+    expect(isValidLifecycleId("_starts-underscore")).toBe(false)
+    expect(isValidLifecycleId("has space")).toBe(false)
+    expect(isValidLifecycleId("has/slash")).toBe(false)
+    expect(isValidLifecycleId("a".repeat(65))).toBe(false)
+    expect(isValidLifecycleId("has\ttab")).toBe(false)
+  })
+
+  test("Given path helpers When called with invalid ids Then they throw StateRootContainmentError", () => {
+    const root = { canonicalPath: "/test", displayPath: "/test" } as unknown as Parameters<
+      typeof directiveActivationPath
+    >[0]
+    expect(() => directiveActivationPath(root, ".bad")).toThrow("state_root_escaped")
+    expect(() => continuationCounterPath(root, "/nested")).toThrow("state_root_escaped")
+    expect(() => modelChainProvenancePath(root, "")).toThrow("state_root_escaped")
   })
 })

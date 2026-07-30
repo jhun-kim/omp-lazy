@@ -1,4 +1,6 @@
+import { join } from "node:path"
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent"
+import { resolveDirective, wrapDirective } from "../activation/directive-resolver"
 import { ActivationProvenanceController } from "../activation/provenance-controller"
 import { TransactionActivationState } from "../activation/transaction-activation-state"
 import type { ActivationStatePort, WorkflowActivationId } from "../activation/types"
@@ -21,6 +23,7 @@ import { resolveAuthoritativeRoot } from "../state/repo-root"
 import { TransactionStore } from "../state/transaction-store"
 import { registerWorkerResultTool } from "../tools/register-worker-result-tool"
 import { compilePromptStepContext, compileRunStepContext } from "../workflows/task-packet-compiler"
+import { guardedApi, HANDLER_BUDGET, HookBudget } from "./hook-budget"
 
 class ContextualActivationState implements ActivationStatePort {
   constructor(readonly cwdBySession: ReadonlyMap<string, string>) {}
@@ -42,14 +45,16 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
   const cwdBySession = new Map<string, string>()
   const activation = new ActivationProvenanceController(new ContextualActivationState(cwdBySession))
   const runtimeObserver = new ProductRuntimeObserver()
+  const budget = new HookBudget(HANDLER_BUDGET)
+  const guarded = guardedApi(api, budget)
 
-  api.on("input", async (event, context) => {
+  guarded.on("input", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId()
     cwdBySession.set(sessionId, context.cwd)
     await activation.recordInput({ sessionId, source: event.source, text: event.text })
   })
 
-  api.on("before_agent_start", async (event, context) => {
+  guarded.on("before_agent_start", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId()
     cwdBySession.set(sessionId, context.cwd)
     const promptContext = compilePromptStepContext(event.prompt)
@@ -86,13 +91,37 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
         `Current OMP-lazy ${scope.run.workflow} run ${scope.run.runId} is ${scope.run.payload.status} at revision ${scope.run.revision}.`,
       )
     }
-    if (contextLines.length === 0) return undefined
+
+    // Resolve and append the directive section when activation is triggered
+    let directiveSection: string | null = null
+    let directiveDetails: { workflow: string; skill: string } | null = null
+    if (decision.kind === "activate") {
+      const extensionRoot = join(import.meta.dir, "..", "..")
+      const result = await resolveDirective(decision.workflow, extensionRoot)
+      if (result.kind === "resolved") {
+        directiveSection = wrapDirective(result)
+        directiveDetails = { workflow: result.workflow, skill: result.skill }
+      }
+      // On degradation: no directive section emitted, no exception
+    }
+
+    if (contextLines.length === 0 && directiveSection === null) return undefined
+    const content =
+      directiveSection !== null
+        ? contextLines.length > 0
+          ? `${contextLines.join("\n")}\n${directiveSection}`
+          : directiveSection
+        : contextLines.join("\n")
     return {
       message: {
         customType: "omp-lazy-runtime-context",
-        content: contextLines.join("\n"),
+        content,
         display: false,
-        details: { activation: decision, scope: scope.kind },
+        details: {
+          activation: decision,
+          scope: scope.kind,
+          ...(directiveDetails !== null ? { directive: directiveDetails } : {}),
+        },
       },
     }
   })
@@ -119,11 +148,11 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
     },
   })
 
-  registerSessionStop(api, createDurableContinuationCoordinator(), activation)
-  registerProductRuntimeObservers(api, runtimeObserver)
-  registerToolCallDispatcher(api)
+  registerSessionStop(guarded, createDurableContinuationCoordinator(), activation)
+  registerProductRuntimeObservers(guarded, runtimeObserver)
+  registerToolCallDispatcher(guarded)
 
-  api.on("tool_result", async (event, context) => {
+  guarded.on("tool_result", async (event, context) => {
     const root = await resolveAuthoritativeRoot({ cwd: context.cwd })
     if (!root.ok) return
     await new ToolResultObserver(new TaskEventLedger(new TransactionStore(root.value))).observe({

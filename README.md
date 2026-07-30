@@ -153,6 +153,16 @@ The alias and expansion columns are an exact machine-checked mirror of `package.
 `verify:candidate` accepts `--bundle <verdict.json>` after the package-script separator when
 investigating a supplied hostile bundle. It is not a substitute for live `verify:release`.
 
+## Runtime behavior
+
+| Behavior | Description |
+| --- | --- |
+| `directive_activation` | An allowlisted trigger token in a user prompt activates the matching workflow directive as a hidden injected message, with the user's own text byte-identical. |
+| `idle_continuation` | An active start-work plan or ulw-loop goal continues itself on agent idle under a bounded, persisted counter, with a steering reminder instead of a rewritten prompt. |
+| `delegation_model_chains` | Each agent declares an ordered model chain plus thinkingLevel; chain fallback is attempted in order with per-attempt provenance, and blocked spawns return a corrective reason. |
+| `status_line` | The OMP status line and working message show the active workflow, run, progress and model role, degrading silently when there is no UI. |
+| `rules_injection` | Repository-scoped .omo/rules/*.md glob-matched rules and a truncation-safe directive/skill catalog are assembled under an explicit byte budget with deterministic priority. |
+
 ## Product commands
 
 Both canonical names and aliases are registered exactly once.
