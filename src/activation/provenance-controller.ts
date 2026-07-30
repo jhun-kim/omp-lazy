@@ -72,6 +72,18 @@ export class ActivationProvenanceController implements ActivationSuppressionPort
     this.#pending.delete(sessionId)
     if (token.hash !== hash || this.#commands.has(sessionId)) return { kind: "quiet" }
     if (await this.state.isActive(token.workflow, sessionId)) return { kind: "quiet" }
+
+    // Idempotency: check if this directive was already activated in this session for the current run
+    if (this.state.isDirectiveAlreadyActivated && this.state.currentRunId) {
+      const currentRunId = await this.state.currentRunId(sessionId)
+      const alreadyActivated = await this.state.isDirectiveAlreadyActivated(
+        sessionId,
+        token.workflow,
+        currentRunId,
+      )
+      if (alreadyActivated) return { kind: "quiet" }
+    }
+
     return { kind: "activate", workflow: token.workflow, command: token.command }
   }
 
@@ -90,6 +102,10 @@ export class ActivationProvenanceController implements ActivationSuppressionPort
 
   async runCommand<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
     this.#commands.add(sessionId)
+    // Clear the directive activation record so the next trigger can re-inject
+    if (this.state.clearDirectiveActivation) {
+      await this.state.clearDirectiveActivation(sessionId)
+    }
     try {
       return await operation()
     } finally {

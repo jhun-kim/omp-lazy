@@ -34,6 +34,18 @@ export type ActivationDecision =
 
 export interface ActivationStatePort {
   isActive(workflow: WorkflowActivationId, sessionId: string): Promise<boolean>
+  isDirectiveAlreadyActivated?(
+    sessionId: string,
+    workflow: WorkflowActivationId,
+    currentRunId: string | null,
+  ): Promise<boolean>
+  currentRunId?(sessionId: string): Promise<string | null>
+  recordDirectiveActivation?(
+    sessionId: string,
+    workflow: WorkflowActivationId,
+    runId: string | null,
+  ): Promise<void>
+  clearDirectiveActivation?(sessionId: string): Promise<void>
 }
 
 export interface ActivationSuppressionPort {

@@ -39,6 +39,38 @@ class ContextualActivationState implements ActivationStatePort {
         )
       : false
   }
+
+  async isDirectiveAlreadyActivated(
+    sessionId: string,
+    workflow: WorkflowActivationId,
+    currentRunId: string | null,
+  ): Promise<boolean> {
+    const cwd = this.cwdBySession.get(sessionId)
+    if (cwd === undefined) return false
+    const root = await resolveAuthoritativeRoot({ cwd })
+    if (!root.ok) return false
+    return new TransactionActivationState(
+      new TransactionStore(root.value),
+    ).isDirectiveAlreadyActivated(sessionId, workflow, currentRunId)
+  }
+
+  async currentRunId(sessionId: string): Promise<string | null> {
+    const cwd = this.cwdBySession.get(sessionId)
+    if (cwd === undefined) return null
+    const root = await resolveAuthoritativeRoot({ cwd })
+    if (!root.ok) return null
+    return new TransactionActivationState(new TransactionStore(root.value)).currentRunId(sessionId)
+  }
+
+  async clearDirectiveActivation(sessionId: string): Promise<void> {
+    const cwd = this.cwdBySession.get(sessionId)
+    if (cwd === undefined) return
+    const root = await resolveAuthoritativeRoot({ cwd })
+    if (!root.ok) return
+    return new TransactionActivationState(
+      new TransactionStore(root.value),
+    ).clearDirectiveActivation(sessionId)
+  }
 }
 
 export function registerOmpLazyExtension(api: ExtensionAPI): void {
@@ -101,6 +133,18 @@ export function registerOmpLazyExtension(api: ExtensionAPI): void {
       if (result.kind === "resolved") {
         directiveSection = wrapDirective(result)
         directiveDetails = { workflow: result.workflow, skill: result.skill }
+
+        // Record the activation durably so it won't re-inject on subsequent turns
+        const root = await resolveAuthoritativeRoot({ cwd: context.cwd })
+        if (root.ok) {
+          const activationState = new TransactionActivationState(new TransactionStore(root.value))
+          const currentRunId = scope.kind === "current" ? scope.run.runId : null
+          await activationState.recordDirectiveActivation(
+            sessionId,
+            decision.workflow,
+            currentRunId,
+          )
+        }
       }
       // On degradation: no directive section emitted, no exception
     }
